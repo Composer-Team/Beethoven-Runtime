@@ -1,0 +1,90 @@
+//
+// Created by Chris Kjellqvist on 9/27/22.
+//
+
+#include <composer_verilator_server.h>
+#include "Vcomposer.h"
+#include "cmd_server.h"
+#include "data_server.h"
+
+#include <cstdio>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <tuple>
+
+system_core_pair::system_core_pair(int system, int core) {
+  this->system = system;
+  this->core = core;
+}
+
+
+static void* cmd_server_f(void* server) {
+  mem_interface<SData> axil;
+  auto ds = (cmd_server*)server;
+
+  FILE* f = fopen("/tmp/composer_cmd_server", "w+");
+  int fd_composer = fileno(f);
+  ftruncate(fd_composer, sizeof(cmd_server_file));
+  auto &addr = *(cmd_server_file*)mmap(nullptr, sizeof(cmd_server_file), PROT_READ | PROT_WRITE,
+                                 MAP_SHARED, fd_composer, 0);
+
+  pthread_mutexattr_t attrs;
+  pthread_mutexattr_init(&attrs);
+  pthread_mutexattr_setpshared(&attrs, true);
+
+  pthread_mutex_init(&addr.server_mut, &attrs);
+  pthread_mutex_init(&addr.wait_for_request_process, &attrs);
+  for (unsigned i = 0; i < MAX_CONCURRENT_COMMANDS; ++i) { // NOLINT(modernize-loop-convert)
+    pthread_mutex_init(&addr.wait_for_response[i], &attrs);
+    pthread_mutex_lock(&addr.wait_for_response[i]);
+  }
+  pthread_mutex_init(&addr.free_list_lock, &attrs);
+
+
+  // wait_responses are all initially available
+  for (int i = 0; i < MAX_CONCURRENT_COMMANDS; ++i) addr.free_list[i] = i;
+  addr.free_list_idx = 255;
+
+  std::vector<std::pair<int, FILE*>> alloc;
+
+  pthread_mutex_lock(&addr.server_mut);
+  pthread_mutex_lock(&addr.server_mut);
+  while(!ds->stop_cond) {
+    // allocate space for response
+    pthread_mutex_lock(&addr.free_list_lock);
+    int id = addr.free_list[addr.free_list_idx];
+    addr.free_list_idx--;
+    pthread_mutex_unlock(&addr.free_list_lock);
+
+    // enqueue command for main simulation thread to handle
+    addr.pthread_wait_id = id;
+    pthread_mutex_lock(&ds->cmdserverlock);
+    ds->cmds.push(addr.cmd);
+    // let main thread know how to return result
+    const auto key = system_core_pair(addr.cmd.system_id, addr.cmd.core_id);
+    auto &m = ds->in_flight;
+    std::queue<int> *q;
+    auto iterator = m.find(key);
+    if (iterator == m.end()) {
+      q = new std::queue<int>;
+      m[key] = q;
+    } else
+      q = iterator->second;
+    q->push(id);
+
+    pthread_mutex_unlock(&ds->cmdserverlock);
+    // re-lock self to stall
+    pthread_mutex_lock(&addr.server_mut);
+  }
+
+  return nullptr;
+}
+
+void cmd_server::start() {
+  pthread_create(&thread, nullptr, cmd_server_f, this);
+}
+
+void cmd_server::stop() {
+  stop_cond = true;
+  pthread_join(thread, nullptr);
+}
