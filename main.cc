@@ -6,6 +6,7 @@
 #include <composer_verilator_server.h>
 #include "data_server.h"
 #include "cmd_server.h"
+#include <yaml-cpp/yaml.h>
 
 // in bytes
 #define DATA_BUS_WIDTH 64
@@ -15,11 +16,11 @@ uint64_t main_time = 0;
 
 #define ASSERT(x) if (!(x)) {fprintf(stderr, "Condition " # x " was not met!\n"); exit(1); }
 
-void enqueue_transaction(address_channel<QData> &chan, std::queue<memory_transaction*> &lst) {
+void enqueue_transaction(address_channel<QData> &chan, std::queue<memory_transaction *> &lst) {
   ASSERT(*chan.id < 8)
   if (*chan.valid && *chan.ready) {
     lst.push(
-            new memory_transaction((char *) (*chan.addr), (int)pow(2, *chan.size),
+            new memory_transaction((char *) (*chan.addr), (int) pow(2, *chan.size),
                                    *chan.len + 1, 0, *chan.burst == 0, *chan.id));
   }
 }
@@ -67,35 +68,16 @@ struct response_transaction {
   static const int payload_length = 4;
 };
 
-std::string get_config_path(int argc, char **argv) {
-  char *str = std::getenv("COMPOSER_HARDWARE_DIRS");
-  char delims[] = ":";
-  std::vector<std::string> paths;
-  char * result = strtok( str, delims );
-  while( result != nullptr ) {
-    paths.emplace_back(std::string(result));
-    result = strtok( nullptr, delims );
-  }
-  if (paths.empty()) {
-    std::cerr << "Environment variable $COMPOSER_HARDWARE_DIRS does not contain a path. Please define." << std::endl;
+int main(int argc, char **argv) {
+  auto cfg_path_c = std::getenv("COMPOSER_HARDWARE_DIR");
+  if (cfg_path_c == nullptr) {
+    std::cerr << "COMPOSER_HARDWARE_DIR not set!" << std::endl;
     exit(1);
   }
-  if (paths.size() > 1) {
-    // look for tag that we should use
-    if (argc <= 2) {
-      std::cerr << "More than one composer hardware directory found. Need to define with build tag to use. This"
-                   "should be defined at the top of each hardware directory's top-level build.sbt." << std::endl;
-      exit(1);
-    }
-    std::string tag(argv[1]);
-    std::cerr << "Found tag: " << tag << std::endl;
-    for (auto p: paths) {
-
-    }
-  }
-}
-
-int main(int argc, char **argv) {
+  std::string config_path = std::string(cfg_path_c) + "/composer.yaml";
+  auto cfg = YAML::LoadFile(config_path);
+  auto pack_cfg = composer_pack_info(cfg["system_id_bits"].as<int>(),
+          cfg["core_id_bits"].as<int>());
   // start servers to communicate with user programs
   data_server dataServer{};
   cmd_server cmdServer;
@@ -208,10 +190,10 @@ int main(int argc, char **argv) {
           // consider narrow transfers. Refer to....
           // https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
           int start = (trans->progress * trans->size) % DATA_BUS_WIDTH;
-          char *dest = (char*)i.r->data->m_storage + start;
+          char *dest = (char *) i.r->data->m_storage + start;
           memcpy(dest, trans->addr, trans->size);
           i.current_read_channel_contents = trans->progress;
-          *i.r->last=trans->progress == trans->len-1;
+          *i.r->last = trans->progress == trans->len - 1;
           *i.r->id = trans->id;
         }
       }
@@ -224,7 +206,7 @@ int main(int argc, char **argv) {
         auto trans = i.write_transactions.front();
         // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
         int start = (trans->progress * trans->size) % DATA_BUS_WIDTH;
-        char *src = (char*)i.w->data->m_storage + start;
+        char *src = (char *) i.w->data->m_storage + start;
         uint64_t strobe = *i.w->strobe >> start;
         for (int byte = 0; byte < trans->size; ++byte) {
           if (strobe & 1) {
@@ -326,9 +308,16 @@ int main(int argc, char **argv) {
         top->ocl_0_w_bits_data = 1;
         if (top->ocl_0_w_ready) {
           if (ongoing_rsp.progress == response_transaction::payload_length) {
-            rocc_response r;
+            rocc_response r(ongoing_rsp.resbuf, pack_cfg);
+            system_core_pair pr(r.system_id, r.core_id);
             pthread_mutex_lock(&cmdServer.cmdserverlock);
-            auto q = cmdServer.in_flight[]
+            auto q = cmdServer.in_flight[pr];
+            int id = q->front();
+            csf->responses[id] = r;
+            // allow client thread to access response
+            pthread_mutex_unlock(&csf->wait_for_response[id]);
+            q->pop();
+            pthread_mutex_unlock(&cmdServer.cmdserverlock);
           }
         }
     }

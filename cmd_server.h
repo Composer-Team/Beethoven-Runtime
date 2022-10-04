@@ -7,7 +7,9 @@
 #include <rocc.h>
 #include <queue>
 #include <unordered_map>
+#include "composer_verilator_server.h"
 
+extern cmd_server_file *csf;
 
 struct system_core_pair {
   int system;
@@ -29,7 +31,6 @@ struct std::hash<system_core_pair> {
 
 struct cmd_server {
   bool stop_cond;
-  rocc_response *responses;
 
   pthread_mutex_t cmdserverlock = PTHREAD_MUTEX_INITIALIZER;
   std::queue<rocc_cmd> cmds;

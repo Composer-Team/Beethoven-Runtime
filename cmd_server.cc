@@ -17,6 +17,7 @@ system_core_pair::system_core_pair(int system, int core) {
   this->core = core;
 }
 
+cmd_server_file *csf;
 
 static void* cmd_server_f(void* server) {
   mem_interface<SData> axil;
@@ -27,18 +28,20 @@ static void* cmd_server_f(void* server) {
   ftruncate(fd_composer, sizeof(cmd_server_file));
   auto &addr = *(cmd_server_file*)mmap(nullptr, sizeof(cmd_server_file), PROT_READ | PROT_WRITE,
                                  MAP_SHARED, fd_composer, 0);
+  csf = &addr;
 
   pthread_mutexattr_t attrs;
   pthread_mutexattr_init(&attrs);
   pthread_mutexattr_setpshared(&attrs, true);
 
   pthread_mutex_init(&addr.server_mut, &attrs);
-  pthread_mutex_init(&addr.wait_for_request_process, &attrs);
+  pthread_mutex_init(&addr.cmd_recieve_server_resp_lock, &attrs);
   for (unsigned i = 0; i < MAX_CONCURRENT_COMMANDS; ++i) { // NOLINT(modernize-loop-convert)
     pthread_mutex_init(&addr.wait_for_response[i], &attrs);
     pthread_mutex_lock(&addr.wait_for_response[i]);
   }
   pthread_mutex_init(&addr.free_list_lock, &attrs);
+  pthread_mutex_lock(&addr.cmd_recieve_server_resp_lock);
 
 
   // wait_responses are all initially available
@@ -55,6 +58,11 @@ static void* cmd_server_f(void* server) {
     int id = addr.free_list[addr.free_list_idx];
     addr.free_list_idx--;
     pthread_mutex_unlock(&addr.free_list_lock);
+
+    // return response handle to client
+    addr.pthread_wait_id = id;
+    pthread_mutex_unlock(&addr.cmd_recieve_server_resp_lock);
+    // end return response handle to client
 
     // enqueue command for main simulation thread to handle
     addr.pthread_wait_id = id;
