@@ -12,6 +12,10 @@
 #include <unistd.h>
 #include <tuple>
 
+// for shared memory
+#include <sys/stat.h>
+#include <fcntl.h>
+
 system_core_pair::system_core_pair(int system, int core) {
   this->system = system;
   this->core = core;
@@ -20,11 +24,9 @@ system_core_pair::system_core_pair(int system, int core) {
 cmd_server_file *csf;
 
 static void* cmd_server_f(void* server) {
-  mem_interface<SData> axil;
   auto ds = (cmd_server*)server;
 
-  FILE* f = fopen("/tmp/composer_cmd_server", "w+");
-  int fd_composer = fileno(f);
+  int fd_composer = shm_open(cmd_server_file_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
   ftruncate(fd_composer, sizeof(cmd_server_file));
   auto &addr = *(cmd_server_file*)mmap(nullptr, sizeof(cmd_server_file), PROT_READ | PROT_WRITE,
                                  MAP_SHARED, fd_composer, 0);
@@ -32,7 +34,7 @@ static void* cmd_server_f(void* server) {
 
   pthread_mutexattr_t attrs;
   pthread_mutexattr_init(&attrs);
-  pthread_mutexattr_setpshared(&attrs, true);
+  pthread_mutexattr_setpshared(&attrs, PTHREAD_PROCESS_SHARED);
 
   pthread_mutex_init(&addr.server_mut, &attrs);
   pthread_mutex_init(&addr.cmd_recieve_server_resp_lock, &attrs);
@@ -49,10 +51,11 @@ static void* cmd_server_f(void* server) {
   addr.free_list_idx = 255;
 
   std::vector<std::pair<int, FILE*>> alloc;
-
+  printf("starting up cmd\n");
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
   while(!ds->stop_cond) {
+    printf("\tGot command!\n"); fflush(stdout);
     // allocate space for response
     pthread_mutex_lock(&addr.free_list_lock);
     int id = addr.free_list[addr.free_list_idx];
@@ -84,7 +87,8 @@ static void* cmd_server_f(void* server) {
     // re-lock self to stall
     pthread_mutex_lock(&addr.server_mut);
   }
-
+  munmap(&addr, sizeof(cmd_server_file));
+  shm_unlink(cmd_server_file_name.c_str());
   return nullptr;
 }
 
@@ -94,5 +98,6 @@ void cmd_server::start() {
 
 void cmd_server::stop() {
   stop_cond = true;
+  pthread_mutex_unlock(&csf->server_mut);
   pthread_join(thread, nullptr);
 }

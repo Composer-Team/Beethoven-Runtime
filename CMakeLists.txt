@@ -13,17 +13,27 @@ find_package(yaml-cpp REQUIRED HINTS $ENV{YAML_DIR})
 add_executable(Composer_Verilator main.cc data_server.cc cmd_server.cc)
 target_link_libraries(Composer_Verilator PUBLIC APEX::composer yaml-cpp)
 
+if("${USE_WAVES}" STREQUAL "")
+    set(vargs "${vargs} --trace")
+    endif()
 
 message("$ENV{COMPOSER_HARDWARE_DIR}")
-if($ENV{COMPOSER_HARDWARE_DIR} EQUAL "")
-    message(FATAL_ERROR "COMPOSER_HARDWARE_DIR is not defined")
+if("$ENV{COMPOSER_HARDWARE_DIR}" STREQUAL "")
+    if ("$ENV{COMPOSER_ROOT}" STREQUAL "")
+        message(FATAL_ERROR "Neither COMPOSER_HARDWARE_DIR or COMPOSER_ROOT is defined")
+    else()
+        set(COMPOSER_HWDIR $ENV{COMPOSER_ROOT}/Composer-Hardware)
+    endif()
+else()
+    set(COMPOSER_HWDIR $ENV{COMPOSER_HARDWARE_DIR})
 endif()
 
-if (NOT EXISTS $ENV{COMPOSER_HARDWARE_DIR}/vsim/generated-src/composer.v)
-    message(FATAL_ERROR "$COMPOSER_HARDWARE_DIR/vsim/generated-src/composer.v does not exist. Try building your project.")
+if (NOT EXISTS ${COMPOSER_HWDIR}/vsim/generated-src/composer.v)
+    message(FATAL_ERROR "${COMPOSER_HWDIR}/vsim/generated-src/composer.v does not exist. Try building your project.")
 endif()
 
 verilate(Composer_Verilator
-        SOURCES $ENV{COMPOSER_HARDWARE_DIR}/vsim/generated-src/composer.v TOP_MODULE ComposerTop
-        VERILATOR_ARGS -LDFLAGS "-undefined dynamic_lookup"
+        SOURCES ${COMPOSER_HWDIR}/vsim/generated-src/composer.v TOP_MODULE ComposerTop
+        VERILATOR_ARGS -LDFLAGS "-undefined dynamic_lookup -lpthread" # --threads 2
+        TRACE
         )
