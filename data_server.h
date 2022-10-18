@@ -8,13 +8,39 @@
 #include <verilated.h>
 #include <queue>
 
+struct address_translator {
+  struct addr_pair {
+    uint64_t fpga_addr;
+    uint64_t mapping_length;
+    void* cpu_addr;
+
+    explicit addr_pair(uint64_t fpgaAddr, void *cpuAddr, uint64_t map_length):
+    fpga_addr(fpgaAddr), cpu_addr(cpuAddr), mapping_length(map_length) {}
+
+    bool operator<(const addr_pair &other) const {
+      return fpga_addr < other.fpga_addr;
+    }
+  };
+  std::set<addr_pair> mappings;
+
+  void* translate(uint64_t fp_addr);
+  void add_mapping(uint64_t fpga_addr, uint64_t mapping_length, void * cpu_addr);
+  void remove_mapping(uint64_t fpga_addr);
+
+};
 
 class data_server {
   pthread_t thread;
-  bool stop_cond;
+  bool stop_cond = false;
 public:
+  address_translator at;
   void start();
   void stop();
+
+  [[nodiscard]] bool isStopCond() const;
+  data_server() {
+    at.mappings.clear();
+  }
 };
 
 
@@ -51,20 +77,22 @@ struct address_channel {
   addr_ty *addr = nullptr;
   CData *len = nullptr;
 
-  explicit address_channel(CData *ready = nullptr,
-                           CData *valid = nullptr,
-                           CData *id = nullptr,
-                           CData *size = nullptr,
-                           CData *burst = nullptr,
-                           addr_ty *addr = nullptr,
-                           CData *len = nullptr) :
+  explicit address_channel(CData *ready,
+                           CData *valid,
+                           CData *id,
+                           CData *size ,
+                           CData *burst,
+                           addr_ty *addr,
+                           CData *len) :
           ready(ready),
           valid(valid),
           id(id),
           size(size),
           burst(burst),
           addr(addr),
-          len(len) {}
+          len(len) {
+
+  }
 };
 
 struct data_channel {
@@ -75,12 +103,12 @@ struct data_channel {
   QData *strobe;
   CData *last;
 
-  explicit data_channel(CData *ready = nullptr,
-                        CData *valid = nullptr,
-                        VlWide<16> *data = nullptr,
-                        QData *strobe = nullptr,
-                        CData *last = nullptr,
-                        CData *id = nullptr) :
+  explicit data_channel(CData *ready,
+                        CData *valid,
+                        VlWide<16> *data,
+                        QData *strobe,
+                        CData *last,
+                        CData *id) :
           ready(ready),
           valid(valid),
           data(data),
@@ -95,6 +123,7 @@ struct response_channel {
   CData *id;
 
   std::queue<int> send_ids;
+  int to_enqueue = -1;
   explicit response_channel(CData *ready = nullptr,
                             CData *valid = nullptr,
                             CData *id = nullptr) :

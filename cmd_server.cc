@@ -21,6 +21,8 @@ system_core_pair::system_core_pair(int system, int core) {
   this->core = core;
 }
 
+using namespace composer;
+
 cmd_server_file *csf;
 
 static void* cmd_server_f(void* server) {
@@ -64,7 +66,6 @@ static void* cmd_server_f(void* server) {
 
     // return response handle to client
     addr.pthread_wait_id = id;
-    pthread_mutex_unlock(&addr.cmd_recieve_server_resp_lock);
     // end return response handle to client
 
     // enqueue command for main simulation thread to handle
@@ -72,17 +73,19 @@ static void* cmd_server_f(void* server) {
     pthread_mutex_lock(&ds->cmdserverlock);
     ds->cmds.push(addr.cmd);
     // let main thread know how to return result
-    const auto key = system_core_pair(addr.cmd.system_id, addr.cmd.core_id);
-    auto &m = ds->in_flight;
-    std::queue<int> *q;
-    auto iterator = m.find(key);
-    if (iterator == m.end()) {
-      q = new std::queue<int>;
-      m[key] = q;
-    } else
-      q = iterator->second;
-    q->push(id);
-
+    if (addr.cmd.xd) {
+      const auto key = system_core_pair(addr.cmd.system_id, addr.cmd.core_id);
+      auto &m = ds->in_flight;
+      std::queue<int> *q;
+      auto iterator = m.find(key);
+      if (iterator == m.end()) {
+        q = new std::queue<int>;
+        m[key] = q;
+      } else
+        q = iterator->second;
+      q->push(id);
+    }
+    pthread_mutex_unlock(&addr.cmd_recieve_server_resp_lock);
     pthread_mutex_unlock(&ds->cmdserverlock);
     // re-lock self to stall
     pthread_mutex_lock(&addr.server_mut);
