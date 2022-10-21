@@ -9,7 +9,7 @@
 #include <string>
 
 #include <composer_allocator_declaration.h>
-#include <composer_verilator_server.h>
+#include <composer/verilator_server.h>
 
 #include "data_server.h"
 

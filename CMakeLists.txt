@@ -4,12 +4,9 @@ project(Composer_Verilator)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(verilator REQUIRED)
-find_package(composer REQUIRED)
+find_package(composer 1.0.2 EXACT REQUIRED)
 message("${verilator_FOUND}")
 
-
-message("$ENV{YAML_DIR}")
-find_package(yaml-cpp REQUIRED HINTS $ENV{YAML_DIR})
 add_executable(Composer_Verilator main.cc data_server.cc cmd_server.cc)
 target_link_libraries(Composer_Verilator PUBLIC APEX::composer yaml-cpp)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")

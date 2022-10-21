@@ -4,10 +4,9 @@
 #ifndef COMPOSER_VERILATOR_CMD_SERVER_H
 #define COMPOSER_VERILATOR_CMD_SERVER_H
 
-#include <rocc.h>
 #include <queue>
 #include <unordered_map>
-#include <composer_verilator_server.h>
+#include <composer/verilator_server.h>
 
 extern composer::cmd_server_file *csf;
 

@@ -2,7 +2,7 @@
 // Created by Chris Kjellqvist on 9/27/22.
 //
 
-#include <composer_verilator_server.h>
+#include <composer/verilator_server.h>
 #include "Vcomposer.h"
 #include "cmd_server.h"
 #include "data_server.h"
@@ -73,8 +73,9 @@ static void* cmd_server_f(void* server) {
     pthread_mutex_lock(&ds->cmdserverlock);
     ds->cmds.push(addr.cmd);
     // let main thread know how to return result
-    if (addr.cmd.xd) {
-      const auto key = system_core_pair(addr.cmd.system_id, addr.cmd.core_id);
+    if (addr.cmd.getXd()) {
+      printf("Inserting response wait for command at S_ID-C_ID: %d %d\n", addr.cmd.getSystemId(), addr.cmd.getCoreId());
+      const auto key = system_core_pair(addr.cmd.getSystemId(), addr.cmd.getCoreId());
       auto &m = ds->in_flight;
       std::queue<int> *q;
       auto iterator = m.find(key);

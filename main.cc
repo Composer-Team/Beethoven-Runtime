@@ -3,10 +3,8 @@
 #include <verilated.h>
 #include <Vcomposer.h>
 #include <cinttypes>
-#include <composer_verilator_server.h>
 #include "data_server.h"
 #include "cmd_server.h"
-#include <iostream>
 
 #include <composer_allocator_declaration.h>
 #include "verilated_vcd_c.h"
@@ -92,6 +90,7 @@ int main(int argc, char **argv) {
   top->trace(tfp, 100);
   tfp->open("trace.vcd");
 
+  //
   mem_interface<QData> axi4_mems[1];
   // ugly initializations
   {
@@ -370,11 +369,12 @@ int main(int argc, char **argv) {
             printf("\tGot command from cmd_server!\n");
             bus_occupied = true;
             ongoing_cmd.state = CMD_BITS_WRITE_ADDR;
-            ongoing_cmd.cmdbuf = cmdServer.cmds.front().pack();
+            ongoing_cmd.cmdbuf = cmdServer.cmds.front().pack(pack_cfg);
             std::cout << cmdServer.cmds.front() << std::endl << std::endl;
             ongoing_cmd.progress = 0;
+            if (cmdServer.cmds.front().getXd() == 1)
+              cmds_in_flight++;
             cmdServer.cmds.pop();
-            cmds_in_flight++;
           }
           pthread_mutex_unlock(&cmdServer.cmdserverlock);
         }
