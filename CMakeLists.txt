@@ -8,7 +8,7 @@ find_package(composer 1.0.2 EXACT REQUIRED)
 message("${verilator_FOUND}")
 
 add_executable(Composer_Verilator main.cc data_server.cc cmd_server.cc)
-target_link_libraries(Composer_Verilator PUBLIC APEX::composer yaml-cpp)
+target_link_libraries(Composer_Verilator PUBLIC APEX::composer)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 
 if("${USE_WAVES}" STREQUAL "")
