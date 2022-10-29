@@ -15,17 +15,19 @@
 
 #include <fcntl.h>
 
+#include "fpga_utils.h"
+
 using namespace composer;
 
 static composer::data_server_file *cf;
 
-static void* data_server_f(void* server) {
-  auto *ds = (data_server*)server;
+static void *data_server_f(void *server) {
+  auto *ds = (data_server *) server;
 
   int fd_composer = shm_open(data_server_file_name.c_str(), O_CREAT | O_RDWR, S_IWUSR | S_IRUSR);
   ftruncate(fd_composer, sizeof(data_server_file));
-  auto &addr = *(data_server_file*)mmap(nullptr, sizeof(data_server_file), PROT_READ | PROT_WRITE,
-                    MAP_SHARED, fd_composer, 0);
+  auto &addr = *(data_server_file *) mmap(nullptr, sizeof(data_server_file), PROT_READ | PROT_WRITE,
+                                          MAP_SHARED, fd_composer, 0);
   cf = &addr;
 
   pthread_mutexattr_t attrs;
@@ -46,9 +48,8 @@ static void* data_server_f(void* server) {
   pthread_mutex_lock(&addr.data_cmd_recieve_resp_lock);
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
-  while(!ds->isStopCond()) {
+  while (!ds->isStopCond()) {
     // get file name, descriptor, expand the file, and map it to address space
-    printf("recieved dserver command\n"); fflush(stdout);
     switch (addr.operation) {
       case data_server_op::ALLOC: {
         auto fname = "/tmp/composer_file_" + std::to_string(req_num);
@@ -56,31 +57,42 @@ static void* data_server_f(void* server) {
         ftruncate(nfd, (off_t) addr.op_argument);
         void *naddr = mmap(nullptr, addr.op_argument, PROT_READ | PROT_WRITE,
                            MAP_SHARED, nfd, 0);
-        fprintf(stderr, "Got data cmd and made new filed\n");
         //write response
         // copy file name to response field
         strcpy(addr.fname, fname.c_str());
-        printf("fname is '%s'\n", addr.fname); fflush(stdout);
         // allocate memory
         auto fpga_addr = allocator->remote_alloc(addr.op_argument);
         // add mapping in server
-        printf("completed allocation\n");fflush(stdout);
         ds->at.add_mapping(fpga_addr.getFpgaAddr(), addr.op_argument, naddr);
         // return fpga address
-        printf("added mapping\n"); fflush(stdout);
         addr.op_argument = fpga_addr.getFpgaAddr();
-        printf("added arg to addr: %llu \n", addr.op_argument); fflush(stdout);
         break;
       }
-      case data_server_op::FREE: {
+      case data_server_op::FREE:
         allocator->remote_free(composer::remote_ptr(addr.op_argument, 0));
         ds->at.remove_mapping(addr.op_argument);
         break;
+#ifdef SIM
+        case data_server_op::MOVE_TO_FPGA:
+        case data_server_op::MOVE_FROM_FPGA:
+          fprintf(stderr, "Attempting to perform a FPGA op with a runtime compiled for simulation.\n");
+          break;
+#endif
+#ifdef FPGA
+      case data_server_op::MOVE_FROM_FPGA: {
+        auto *dst = (uint8_t *) addr.op_argument;
+        fpga_dma_burst_read(xdma_read_fd, dst, addr.op3_argument, addr.op2_argument);
+        break;
       }
+      case data_server_op::MOVE_TO_FPGA: {
+        auto *src = (uint8_t *) addr.op2_argument;
+        fpga_dma_burst_write(xdma_write_fd, src, addr.op3_argument, addr.op2_argument);
+        break;
+      }
+#endif
     }
     // un-lock client to read response
     pthread_mutex_unlock(&addr.data_cmd_recieve_resp_lock);
-    printf("unlocked recieve\n"); fflush(stdout);
     // re-lock self to stall
     pthread_mutex_lock(&addr.server_mut);
   }
@@ -104,13 +116,12 @@ bool data_server::isStopCond() const {
 }
 
 void *address_translator::translate(uint64_t fp_addr) {
-  printf("translating %llx\n", fp_addr);
   auto it = mappings.begin();
   while (it != mappings.end()) {
     if (it->fpga_addr <= fp_addr and it->fpga_addr + it->mapping_length > fp_addr) {
       break;
     }
-    it ++;
+    it++;
   }
   if (it == mappings.end()) {
     fprintf(stderr, "BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: %llx\n", fp_addr);
