@@ -75,7 +75,7 @@ static void *data_server_f(void *server) {
 #ifdef SIM
         case data_server_op::MOVE_TO_FPGA:
         case data_server_op::MOVE_FROM_FPGA:
-          fprintf(stderr, "Attempting to perform a FPGA op with a runtime compiled for simulation.\n");
+          // noop
           break;
 #endif
 #ifdef FPGA
