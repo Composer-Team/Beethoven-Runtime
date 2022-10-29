@@ -4,7 +4,7 @@ project(Composer_Verilator)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(verilator REQUIRED)
-find_package(composer 1.0.2 EXACT REQUIRED)
+find_package(composer 1.0.3 EXACT REQUIRED)
 message("${verilator_FOUND}")
 
 add_executable(Composer_Verilator verilator.cc data_server.cc cmd_server.cc main.cc verilator.h fpga_utils.h fpga_utils.cc)
