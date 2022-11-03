@@ -10,12 +10,14 @@
 #include <cstdio>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <composer_allocator_declaration.h>
 #include <tuple>
 
 // for shared memory
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "fpga_utils.h"
 system_core_pair::system_core_pair(int system, int core) {
   this->system = system;
   this->core = core;
@@ -53,11 +55,9 @@ static void* cmd_server_f(void* server) {
   addr.free_list_idx = 255;
 
   std::vector<std::pair<int, FILE*>> alloc;
-  printf("starting up cmd\n");
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
   while(!ds->stop_cond) {
-    printf("\tGot command!\n"); fflush(stdout);
     // allocate space for response
     pthread_mutex_lock(&addr.free_list_lock);
     int id = addr.free_list[addr.free_list_idx];
@@ -71,10 +71,25 @@ static void* cmd_server_f(void* server) {
     // enqueue command for main simulation thread to handle
     addr.pthread_wait_id = id;
     pthread_mutex_lock(&ds->cmdserverlock);
+#ifdef FPGA
+    pthread_mutex_lock(&bus_lock);
+    auto *pack = addr.cmd.pack(pack_cfg);
+    for (int i = 0; i < 5; ++i) { // command is 5 32-bit payloads
+      uint32_t ready = false;
+      while(!ready) {
+        int rc = fpga_pci_peek(pci_bar_handle, CMD_READY, &ready);
+        assert(rc == 0);
+      }
+      fpga_pci_poke(pci_bar_handle, CMD_BITS, pack[i]);
+      fpga_pci_poke(pci_bar_handle, CMD_VALID, 1);
+    }
+    free(pack);
+    pthread_mutex_unlock(&bus_lock);
+#else
     ds->cmds.push(addr.cmd);
+#endif
     // let main thread know how to return result
     if (addr.cmd.getXd()) {
-      printf("Inserting response wait for command at S_ID-C_ID: %d %d\n", addr.cmd.getSystemId(), addr.cmd.getCoreId());
       const auto key = system_core_pair(addr.cmd.getSystemId(), addr.cmd.getCoreId());
       auto &m = ds->in_flight;
       std::queue<int> *q;
