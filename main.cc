@@ -6,7 +6,7 @@
 #include <pthread.h>
 #include "verilator.h"
 #include "fpga_utils.h"
-
+#include "response_poller.h"
 data_server *d_server;
 cmd_server *c_server;
 
@@ -21,6 +21,8 @@ int main(int argc, char **argv) {
 #endif
 #ifdef FPGA
   fpga_setup(0);
+  response_poller poller;
+  poller.start_poller();
 #endif
   pthread_mutex_lock(&main_lock);
   pthread_mutex_lock(&main_lock);

@@ -7,7 +7,8 @@ find_package(verilator REQUIRED)
 find_package(composer 1.0.3 EXACT REQUIRED)
 message("${verilator_FOUND}")
 
-add_executable(Composer_Verilator verilator.cc data_server.cc cmd_server.cc main.cc verilator.h fpga_utils.h fpga_utils.cc)
+add_executable(Composer_Verilator verilator.cc data_server.cc cmd_server.cc main.cc verilator.h fpga_utils.h
+        fpga_utils.cc response_poller.cc response_poller.h)
 target_link_libraries(Composer_Verilator PUBLIC APEX::composer)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS "-DFPGA")
