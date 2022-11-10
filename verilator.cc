@@ -80,6 +80,10 @@ struct response_transaction {
 
 void run_verilator(int argc, char **argv) {
   // start servers to communicate with user programs
+  cmd_server cmdServer;
+  d_server = new data_server;
+  d_server->start();
+  cmdServer.start();
   Verilated::commandArgs(argc, argv);
   top = new Vcomposer;
 

@@ -11,7 +11,6 @@ cmd_server *c_server;
 
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 
-
 int main(int argc, char **argv) {
   d_server = new data_server;
   c_server = new cmd_server;

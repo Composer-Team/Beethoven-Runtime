@@ -15,7 +15,6 @@ int pci_bar_handle;
 int xdma_write_fd;
 int xdma_read_fd;
 
-
 void check_rc(int rc, const std::string &message) {
   if (rc) {
     std::cerr << "Failure: '" << message << "' " << rc << std::endl;
