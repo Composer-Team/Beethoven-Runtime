@@ -61,7 +61,7 @@ static void *data_server_f(void *server) {
         // copy file name to response field
         strcpy(addr.fname, fname.c_str());
         // allocate memory
-        auto fpga_addr = allocator->remote_alloc(addr.op_argument);
+        auto fpga_addr = allocator->malloc(addr.op_argument);
         // add mapping in server
         ds->at.add_mapping(fpga_addr.getFpgaAddr(), addr.op_argument, naddr);
         // return fpga address
@@ -69,7 +69,7 @@ static void *data_server_f(void *server) {
         break;
       }
       case data_server_op::FREE:
-        allocator->remote_free(composer::remote_ptr(addr.op_argument, 0));
+        allocator->free(composer::remote_ptr(addr.op_argument, 0));
         ds->at.remove_mapping(addr.op_argument);
         break;
 #ifdef SIM

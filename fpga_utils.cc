@@ -4,12 +4,10 @@
 
 #ifdef FPGA
 
-#include "fpga_mgmt.h"
-#include "fpga_pci.h"
 #include <iostream>
+#include "fpga_utils.h"
 #include <string>
 #include <sys/fcntl.h>
-#include <fpga_dma.h>
 
 pthread_mutex_t bus_lock;
 int slot_id;
@@ -17,7 +15,6 @@ int pci_bar_handle;
 int xdma_write_fd;
 int xdma_read_fd;
 
-pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void check_rc(int rc, const std::string &message) {
   if (rc) {

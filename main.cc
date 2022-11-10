@@ -5,10 +5,11 @@
 #include "data_server.h"
 #include <pthread.h>
 #include "verilator.h"
-#include "fpga_utils.h"
-#include "response_poller.h"
+
 data_server *d_server;
 cmd_server *c_server;
+
+pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 
 
 int main(int argc, char **argv) {
@@ -17,6 +18,7 @@ int main(int argc, char **argv) {
   d_server->start();
   c_server->start();
 #ifdef SIM
+  printf("Entering verilator\n");
   run_verilator(argc, argv);
 #endif
 #ifdef FPGA
@@ -26,6 +28,7 @@ int main(int argc, char **argv) {
 #endif
   pthread_mutex_lock(&main_lock);
   pthread_mutex_lock(&main_lock);
+  printf("Main thread exiting\n");
 #ifdef FPGA
   fpga_shutdown();
 #endif

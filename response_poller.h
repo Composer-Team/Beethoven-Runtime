@@ -6,7 +6,7 @@
 #define COMPOSER_VERILATOR_RESPONSE_POLLER_H
 
 #include <pthread.h>
-#include <verilator_server.h>
+#include <composer/verilator_server.h>
 #include <thread>
 
 extern composer::cmd_server_file *csf;

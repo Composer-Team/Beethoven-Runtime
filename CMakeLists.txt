@@ -11,7 +11,8 @@ add_executable(Composer_Verilator verilator.cc data_server.cc cmd_server.cc main
         fpga_utils.cc response_poller.cc response_poller.h)
 target_link_libraries(Composer_Verilator PUBLIC APEX::composer)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
-set(CMAKE_CXX_FLAGS "-DFPGA")
+#set(CMAKE_CXX_FLAGS "-DFPGA")
+set(CMAKE_CXX_FLAGS "-DSIM")
 
 if("${USE_WAVES}" STREQUAL "")
     set(vargs "${vargs} --trace")

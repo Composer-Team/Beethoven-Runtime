@@ -15,7 +15,9 @@
 
 Vcomposer *top;
 uint64_t main_time = 0;
-data_server *d_server;
+extern data_server *d_server;
+extern cmd_server *c_server;
+
 
 void enqueue_transaction(address_channel<QData> &chan, std::queue<memory_transaction *> &lst, bool write) {
   if (*chan.valid && *chan.ready) {
@@ -78,10 +80,6 @@ struct response_transaction {
 
 void run_verilator(int argc, char **argv) {
   // start servers to communicate with user programs
-  cmd_server cmdServer;
-  d_server = new data_server;
-  d_server->start();
-  cmdServer.start();
   Verilated::commandArgs(argc, argv);
   top = new Vcomposer;
 
@@ -147,14 +145,16 @@ void run_verilator(int argc, char **argv) {
   int cmds_in_flight = 0;
   bool bus_occupied = false;
   int check_freq = 50;
-
-  while (main_time < 100000) {
+  bool kill_sig = false;
+  printf("main time %lld\n", main_time);
+  while (not kill_sig) {
     // clock is high after posedge - changes now are taking place after posedge,
     // and will take effect on negedge
-    main_time++;
-    if (main_time % 10000 == 0) {
+    main_time ++;
+    if (main_time % 10000 <= 1) {
       printf("main time: %lld\n", main_time);
     }
+
 
     // ------------ HANDLE COMMAND INTERFACE ----------------
 
@@ -355,19 +355,20 @@ void run_verilator(int argc, char **argv) {
         break;
       case CMD_INACTIVE:
         if (ongoing_cmd.ready_for_command && !bus_occupied) {
-          pthread_mutex_lock(&cmdServer.cmdserverlock);
-          if (not cmdServer.cmds.empty()) {
+          pthread_mutex_lock(&c_server->cmdserverlock);
+          if (not c_server->cmds.empty()) {
             printf("\tGot command from cmd_server!\n");
             bus_occupied = true;
             ongoing_cmd.state = CMD_BITS_WRITE_ADDR;
-            ongoing_cmd.cmdbuf = cmdServer.cmds.front().pack(pack_cfg);
-            std::cout << cmdServer.cmds.front() << std::endl << std::endl;
+            ongoing_cmd.cmdbuf = c_server->cmds.front().pack(pack_cfg);
+            kill_sig = c_server->cmds.front().getOpcode() == ROCC_OP_FLUSH;
+            std::cout << c_server->cmds.front() << std::endl << std::endl;
             ongoing_cmd.progress = 0;
-            if (cmdServer.cmds.front().getXd() == 1)
+            if (c_server->cmds.front().getXd() == 1)
               cmds_in_flight++;
-            cmdServer.cmds.pop();
+            c_server->cmds.pop();
           }
-          pthread_mutex_unlock(&cmdServer.cmdserverlock);
+          pthread_mutex_unlock(&c_server->cmdserverlock);
         }
         break;
     }
@@ -415,14 +416,14 @@ void run_verilator(int argc, char **argv) {
             if (ongoing_rsp.progress == response_transaction::payload_length) {
               composer::rocc_response r(ongoing_rsp.resbuf, pack_cfg);
               system_core_pair pr(r.system_id, r.core_id);
-              pthread_mutex_lock(&cmdServer.cmdserverlock);
-              auto q = cmdServer.in_flight[pr];
+              pthread_mutex_lock(&c_server->cmdserverlock);
+              auto q = c_server->in_flight[pr];
               int id = q->front();
               csf->responses[id] = r;
               // allow client thread to access response
               pthread_mutex_unlock(&csf->wait_for_response[id]);
               q->pop();
-              pthread_mutex_unlock(&cmdServer.cmdserverlock);
+              pthread_mutex_unlock(&c_server->cmdserverlock);
               cmds_in_flight--;
               bus_occupied = false;
               printf("respt-ready-b -> respt-inactive\n");
@@ -525,7 +526,7 @@ void run_verilator(int argc, char **argv) {
   d_server->stop();
   printf("trying to close cmd\n");
   fflush(stdout);
-  cmdServer.stop();
+  c_server->stop();
   printf("printing traces\n");
   fflush(stdout);
   tfp->close();
