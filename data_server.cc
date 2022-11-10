@@ -56,7 +56,7 @@ static void *data_server_f(void *server) {
     // get file name, descriptor, expand the file, and map it to address space
     switch (addr.operation) {
       case data_server_op::ALLOC: {
-        auto fname = "/tmp/composer_file_" + std::to_string(req_num);
+        auto fname = "/composer_file_" + std::to_string(req_num);
         req_num++;
         int nfd = shm_open(fname.c_str(), O_CREAT | O_RDWR, S_IWUSR | S_IRUSR);
         ftruncate(nfd, (off_t) addr.op_argument);
