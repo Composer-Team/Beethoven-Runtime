@@ -17,7 +17,7 @@ Vcomposer *top;
 uint64_t main_time = 0;
 extern data_server *d_server;
 extern cmd_server *c_server;
-
+bool kill_sig = false;
 
 void enqueue_transaction(address_channel<QData> &chan, std::queue<memory_transaction *> &lst, bool write) {
   if (*chan.valid && *chan.ready) {
@@ -145,7 +145,6 @@ void run_verilator(int argc, char **argv) {
   int cmds_in_flight = 0;
   bool bus_occupied = false;
   int check_freq = 50;
-  bool kill_sig = false;
   printf("main time %lld\n", main_time);
   while (not kill_sig) {
     // clock is high after posedge - changes now are taking place after posedge,

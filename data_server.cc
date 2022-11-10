@@ -17,6 +17,10 @@
 
 #include "fpga_utils.h"
 
+#ifdef SIM
+extern bool kill_sig;
+#endif
+
 using namespace composer;
 
 static composer::data_server_file *cf;
@@ -53,6 +57,7 @@ static void *data_server_f(void *server) {
     switch (addr.operation) {
       case data_server_op::ALLOC: {
         auto fname = "/tmp/composer_file_" + std::to_string(req_num);
+        req_num++;
         int nfd = shm_open(fname.c_str(), O_CREAT | O_RDWR, S_IWUSR | S_IRUSR);
         ftruncate(nfd, (off_t) addr.op_argument);
         void *naddr = mmap(nullptr, addr.op_argument, PROT_READ | PROT_WRITE,
@@ -125,7 +130,12 @@ void *address_translator::translate(uint64_t fp_addr) {
   }
   if (it == mappings.end()) {
     fprintf(stderr, "BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: %llx\n", fp_addr);
+#ifdef SIM
+    kill_sig = true;
+    return nullptr;
+#else
     exit(1);
+#endif
   }
   if (it->fpga_addr + it->mapping_length <= fp_addr) {
     fprintf(stderr, "ADDRESS IS OUT OF BOUNDS FROM FPGA -> CPU\n");
