@@ -52,6 +52,8 @@ struct memory_transaction {
   int id;
   bool fixed;
   uint64_t fpga_addr;
+  int dram_tx_len = 0;
+  int dram_tx_progress = 0;
 
   memory_transaction(char *addr,
                      int size,
@@ -144,6 +146,13 @@ struct mem_interface {
   response_channel *b = nullptr;
   std::queue<memory_transaction*> write_transactions;
   std::queue<memory_transaction*> read_transactions;
+#ifdef USE_DRAMSIM
+  memory_transaction* to_enqueue_read = nullptr;
+  memory_transaction* to_enqueue_write = nullptr;
+  int r_progress = 0;
+  int w_progress = 0;
+#endif
+
   int current_read_channel_contents = -1;
 };
 

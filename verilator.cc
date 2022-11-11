@@ -31,13 +31,14 @@ bool kill_sig = false;
 #ifdef USE_DRAMSIM
 std::vector<dramsim3::JedecDRAMSystem *> mem_sys;
 Config dramsim3config("../DRAMsim3/configs/DDR4_8Gb_x16_2666.ini", "./");
-std::map<uint64_t, std::queue<memory_transaction *> *> in_flight_ddrs;
+std::map<uint64_t, std::queue<memory_transaction *> *> in_flight_reads;
+std::map<uint64_t, std::queue<memory_transaction *> *> in_flight_writes;
 #endif
 
 void enqueue_transaction(v_address_channel<QData> &chan, std::queue<memory_transaction *> &lst) {
   if (*chan.valid && *chan.ready) {
     char *addr = (char *) d_server->at.translate(*chan.addr);
-    auto tx = new memory_transaction(addr, (int) pow(2, *chan.size),
+    auto tx = new memory_transaction(addr, 1 << *chan.size,
                                      *chan.len + 1, 0, *chan.burst == 0, *chan.id, *chan.addr);
     lst.push(tx);
   }
@@ -111,17 +112,22 @@ void run_verilator(int argc, char **argv) {
             dramsim3config,
             "",
             [&axi4_mem](uint64_t addr) {
-              char *ad = (char *) d_server->at.translate(addr);
-              auto tx = in_flight_ddrs[addr]->front();
-              axi4_mem.read_transactions.push(tx);
-              in_flight_ddrs[addr]->pop();
+              auto tx = in_flight_reads[addr]->front();
+              tx->progress--;
+              if (tx->progress == 0) {
+                axi4_mem.read_transactions.push(tx);
+              }
+              in_flight_reads[addr]->pop();
               printf("read transaction finish %x\n", tx->id);
             },
             [&axi4_mem](uint64_t addr) {
-              auto tx = in_flight_ddrs[addr]->front();
-              in_flight_ddrs[addr]->pop();
-              axi4_mem.b->to_enqueue = tx->id;
-              delete tx;
+              auto tx = in_flight_writes[addr]->front();
+              tx->progress--;
+              if (tx->progress == 0) {
+                axi4_mem.b->to_enqueue = tx->id;
+                delete tx;
+              }
+              in_flight_writes[addr]->pop();
 //              axi4_mem.write_transactions.push(new memory_transaction(ad, size, len, 0, false, id, addr));
               printf("write transaction finish\n");
             });
@@ -147,12 +153,11 @@ void run_verilator(int argc, char **argv) {
   for (auto &mem: axi4_mems) {
 #ifndef USE_DRAMSIM
     *mem.ar->ready = 1;
-    *mem.aw->ready = 1;
+    *mem.w->ready = 0;
 #endif
     *mem.r->valid = 0;
-    *mem.w->ready = 0;
     *mem.b->valid = 0;
-
+    *mem.aw->ready = 1;
   }
 
   top->clock = 1;
@@ -190,7 +195,7 @@ void run_verilator(int argc, char **argv) {
     // ------------ HANDLE MEMORY INTERFACES ----------------
     for (int inter_idx = 0; inter_idx < NUM_DDR_CHANNELS; ++inter_idx) {
       mem_interface<QData> &inter = axi4_mems[inter_idx];
-      if (not inter.read_transactions.empty() && not*inter.r->valid) {
+      if (not inter.read_transactions.empty() && not *inter.r->valid) {
         auto tx = inter.read_transactions.front();
         int start = (tx->progress * tx->size) % DATA_BUS_WIDTH;
         char *dest = (char *) inter.r->data->m_storage + start;
@@ -238,8 +243,12 @@ void run_verilator(int argc, char **argv) {
       // to be recieved. ready and valid have to be high at the same time for this
       // to work
       if (not inter.write_transactions.empty() and not*inter.w->ready) {
+#ifdef USE_DRAMSIM
+        *inter.w->ready = inter.to_enqueue_write == nullptr;
+#else
         *inter.w->ready = 1;
-        if (*inter.w->valid) {
+#endif
+        if (*inter.w->valid && *inter.w->ready) {
           auto trans = inter.write_transactions.front();
           printf("Handling write transaction: addr %16llx, id: %d\n", (uint64_t) trans->addr, trans->id);
           // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
@@ -256,21 +265,21 @@ void run_verilator(int argc, char **argv) {
             off += 1;
             strobe >>= 1;
           }
+          trans->progress++;
+
           if (*inter.w->last) {
             printf("Enqueuing %d to be succeeded \n", trans->id);
             inter.write_transactions.pop();
 #ifdef USE_DRAMSIM
-            mem_sys[inter_idx]->AddTransaction(trans->fpga_addr, true);
-            if (in_flight_ddrs.find(trans->fpga_addr) == in_flight_ddrs.end()) {
-              in_flight_ddrs[trans->fpga_addr] = new std::queue<memory_transaction*>;
-            }
-            in_flight_ddrs[trans->fpga_addr]->push(trans);
+            trans->dram_tx_progress = 0;
+            trans->dram_tx_len = trans->len * trans->size >> 3;
+            trans->progress = trans->dram_tx_len;
+            inter.to_enqueue_write = trans;
 #else
             inter.b->to_enqueue = trans->id;
             delete trans;
 #endif
           }
-          trans->progress++;
           if (not trans->fixed) {
             trans->addr += trans->size;
           }
@@ -283,24 +292,55 @@ void run_verilator(int argc, char **argv) {
 #ifdef USE_DRAMSIM
       if (*axi4_mems[inter_idx].ar->ready && *axi4_mems[inter_idx].ar->valid) {
         uint64_t addr = *axi4_mems[inter_idx].ar->addr;
-        mem_sys[inter_idx]->AddTransaction(addr, false);
-        if (in_flight_ddrs.find(addr) == in_flight_ddrs.end()) {
-          in_flight_ddrs[addr] = new std::queue<memory_transaction *>;
-        }
         char *ad = (char *) d_server->at.translate(addr);
-        in_flight_ddrs[addr]->push(new memory_transaction(ad, (int) (pow(2, *axi4_mems[inter_idx].ar->size)),
-                                                          *axi4_mems[inter_idx].ar->len + 1, 0, false,
-                                                          *axi4_mems[inter_idx].ar->id, addr));
-        *axi4_mems[inter_idx].ar->ready = false;
+        auto txsize = (int) pow(2, *axi4_mems[inter_idx].ar->size);
+        auto txlen = *axi4_mems[inter_idx].ar->len + 1;
+        auto dram_txlen = txsize * txlen >> 3;
+        if (dram_txlen == 0) dram_txlen = 1;
+        auto tx = new memory_transaction(ad, txsize, txlen, dram_txlen, false,
+                                         *axi4_mems[inter_idx].ar->id, addr);
+        // 64b per DRAM transaction
+        tx->dram_tx_len = dram_txlen;
+        inter.to_enqueue_read = tx;
+        tx->dram_tx_progress = 0;
         printf("enqueue ID %x\n", *axi4_mems[inter_idx].ar->id);
-      } else {
-        *axi4_mems[inter_idx].ar->ready = mem_sys[inter_idx]->WillAcceptTransaction(0, false);
       }
-      if (*axi4_mems[inter_idx].aw->ready && *axi4_mems[inter_idx].aw->valid) {
-        *axi4_mems[inter_idx].aw->ready = false;
-      } else {
-        *axi4_mems[inter_idx].aw->ready = mem_sys[inter_idx]->WillAcceptTransaction(0, true);
+
+      if (inter.to_enqueue_read != nullptr) {
+        auto &r = *inter.to_enqueue_read;
+        auto fpga_init = r.fpga_addr;
+        auto fpga_addr = fpga_init + 8 * r.dram_tx_progress;
+        if (mem_sys[inter_idx]->WillAcceptTransaction(fpga_addr, false)) {
+          mem_sys[inter_idx]->AddTransaction(fpga_addr, false);
+          if (in_flight_reads.find(fpga_addr) == in_flight_reads.end())
+            in_flight_reads[fpga_addr] = new std::queue<memory_transaction*>();
+          auto &q = *in_flight_reads[fpga_addr];
+          q.push(&r);
+          printf("enqueueing %x\n", fpga_addr);
+          r.dram_tx_progress++;
+        }
+        if (r.dram_tx_len == r.dram_tx_progress) {
+          inter.to_enqueue_read = nullptr;
+        }
       }
+
+      if (inter.to_enqueue_write != nullptr) {
+        auto &w = *inter.to_enqueue_write;
+        auto fpga_addr = w.fpga_addr + w.dram_tx_progress * 8;
+        if (mem_sys[inter_idx]->WillAcceptTransaction(fpga_addr, true)) {
+          w.dram_tx_progress++;
+          mem_sys[inter_idx]->AddTransaction(fpga_addr, true);
+          if (in_flight_writes.find(fpga_addr) == in_flight_writes.end())
+            in_flight_writes[fpga_addr] = new std::queue<memory_transaction*>;
+          in_flight_writes[fpga_addr]->push(&w);
+        }
+        if (w.dram_tx_progress == w.dram_tx_len) {
+          inter.to_enqueue_write = nullptr;
+        }
+      }
+
+      // to signify that the AXI4 DDR Controller is busy enqueueing another transaction in the DRAM
+      *inter.ar->ready = inter.to_enqueue_read == nullptr;
 #else
       enqueue_transaction(*i.ar, i.read_transactions);
 #endif
