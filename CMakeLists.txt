@@ -4,11 +4,27 @@ project(Composer_Verilator)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(verilator REQUIRED)
-find_package(composer 1.0.4 EXACT REQUIRED)
+find_package(composer 1.0.5 EXACT REQUIRED)
 message("${verilator_FOUND}")
 
 add_executable(Composer_Verilator verilator.cc data_server.cc cmd_server.cc main.cc verilator.h fpga_utils.h
         fpga_utils.cc response_poller.cc response_poller.h)
+
+if("${USE_DRAMSIM}" STREQUAL "1")
+    message("hello")
+    add_subdirectory(DRAMsim3)
+    target_compile_definitions(Composer_Verilator PRIVATE USE_DRAMSIM=1)
+endif()
+
+
+target_link_libraries(Composer_Verilator PRIVATE dramsim3 args)
+target_compile_options(Composer_Verilator PRIVATE)
+set_target_properties(Composer_Verilator PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS NO
+        )
+
 target_link_libraries(Composer_Verilator PUBLIC APEX::composer)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 #set(CMAKE_CXX_FLAGS "-DFPGA")
@@ -16,7 +32,8 @@ set(CMAKE_CXX_FLAGS "-DSIM")
 
 if("${USE_WAVES}" STREQUAL "")
     set(vargs "${vargs} --trace")
-    endif()
+endif()
+
 
 if (NOT "$ENV{COMPOSER_AWS_SDK_DIR}" STREQUAL "")
     include_directories($ENV{COMPOSER_AWS_SDK_DIR}/sdk/userspace/include)

@@ -51,24 +51,27 @@ struct memory_transaction {
   int progress;
   int id;
   bool fixed;
+  uint64_t fpga_addr;
 
   memory_transaction(char *addr,
                      int size,
                      int len,
                      int progress,
                      bool fixed,
-                     int id) :
+                     int id,
+                     uint64_t fpga_addr) :
           addr(addr),
           size(size),
           len(len),
           progress(progress),
           fixed(fixed),
-          id(id) {}
+          id(id),
+          fpga_addr(fpga_addr){}
 
   memory_transaction() = delete;
 };
 template<typename addr_ty>
-struct address_channel {
+struct v_address_channel {
   CData *ready = nullptr;
   CData *valid = nullptr;
   CData *id = nullptr;
@@ -77,13 +80,13 @@ struct address_channel {
   addr_ty *addr = nullptr;
   CData *len = nullptr;
 
-  explicit address_channel(CData *ready,
-                           CData *valid,
-                           CData *id,
-                           CData *size ,
-                           CData *burst,
-                           addr_ty *addr,
-                           CData *len) :
+  explicit v_address_channel(CData *ready,
+                             CData *valid,
+                             CData *id,
+                             CData *size ,
+                             CData *burst,
+                             addr_ty *addr,
+                             CData *len) :
           ready(ready),
           valid(valid),
           id(id),
@@ -134,8 +137,8 @@ struct response_channel {
 
 template<typename addr_ty>
 struct mem_interface {
-  address_channel<addr_ty> *aw = nullptr;
-  address_channel<addr_ty> *ar = nullptr;
+  v_address_channel<addr_ty> *aw = nullptr;
+  v_address_channel<addr_ty> *ar = nullptr;
   data_channel *w = nullptr;
   data_channel *r = nullptr;
   response_channel *b = nullptr;
