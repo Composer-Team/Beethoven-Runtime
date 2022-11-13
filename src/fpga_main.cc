@@ -4,7 +4,7 @@
 #include "../include/cmd_server.h"
 #include "../include/data_server.h"
 #include <pthread.h>
-#include <fpga_utils.h>
+#include "fpga_utils.h"
 #include <response_poller.h>
 
 data_server *d_server;

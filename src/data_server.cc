@@ -20,7 +20,7 @@ extern bool kill_sig;
 #endif
 
 #ifdef FPGA
-#include <fpga_utils.h>
+#include "fpga_utils.h"
 #endif
 
 using namespace composer;

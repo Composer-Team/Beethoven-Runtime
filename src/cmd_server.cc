@@ -15,7 +15,7 @@
 #include <fcntl.h>
 
 #ifdef FPGA
-#include <fpga_utils.h>
+#include "fpga_utils.h"
 #include <composer_allocator_declaration.h>
 #endif
 
