@@ -11,14 +11,16 @@
 #include <composer_allocator_declaration.h>
 #include <composer/verilator_server.h>
 
-#include "data_server.h"
+#include "../include/data_server.h"
 
 #include <fcntl.h>
 
-#include "fpga_utils.h"
-
 #ifdef SIM
 extern bool kill_sig;
+#endif
+
+#ifdef FPGA
+#include <fpga_utils.h>
 #endif
 
 using namespace composer;

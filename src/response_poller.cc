@@ -1,7 +1,7 @@
 //
 // Created by Chris Kjellqvist on 11/6/22.
 //
-#ifdef FPGA
+
 #include "response_poller.h"
 #include <fpga_pci.h>
 #include "fpga_utils.h"
@@ -48,5 +48,3 @@ void response_poller::start_poller() {
   pthread_t thread;
   pthread_create(&thread, nullptr, poll_thread, this);
 }
-
-#endif

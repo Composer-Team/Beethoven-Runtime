@@ -3,21 +3,22 @@
 //
 
 #include <composer/verilator_server.h>
-#include "Vcomposer.h"
-#include "cmd_server.h"
-#include "data_server.h"
+#include "../include/cmd_server.h"
+#include "../include/data_server.h"
 
 #include <cstdio>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <composer_allocator_declaration.h>
 #include <tuple>
 
 // for shared memory
-#include <sys/stat.h>
 #include <fcntl.h>
 
-#include "fpga_utils.h"
+#ifdef FPGA
+#include <fpga_utils.h>
+#include <composer_allocator_declaration.h>
+#endif
+
 system_core_pair::system_core_pair(int system, int core) {
   this->system = system;
   this->core = core;

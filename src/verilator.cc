@@ -1,16 +1,17 @@
 #include <iostream>
 
 #include <verilated.h>
-#include <Vcomposer.h>
+#include "Vcomposer.h"
 #include <cinttypes>
 #include <queue>
-#include "data_server.h"
-#include "cmd_server.h"
+#include <pthread.h>
+#include "../include/data_server.h"
+#include "../include/cmd_server.h"
 
 #include <composer_allocator_declaration.h>
 #include "verilated_vcd_c.h"
-#include "verilator.h"
-#include "ddr_macros.h"
+#include "../include/verilator.h"
+#include "../include/ddr_macros.h"
 
 #ifdef USE_DRAMSIM
 // dramsim3
@@ -104,9 +105,8 @@ void run_verilator(int argc, char **argv) {
   top->trace(tfp, 100);
   tfp->open("trace.vcd");
 
-#ifdef USE_DRAMSIM
-
   mem_interface<QData> axi4_mems[NUM_DDR_CHANNELS];
+#ifdef USE_DRAMSIM
   for (auto &axi4_mem: axi4_mems) {
     auto q = new JedecDRAMSystem(
             dramsim3config,
@@ -342,7 +342,7 @@ void run_verilator(int argc, char **argv) {
       // to signify that the AXI4 DDR Controller is busy enqueueing another transaction in the DRAM
       *inter.ar->ready = inter.to_enqueue_read == nullptr;
 #else
-      enqueue_transaction(*i.ar, i.read_transactions);
+      enqueue_transaction(*inter.ar, inter.read_transactions);
 #endif
 
     }
@@ -631,5 +631,23 @@ void run_verilator(int argc, char **argv) {
   printf("printing traces\n");
   fflush(stdout);
   tfp->close();
+  exit(0);
+}
+
+data_server *d_server;
+cmd_server *c_server;
+
+pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
+
+int main(int argc, char **argv) {
+  d_server = new data_server;
+  c_server = new cmd_server;
+  d_server->start();
+  c_server->start();
+  printf("Entering verilator\n");
+  run_verilator(argc, argv);
+  pthread_mutex_lock(&main_lock);
+  pthread_mutex_lock(&main_lock);
+  printf("Main thread exiting\n");
   exit(0);
 }

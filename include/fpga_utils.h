@@ -5,8 +5,6 @@
 #ifndef COMPOSER_VERILATOR_FPGA_UTILS_H
 #define COMPOSER_VERILATOR_FPGA_UTILS_H
 
-#ifdef FPGA
-
 #include "fpga_mgmt.h"
 #include "fpga_pci.h"
 extern "C" {
@@ -28,8 +26,5 @@ void check_rc(int rc, const std::string &message);
 void fpga_setup(int id);
 
 void fpga_shutdown();
-
-
-#endif
 
 #endif //COMPOSER_VERILATOR_FPGA_UTILS_H

@@ -7,52 +7,59 @@ find_package(verilator REQUIRED)
 find_package(composer 1.0.5 EXACT REQUIRED)
 message("${verilator_FOUND}")
 
-add_executable(Composer_Verilator verilator.cc data_server.cc cmd_server.cc main.cc verilator.h fpga_utils.h
-        fpga_utils.cc response_poller.cc response_poller.h)
+set(SRC src/data_server.cc src/cmd_server.cc )
 
-if("${USE_DRAMSIM}" STREQUAL "1")
-    message("hello")
-    add_subdirectory(DRAMsim3)
-    target_compile_definitions(Composer_Verilator PRIVATE USE_DRAMSIM=1)
-endif()
+include_directories(include)
+# customize make based on simulator (verilator) or fpga (aws) target
+if ("${TARGET}" STREQUAL "sim")
+    add_executable(Composer_Verilator ${SRC} src/verilator.cc)
+    if ("${USE_DRAMSIM}" STREQUAL "1")
+        add_subdirectory(DRAMsim3)
+        target_compile_definitions(Composer_Verilator PRIVATE USE_DRAMSIM=1)
+        target_link_libraries(Composer_Verilator PRIVATE dramsim3 args)
+    endif ()
+    if ("${USE_WAVES}" STREQUAL "")
+        set(vargs "${vargs} --trace")
+    endif ()
+    set(BUILD_SIM 1)
+    set(CMAKE_CXX_FLAGS "-DSIM")
+elseif ("${TARGET}" STREQUAL "fpga")
+    if ("$ENV{COMPOSER_AWS_SDK_DIR}" STREQUAL "")
+        message(FATAL_ERROR "aws-fpga not found. Please install aws-fpga repo and define $COMPOSER_AWS_SDK_DIR in environment")
+    endif ()
+    include_directories($ENV{COMPOSER_AWS_SDK_DIR}/sdk/userspace/include)
+    add_executable(Composer_Verilator ${SRC} src/response_poller.cc src/fpga_utils.cc)
+    set(CMAKE_CXX_FLAGS "-DFPGA")
+    set(BUILD_FPGA 1)
+else()
+    message(FATAL_ERROR "Must define build target: 'sim' or 'fpga'. -DTARGET=<opt>")
+endif ()
 
-
-target_link_libraries(Composer_Verilator PRIVATE dramsim3 args)
-target_compile_options(Composer_Verilator PRIVATE)
+# Tie in composer
 set_target_properties(Composer_Verilator PROPERTIES
         CXX_STANDARD 20
         CXX_STANDARD_REQUIRED YES
         CXX_EXTENSIONS NO
         )
-
 target_link_libraries(Composer_Verilator PUBLIC APEX::composer)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
-#set(CMAKE_CXX_FLAGS "-DFPGA")
-set(CMAKE_CXX_FLAGS "-DSIM")
-
-if("${USE_WAVES}" STREQUAL "")
-    set(vargs "${vargs} --trace")
-endif()
-
-
-if (NOT "$ENV{COMPOSER_AWS_SDK_DIR}" STREQUAL "")
-    include_directories($ENV{COMPOSER_AWS_SDK_DIR}/sdk/userspace/include)
-endif()
 
 if ("$ENV{COMPOSER_ROOT}" STREQUAL "")
-    message(FATAL_ERROR "Neither COMPOSER_HARDWARE_DIR or COMPOSER_ROOT is defined")
-else()
-    set(COMPOSER_HWDIR $ENV{COMPOSER_ROOT}/Composer-Hardware)
-endif()
+    message(FATAL_ERROR "Environment variable $COMPOSER_ROOT is not defined")
+endif ()
 
-if (NOT EXISTS ${COMPOSER_HWDIR}/vsim/generated-src/composer.v)
-    message(FATAL_ERROR "${COMPOSER_HWDIR}/vsim/generated-src/composer.v does not exist. Try building your project.")
-endif()
+set(COMPOSER_HWDIR $ENV{COMPOSER_ROOT}/Composer-Hardware)
 
-include_directories(${COMPOSER_HWDIR}/vsim/generated-src)
+if (NOT EXISTS $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v)
+    message(FATAL_ERROR "$ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v does not exist. Try building your project.")
+endif ()
 
-verilate(Composer_Verilator
-        SOURCES ${COMPOSER_HWDIR}/vsim/generated-src/composer.v TOP_MODULE ComposerTop
-        VERILATOR_ARGS -LDFLAGS "-undefined dynamic_lookup -lpthread" # --threads 2
-        TRACE
-        )
+include_directories($ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src)
+
+if (${BUILD_SIM})
+    verilate(Composer_Verilator
+            SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v TOP_MODULE ComposerTop
+            VERILATOR_ARGS -LDFLAGS "-undefined dynamic_lookup -lpthread" # --threads 2
+            TRACE
+            )
+endif ()

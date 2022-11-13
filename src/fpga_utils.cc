@@ -2,12 +2,9 @@
 // Created by Chris Kjellqvist on 10/29/22.
 //
 
-#ifdef FPGA
-
 #include <iostream>
 #include "fpga_utils.h"
 #include <string>
-#include <sys/fcntl.h>
 
 pthread_mutex_t bus_lock;
 int slot_id;
@@ -92,13 +89,7 @@ void fpga_setup(int id) {
 
 
 void fpga_shutdown() {
-
-#ifndef SIMULATION_XSIM
   int rc = fpga_pci_detach(pci_bar_handle);
   // don't call check_rc because of fpga_shutdown call. do it manually:
   check_rc(rc, "Failure while detaching from the fpga");
-#endif
 }
-
-
-#endif
