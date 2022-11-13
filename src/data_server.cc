@@ -88,12 +88,12 @@ static void *data_server_f(void *server) {
 #ifdef FPGA
       case data_server_op::MOVE_FROM_FPGA: {
         auto *dst = (uint8_t *) addr.op_argument;
-        fpga_dma_burst_read(xdma_read_fd, dst, addr.op3_argument, addr.op2_argument);
+        wrapper_fpga_dma_burst_read(xdma_read_fd, dst, addr.op3_argument, addr.op2_argument);
         break;
       }
       case data_server_op::MOVE_TO_FPGA: {
         auto *src = (uint8_t *) addr.op2_argument;
-        fpga_dma_burst_write(xdma_write_fd, src, addr.op3_argument, addr.op2_argument);
+        wrapper_fpga_dma_burst_write(xdma_write_fd, src, addr.op3_argument, addr.op2_argument);
         break;
       }
 #endif

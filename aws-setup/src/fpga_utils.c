@@ -2,9 +2,12 @@
 // Created by Chris Kjellqvist on 10/29/22.
 //
 
-#include <iostream>
 #include "fpga_utils.h"
-#include <string>
+#include <fpga_dma.h>
+
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 pthread_mutex_t bus_lock;
 int slot_id;
@@ -13,9 +16,9 @@ int xdma_write_fd;
 int xdma_read_fd;
 
 
-void check_rc(int rc, const std::string &message) {
+void check_rc(int rc, const char *message) {
   if (rc) {
-    std::cerr << "Failure: '" << message << "' " << rc << std::endl;
+    fprintf(stderr, "Failure: '%s'\t%d\n", message, rc);
     exit(rc);
   }
 }
@@ -77,12 +80,12 @@ void fpga_setup(int id) {
   xdma_read_fd = fpga_dma_open_queue(FPGA_DMA_XDMA, id, 0, true);
   xdma_write_fd = fpga_dma_open_queue(FPGA_DMA_XDMA, id, 1, false);
   if (xdma_write_fd < 0) {
-    std::cerr << "error opening xdma write fd" << std::endl;
+    fprintf(stderr, "Error opening XDMA write fd\n");
     exit(1);
   }
 
   if (xdma_read_fd < 0) {
-    std::cerr << "error opening xdma read fd" << std::endl;
+    fprintf(stderr, "Error opening XDMA read fd\n");
     exit(1);
   }
 }
@@ -93,3 +96,15 @@ void fpga_shutdown() {
   // don't call check_rc because of fpga_shutdown call. do it manually:
   check_rc(rc, "Failure while detaching from the fpga");
 }
+
+int wrapper_fpga_dma_burst_write(int fd, uint8_t *buffer, size_t xfer_sz,
+                                 size_t address) {
+  return fpga_dma_burst_write(fd, buffer, xfer_sz, address);
+}
+
+int wrapper_fpga_dma_burst_read(int fd, uint8_t *buffer, size_t xfer_sz,
+                                size_t address) {
+  return fpga_dma_burst_read(fd, buffer, xfer_sz, address);
+}
+
+

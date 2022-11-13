@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <composer/verilator_server.h>
 #include <thread>
+#include <mutex>
 
 extern composer::cmd_server_file *csf;
 
