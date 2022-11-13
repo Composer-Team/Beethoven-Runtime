@@ -10,6 +10,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <tuple>
+#include <cassert>
 
 // for shared memory
 #include <fcntl.h>
