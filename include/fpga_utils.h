@@ -8,7 +8,9 @@
 #include "fpga_mgmt.h"
 #include "fpga_pci.h"
 
+#ifdef __cplusplus
 extern "C" {
+#endif
 
 extern pthread_mutex_t bus_lock;
 extern int slot_id;
@@ -29,7 +31,9 @@ int wrapper_fpga_dma_burst_write(int fd, uint8_t *buffer, size_t xfer_sz,
 
 int wrapper_fpga_dma_burst_read(int fd, uint8_t *buffer, size_t xfer_sz,
                                 size_t address);
+#ifdef __cplusplus
 }
+#endif
 
 
 #endif //COMPOSER_VERILATOR_FPGA_UTILS_H

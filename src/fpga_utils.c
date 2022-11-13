@@ -25,11 +25,14 @@ void check_rc(int rc, const char *message) {
 
 void fpga_setup(int id) {
   uint16_t pci_vendor_id = 0x1D0F; /* Amazon PCI Vendor ID */
-  uint16_t pci_device_id = 0xF000; /* PCI Device ID preassigned by Amazon for F1 applications */
+  uint16_t pci_device_id = 0xF002; /* PCI Device ID preassigned by Amazon for F1 applications */
 
   slot_id = id;
   int rc = fpga_pci_init();
   check_rc(rc, "fpga_pci_init FAILED");
+
+  rc = fpga_mgmt_init();
+  check_rc(rc, "fpga_mgmt_init FAILED");
 
   /* check AFI status */
   struct fpga_mgmt_image_info info = {0};
