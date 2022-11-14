@@ -36,9 +36,11 @@ struct cmd_server {
   std::unordered_map<system_core_pair, std::queue<int>*> in_flight;
   void start();
   void stop();
+  void register_reponse(uint32_t *r_buffer);
 private:
   pthread_t thread;
 };
 
+extern cmd_server *c_server;
 
 #endif //COMPOSER_VERILATOR_CMD_SERVER_H

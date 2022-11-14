@@ -36,6 +36,7 @@ response_poller::response_poller() {
         fpga_pci_peek(pci_bar_handle, RESP_BITS, &i);
         fpga_pci_poke(pci_bar_handle, RESP_VALID, 1);
       }
+      c_server->register_reponse(buf);
       pthread_mutex_lock(&csf->process_waiting_count_lock);
       csf->processes_waiting--;
       pthread_mutex_unlock(&csf->process_waiting_count_lock);

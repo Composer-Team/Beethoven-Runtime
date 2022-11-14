@@ -26,7 +26,6 @@ using namespace dramsim3;
 Vcomposer *top;
 uint64_t main_time = 0;
 extern data_server *d_server;
-extern cmd_server *c_server;
 bool kill_sig = false;
 
 #ifdef USE_DRAMSIM
@@ -510,16 +509,7 @@ void run_verilator(int argc, char **argv) {
         if (top->ocl_0_b_valid) {
           if (top->ocl_0_b_bits_resp == 0) {
             if (ongoing_rsp.progress == response_transaction::payload_length) {
-              composer::rocc_response r(ongoing_rsp.resbuf, pack_cfg);
-              system_core_pair pr(r.system_id, r.core_id);
-              pthread_mutex_lock(&c_server->cmdserverlock);
-              auto q = c_server->in_flight[pr];
-              int id = q->front();
-              csf->responses[id] = r;
-              // allow client thread to access response
-              pthread_mutex_unlock(&csf->wait_for_response[id]);
-              q->pop();
-              pthread_mutex_unlock(&c_server->cmdserverlock);
+              c_server->register_reponse(ongoing_rsp.resbuf);
               cmds_in_flight--;
               bus_occupied = false;
               printf("respt-ready-b -> respt-inactive\n");

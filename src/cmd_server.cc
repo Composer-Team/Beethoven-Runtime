@@ -117,3 +117,15 @@ void cmd_server::stop() {
   pthread_mutex_unlock(&csf->server_mut);
   pthread_join(thread, nullptr);
 }
+
+void cmd_server::register_reponse(uint32_t *r_buffer) {
+  composer::rocc_response r(r_buffer, pack_cfg);
+  system_core_pair pr(r.system_id, r.core_id);
+  pthread_mutex_lock(&cmdserverlock);
+  int id = in_flight[pr]->front();
+  csf->responses[id] = r;
+  // allow client thread to access response
+  pthread_mutex_unlock(&csf->wait_for_response[id]);
+  in_flight[pr]->pop();
+  pthread_mutex_unlock(&cmdserverlock);
+}
