@@ -88,8 +88,16 @@ static void* cmd_server_f(void* server) {
         int rc = fpga_pci_peek(pci_bar_handle, CMD_READY, &ready);
         assert(rc == 0);
       }
-      fpga_pci_poke(pci_bar_handle, CMD_BITS, pack[i]);
-      fpga_pci_poke(pci_bar_handle, CMD_VALID, 1);
+
+      if (fpga_pci_poke(pci_bar_handle, CMD_BITS, pack[i])) {
+        fprintf(stderr, "error in CMD_BITS poke\n");
+        exit(1);
+      }
+
+      if (fpga_pci_poke(pci_bar_handle, CMD_VALID, 1)) {
+        fprintf(stderr, "error in CMD_VALID poke\n");
+        exit(1);
+      }
     }
     free(pack);
     pthread_mutex_unlock(&bus_lock);

@@ -22,6 +22,7 @@ response_poller::response_poller() {
     pthread_mutex_lock(&p->queue_mutex);
     flights = p->n_waiting;
     pthread_mutex_unlock(&p->queue_mutex);
+    printf("Polling! In-flight: %d\n", flights);
 
     if (flights) {
       uint32_t buf[3];
