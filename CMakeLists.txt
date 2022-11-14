@@ -45,7 +45,7 @@ elseif ("${TARGET}" STREQUAL "fpga")
     target_compile_definitions(Composer_Verilator PUBLIC FPGA)
     set(BUILD_FPGA 1)
 else ()
-    message(FATAL_ERROR "Must define build target: 'sim' or 'fpga'. -DTARGET=<opt>")
+    message(FATAL_ERROR "Must define build target: 'sim', 'fpga', or 'vsim'. Got '${TARGET}'. -DTARGET=<opt>")
 endif ()
 
 # Tie in composer
