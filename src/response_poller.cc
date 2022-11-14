@@ -25,16 +25,21 @@ response_poller::response_poller() {
 
     if (flights) {
       uint32_t buf[3];
+      int rc = 0;
       for (unsigned int & i : buf) {
         uint32_t resp_ready = 0;
         while (!resp_ready) {
-          fpga_pci_peek(pci_bar_handle, RESP_READY, &resp_ready);
+          rc |= fpga_pci_peek(pci_bar_handle, RESP_READY, &resp_ready);
           if (not resp_ready) {
             std::this_thread::sleep_for(1ms);
           }
         }
-        fpga_pci_peek(pci_bar_handle, RESP_BITS, &i);
-        fpga_pci_poke(pci_bar_handle, RESP_VALID, 1);
+        rc |= fpga_pci_peek(pci_bar_handle, RESP_BITS, &i);
+        rc |= fpga_pci_poke(pci_bar_handle, RESP_VALID, 1);
+      }
+      if (rc) {
+        fprintf(stderr, "Error in fpga pci peek/poke\t%s\n", strerror(errno));
+        throw std::exception();
       }
       c_server->register_reponse(buf);
       pthread_mutex_lock(&csf->process_waiting_count_lock);
