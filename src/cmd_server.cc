@@ -49,6 +49,7 @@ static void* cmd_server_f(void* server) {
 
   pthread_mutex_init(&addr.server_mut, &attrs);
   pthread_mutex_init(&addr.cmd_recieve_server_resp_lock, &attrs);
+  pthread_mutex_init(&addr.cmd_send_lock, &attrs);
   for (unsigned i = 0; i < MAX_CONCURRENT_COMMANDS; ++i) { // NOLINT(modernize-loop-convert)
     pthread_mutex_init(&addr.wait_for_response[i], &attrs);
     pthread_mutex_lock(&addr.wait_for_response[i]);
