@@ -42,26 +42,7 @@ static void* cmd_server_f(void* server) {
   auto &addr = *(cmd_server_file*)mmap(nullptr, sizeof(cmd_server_file), PROT_READ | PROT_WRITE,
                                  MAP_SHARED, fd_composer, 0);
   csf = &addr;
-
-  pthread_mutexattr_t attrs;
-  pthread_mutexattr_init(&attrs);
-  pthread_mutexattr_setpshared(&attrs, PTHREAD_PROCESS_SHARED);
-
-  pthread_mutex_init(&addr.server_mut, &attrs);
-  pthread_mutex_init(&addr.cmd_recieve_server_resp_lock, &attrs);
-  pthread_mutex_init(&addr.cmd_send_lock, &attrs);
-  for (unsigned i = 0; i < MAX_CONCURRENT_COMMANDS; ++i) { // NOLINT(modernize-loop-convert)
-    pthread_mutex_init(&addr.wait_for_response[i], &attrs);
-    pthread_mutex_lock(&addr.wait_for_response[i]);
-  }
-  pthread_mutex_init(&addr.free_list_lock, &attrs);
-  pthread_mutex_lock(&addr.cmd_recieve_server_resp_lock);
-
-
-  // wait_responses are all initially available
-  for (int i = 0; i < MAX_CONCURRENT_COMMANDS; ++i) addr.free_list[i] = i;
-  addr.free_list_idx = 255;
-
+  cmd_server_file::init(addr);
   std::vector<std::pair<int, FILE*>> alloc;
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);

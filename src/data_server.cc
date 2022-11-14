@@ -36,16 +36,6 @@ static void *data_server_f(void *server) {
                                           MAP_SHARED, fd_composer, 0);
   cf = &addr;
 
-  pthread_mutexattr_t attrs;
-  pthread_mutexattr_init(&attrs);
-  pthread_mutexattr_setpshared(&attrs, PTHREAD_PROCESS_SHARED);
-
-  pthread_mutex_init(&addr.server_mut, &attrs);
-  pthread_mutex_init(&addr.data_cmd_recieve_resp_lock, &attrs);
-  pthread_mutex_init(&addr.data_cmd_send_lock, &attrs);
-  memset(addr.fname, 0, 512);
-  addr.op_argument = 0;
-
   fprintf(stderr, "Constructing allocator\n");
   auto allocator = new composer_allocator();
   fprintf(stderr, "Constructed allocator\n");
@@ -54,6 +44,7 @@ static void *data_server_f(void *server) {
   pthread_mutex_lock(&addr.data_cmd_recieve_resp_lock);
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
+  data_server_file::init(addr);
   while (!ds->isStopCond()) {
     // get file name, descriptor, expand the file, and map it to address space
     switch (addr.operation) {

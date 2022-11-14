@@ -10,7 +10,7 @@
 
 using namespace std::chrono_literals;
 
-response_poller::response_poller() {
+response_poller::response_poller(int * n_waiting) : n_waiting(n_waiting) {
   this->poller_release_mutex.lock();
 }
 
@@ -20,7 +20,7 @@ response_poller::response_poller() {
   int flights;
   while(true) {
     pthread_mutex_lock(&p->queue_mutex);
-    flights = p->n_waiting;
+    flights = *p->n_waiting;
     pthread_mutex_unlock(&p->queue_mutex);
     printf("Polling! In-flight: %d\n", flights);
 
