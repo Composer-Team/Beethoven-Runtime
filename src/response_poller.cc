@@ -16,7 +16,6 @@ response_poller::response_poller() {
 }
 
 [[noreturn]] static void* poll_thread(void * in) {
-  int pause_length = *(int*)in; // UNUSED
   int flights;
   while(true) {
     pthread_mutex_lock(&csf->process_waiting_count_lock);
