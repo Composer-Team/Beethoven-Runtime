@@ -11,6 +11,11 @@ set(SRC src/data_server.cc src/cmd_server.cc)
 if ("$ENV{COMPOSER_ROOT}" STREQUAL "")
     message(FATAL_ERROR "Environment variable $COMPOSER_ROOT is not defined")
 endif ()
+
+if (NOT EXISTS $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v)
+    message(FATAL_ERROR "$ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v does not exist. Try building your project.")
+endif ()
+
 set(AWS_SDK "$ENV{COMPOSER_ROOT}/aws-fpga")
 
 include_directories(include)
@@ -28,10 +33,9 @@ if ("${TARGET}" STREQUAL "sim")
     target_compile_definitions(Composer_Verilator PUBLIC SIM)
     set(BUILD_SIM 1)
 elseif ("${TARGET}" STREQUAL "vsim")
-    add_executable(Composer_Verilator ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc)
-    include_directories(${AWS_SDK}/hdk/common/software/include)
+    add_library(Composer_Verilator STATIC ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc)
+    include_directories(${AWS_SDK}/hdk/common/software/include ${AWS_SDK}/sdk/userspace/include ${AWS_SDK}/sdk/userspace/include/utils/)
     target_compile_definitions(Composer_Verilator PUBLIC VSIM FPGA)
-    include_directories(${AWS_SDK}/sdk/userspace/include)
     target_link_options(Composer_Verilator PRIVATE -lfpga_mgmt -lpthread -lrt)
     set(BUILD_FPGA 1)
 elseif ("${TARGET}" STREQUAL "fpga")
@@ -55,10 +59,6 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 
 
 set(COMPOSER_HWDIR $ENV{COMPOSER_ROOT}/Composer-Hardware)
-
-if (NOT EXISTS $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v)
-    message(FATAL_ERROR "$ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v does not exist. Try building your project.")
-endif ()
 
 include_directories($ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src)
 

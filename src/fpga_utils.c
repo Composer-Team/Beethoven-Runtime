@@ -79,12 +79,20 @@ void fpga_shutdown() {
 
 int wrapper_fpga_dma_burst_write(int fd, uint8_t *buffer, size_t xfer_sz,
                                  size_t address) {
+#ifndef VSIM
   return fpga_dma_burst_write(fd, buffer, xfer_sz, address);
+#else
+  return 0;
+#endif
 }
 
 int wrapper_fpga_dma_burst_read(int fd, uint8_t *buffer, size_t xfer_sz,
                                 size_t address) {
+#ifndef VSIM
   return fpga_dma_burst_read(fd, buffer, xfer_sz, address);
+#else
+  return 0;
+#endif
 }
 
 

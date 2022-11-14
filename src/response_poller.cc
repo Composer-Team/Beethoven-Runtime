@@ -3,8 +3,8 @@
 //
 
 #include "response_poller.h"
-#include <fpga_pci.h>
 #include "fpga_utils.h"
+#include "sh_dpi_tasks.h"
 #include "cmd_server.h"
 #include <composer_allocator_declaration.h>
 #include <cinttypes>
@@ -24,7 +24,12 @@ response_poller::response_poller() {
     pthread_mutex_lock(&csf->process_waiting_count_lock);
     flights = csf->processes_waiting;
     pthread_mutex_unlock(&csf->process_waiting_count_lock);
-    printf("Polling! In-flight: %d\n", flights);
+#ifdef VSIM
+    cosim_printf
+#else
+    printf
+#endif
+    ("Polling! In-flight: %d\n", flights);
 
     if (flights) {
       uint32_t buf[3];
