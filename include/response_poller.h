@@ -8,21 +8,14 @@
 #include <pthread.h>
 #include <composer/verilator_server.h>
 #include <thread>
-#include <mutex>
 
 extern composer::cmd_server_file *csf;
 
 struct response_poller {
-  pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
-  int *n_waiting;
-
-  // no easy way to do this without interrupts from FPGA and without race conditions
-  std::timed_mutex poller_release_mutex;
-
   void start_poller();
 
 public:
-  explicit response_poller(int * n_waiting);
+  explicit response_poller();
 };
 
 #endif //COMPOSER_VERILATOR_RESPONSE_POLLER_H
