@@ -10,6 +10,9 @@
 #include <cinttypes>
 #include <thread>
 
+#include <cerrno>
+#include <cstring>
+
 using namespace std::chrono_literals;
 
 response_poller::response_poller() {
