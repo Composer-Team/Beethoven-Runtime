@@ -30,7 +30,7 @@ static composer::data_server_file *cf;
 static void *data_server_f(void *server) {
   auto *ds = (data_server *) server;
 
-  int fd_composer = shm_open(data_server_file_name.c_str(), O_CREAT | O_RDWR, S_IWUSR | S_IRUSR);
+  int fd_composer = shm_open(data_server_file_name.c_str(), O_CREAT | O_RDWR, S_IROTH | S_IWOTH);
   ftruncate(fd_composer, sizeof(data_server_file));
   auto &addr = *(data_server_file *) mmap(nullptr, sizeof(data_server_file), PROT_READ | PROT_WRITE,
                                           MAP_SHARED, fd_composer, 0);

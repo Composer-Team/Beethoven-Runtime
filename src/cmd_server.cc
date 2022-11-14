@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <tuple>
 #include <cassert>
+#include <cerrno>
 
 // for shared memory
 #include <fcntl.h>
@@ -32,7 +33,11 @@ cmd_server_file *csf;
 static void* cmd_server_f(void* server) {
   auto ds = (cmd_server*)server;
 
-  int fd_composer = shm_open(cmd_server_file_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+  int fd_composer = shm_open(cmd_server_file_name.c_str(), O_CREAT | O_RDWR, S_IROTH | S_IWOTH);
+  if (fd_composer < 0) {
+    printf("Failed to initialize cmd_file\n");
+    exit(errno);
+  }
   ftruncate(fd_composer, sizeof(cmd_server_file));
   auto &addr = *(cmd_server_file*)mmap(nullptr, sizeof(cmd_server_file), PROT_READ | PROT_WRITE,
                                  MAP_SHARED, fd_composer, 0);
