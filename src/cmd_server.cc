@@ -63,6 +63,15 @@ static void* cmd_server_f(void* server) {
 #ifdef FPGA
     pthread_mutex_lock(&bus_lock);
     auto *pack = addr.cmd.pack(pack_cfg);
+#ifdef VSIM
+    if (addr.cmd.getOpcode() == ROCC_OP_FLUSH) {
+      pthread_mutex_unlock(&addr.cmd_recieve_server_resp_lock);
+      pthread_mutex_unlock(&bus_lock);
+      pthread_mutex_unlock(&ds->cmdserverlock);
+      // quit!
+      pthread_mutex_unlock(&main_lock);
+    }
+#endif
     for (int i = 0; i < 5; ++i) { // command is 5 32-bit payloads
       uint32_t ready = false;
       while(!ready) {

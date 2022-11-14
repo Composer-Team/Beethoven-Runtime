@@ -3,8 +3,9 @@
 //
 
 #include "fpga_utils.h"
-#include <fpga_dma.h>
-
+#ifndef VSIM
+#include "fpga_dma.h"
+#endif
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,16 +25,13 @@ void check_rc(int rc, const char *message) {
 }
 
 void fpga_setup(int id) {
-  uint16_t pci_vendor_id = 0x1D0F; /* Amazon PCI Vendor ID */
-  uint16_t pci_device_id = 0xF002; /* PCI Device ID preassigned by Amazon for F1 applications */
-
   int rc = fpga_pci_init();
   check_rc(rc, "fpga_pci_init FAILED");
   slot_id = id;
 
   rc = fpga_mgmt_init();
   check_rc(rc, "fpga_mgmt_init FAILED");
-
+#ifndef VSIM
   /* check AFI status */
   struct fpga_mgmt_image_info info = {0};
 
@@ -51,30 +49,9 @@ void fpga_setup(int id) {
           info.spec.map[FPGA_APP_PF].vendor_id,
           info.spec.map[FPGA_APP_PF].device_id);
 
-  /* confirm that the AFI that we expect is in fact loaded */
-//  if (info.spec.map[FPGA_APP_PF].vendor_id != pci_vendor_id ||
-//      info.spec.map[FPGA_APP_PF].device_id != pci_device_id) {
-//    fprintf(stderr, "AFI does not show expected PCI vendor id and device ID. If the AFI "
-//                    "was just loaded, it might need a rescan. Rescanning now.\n");
-//
-//    rc = fpga_pci_rescan_slot_app_pfs(slot_id);
-//    check_rc(rc, "Unable to update PF for slot");
     /* get local image description, contains status, vendor id, and device id. */
     rc = fpga_mgmt_describe_local_image(slot_id, &info, 0);
     check_rc(rc, "Unable to get AFI information from slot");
-
-//    fprintf(stderr, "AFI PCI  Vendor ID: 0x%x, Device ID 0x%x\n",
-//            info.spec.map[FPGA_APP_PF].vendor_id,
-//            info.spec.map[FPGA_APP_PF].device_id);
-
-    /* confirm that the AFI that we expect is in fact loaded after rescan */
-//    if (info.spec.map[FPGA_APP_PF].vendor_id != pci_vendor_id ||
-//        info.spec.map[FPGA_APP_PF].device_id != pci_device_id) {
-//      rc = 1;
-//      check_rc(rc, "The PCI vendor id and device of the loaded AFI are not "
-//                   "the expected values.");
-//    }
-//  }
 
   /* attach to BAR0 */
   pci_bar_handle = PCI_BAR_HANDLE_INIT;
@@ -90,7 +67,7 @@ void fpga_setup(int id) {
     fprintf(stderr, "Error opening XDMA write fd\n");
     exit(1);
   }
-
+#endif
 }
 
 

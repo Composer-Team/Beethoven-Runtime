@@ -12,8 +12,12 @@ cmd_server *c_server;
 
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 
-
-int main(int argc, char **argv) {
+#ifdef VSIM
+void test_main(uint32_t *exit_code)
+#else
+int main(int argc, char **argv)
+#endif
+{
   d_server = new data_server;
   c_server = new cmd_server;
   d_server->start();
@@ -25,5 +29,5 @@ int main(int argc, char **argv) {
   pthread_mutex_lock(&main_lock);
   printf("Main thread exiting\n");
   fpga_shutdown();
-  exit(0);
+  *exit_code = 0;
 }

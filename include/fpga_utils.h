@@ -5,12 +5,20 @@
 #ifndef COMPOSER_VERILATOR_FPGA_UTILS_H
 #define COMPOSER_VERILATOR_FPGA_UTILS_H
 
+#ifdef VSIM
+
+#include "fpga_pci_sv.h"
+
+#else
 #include "fpga_mgmt.h"
 #include "fpga_pci.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include <pthread.h>
 
 extern pthread_mutex_t bus_lock;
 extern int slot_id;
@@ -31,6 +39,7 @@ int wrapper_fpga_dma_burst_write(int fd, uint8_t *buffer, size_t xfer_sz,
 
 int wrapper_fpga_dma_burst_read(int fd, uint8_t *buffer, size_t xfer_sz,
                                 size_t address);
+
 #ifdef __cplusplus
 }
 #endif
