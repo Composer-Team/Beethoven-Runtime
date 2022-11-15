@@ -20,7 +20,7 @@ using namespace std::chrono_literals;
 response_poller::response_poller() {
 }
 
-[[noreturn]] static void* poll_thread(void * in) {
+static void* poll_thread(void * in) {
   int flights;
   int tries = 0;
   while(tries < 20) {
@@ -57,6 +57,7 @@ response_poller::response_poller() {
     }
   }
   pthread_mutex_unlock(&main_lock);
+  return nullptr;
 }
 void response_poller::start_poller() {
   pthread_t thread;
