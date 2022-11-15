@@ -20,7 +20,9 @@ response_poller::response_poller() {
 
 [[noreturn]] static void* poll_thread(void * in) {
   int flights;
-  while(true) {
+  int tries = 0;
+  while(tries < 200) {
+	  tries ++;
     pthread_mutex_lock(&csf->process_waiting_count_lock);
     flights = csf->processes_waiting;
     pthread_mutex_unlock(&csf->process_waiting_count_lock);
