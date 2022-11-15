@@ -6,6 +6,8 @@
 #include <pthread.h>
 #include "fpga_utils.h"
 #include <response_poller.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 data_server *d_server;
 cmd_server *c_server;
@@ -26,6 +28,12 @@ int main(int argc, char **argv)
   fpga_setup(0);
   response_poller poller;
   poller.start_poller();
+#ifdef VSIM
+  int pid = fork();
+  if (pid == 0) {
+    execv((std::string(getenv("COMPOSER_ROOT")) + "/Composer-Examples/build/alutest").c_str(), nullptr);
+  }
+#endif
   pthread_mutex_lock(&main_lock);
   pthread_mutex_lock(&main_lock);
   fpga_shutdown();
