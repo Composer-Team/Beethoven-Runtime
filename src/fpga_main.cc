@@ -15,6 +15,7 @@ pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 #ifdef VSIM
 extern "C" void test_main_hook(uint32_t *exit_code)
 #else
+
 int main(int argc, char **argv)
 #endif
 {
@@ -27,8 +28,8 @@ int main(int argc, char **argv)
   poller.start_poller();
   pthread_mutex_lock(&main_lock);
   pthread_mutex_lock(&main_lock);
-  #ifdef VSIM
   fpga_shutdown();
+#ifdef VSIM
   *exit_code = 0;
 #endif
 }
