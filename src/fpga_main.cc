@@ -13,7 +13,7 @@ cmd_server *c_server;
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #ifdef VSIM
-extern "C" void test_main(uint32_t *exit_code)
+extern "C" void test_main_hook(uint32_t *exit_code)
 #else
 int main(int argc, char **argv)
 #endif
