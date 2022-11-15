@@ -23,7 +23,7 @@ response_poller::response_poller() {
 [[noreturn]] static void* poll_thread(void * in) {
   int flights;
   int tries = 0;
-  while(tries < 200) {
+  while(tries < 20) {
 	  tries ++;
     pthread_mutex_lock(&csf->process_waiting_count_lock);
     flights = csf->processes_waiting;
@@ -56,6 +56,7 @@ response_poller::response_poller() {
       std::this_thread::sleep_for(300ms);
     }
   }
+  pthread_mutex_unlock(&main_lock);
 }
 void response_poller::start_poller() {
   pthread_t thread;
