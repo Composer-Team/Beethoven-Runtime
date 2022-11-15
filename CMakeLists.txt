@@ -3,9 +3,7 @@ project(Composer_Verilator)
 
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(verilator REQUIRED)
 find_package(composer 1.0.5 EXACT REQUIRED)
-message("${verilator_FOUND}")
 
 set(SRC src/data_server.cc src/cmd_server.cc)
 if ("$ENV{COMPOSER_ROOT}" STREQUAL "")
@@ -21,6 +19,7 @@ set(AWS_SDK "$ENV{COMPOSER_ROOT}/aws-fpga")
 include_directories(include)
 # customize make based on simulator (verilator) or fpga (aws) target
 if ("${TARGET}" STREQUAL "sim")
+    find_package(verilator REQUIRED)
     add_executable(Composer_Verilator ${SRC} src/verilator.cc)
     if ("${USE_DRAMSIM}" STREQUAL "1")
         add_subdirectory(DRAMsim3)
