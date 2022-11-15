@@ -4,7 +4,9 @@
 
 #include "response_poller.h"
 #include "fpga_utils.h"
+#ifdef VSIM
 #include "sh_dpi_tasks.h"
+#endif
 #include "cmd_server.h"
 #include <composer_allocator_declaration.h>
 #include <cinttypes>
