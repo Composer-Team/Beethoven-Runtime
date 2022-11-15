@@ -24,12 +24,7 @@ response_poller::response_poller() {
     pthread_mutex_lock(&csf->process_waiting_count_lock);
     flights = csf->processes_waiting;
     pthread_mutex_unlock(&csf->process_waiting_count_lock);
-#ifdef VSIM
-    cosim_printf
-#else
-    printf
-#endif
-    ("Polling! In-flight: %d\n", flights);
+    printf("Polling! In-flight: %d\n", flights);
 
     if (flights) {
       uint32_t buf[3];
