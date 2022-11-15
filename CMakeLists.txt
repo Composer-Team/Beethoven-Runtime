@@ -4,6 +4,7 @@ project(Composer_Verilator)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(composer 1.0.5 EXACT REQUIRED)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(SRC src/data_server.cc src/cmd_server.cc)
 if ("$ENV{COMPOSER_ROOT}" STREQUAL "")
