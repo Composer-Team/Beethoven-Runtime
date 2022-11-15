@@ -27,6 +27,8 @@ int main(int argc, char **argv)
   poller.start_poller();
   pthread_mutex_lock(&main_lock);
   pthread_mutex_lock(&main_lock);
+  #ifdef VSIM
   fpga_shutdown();
   *exit_code = 0;
+#endif
 }
