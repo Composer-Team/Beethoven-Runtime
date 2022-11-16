@@ -20,6 +20,7 @@
 #include "fpga_utils.h"
 #include <composer_allocator_declaration.h>
 #endif
+#include <ctime>
 
 system_core_pair::system_core_pair(int system, int core) {
   this->system = system;
@@ -32,7 +33,6 @@ cmd_server_file *csf;
 
 static void* cmd_server_f(void* server) {
   auto ds = (cmd_server*)server;
-
   int fd_composer = shm_open(cmd_server_file_name.c_str(), O_CREAT | O_RDWR, S_IROTH | S_IWOTH);
   if (fd_composer < 0) {
     printf("Failed to initialize cmd_file\n");
@@ -60,18 +60,9 @@ static void* cmd_server_f(void* server) {
     // enqueue command for main simulation thread to handle
     addr.pthread_wait_id = id;
     pthread_mutex_lock(&ds->cmdserverlock);
-#ifdef FPGA
+#if defined(FPGA) || defined(VSIM)
     pthread_mutex_lock(&bus_lock);
     auto *pack = addr.cmd.pack(pack_cfg);
-#ifdef VSIM
-    if (addr.cmd.getOpcode() == ROCC_OP_FLUSH) {
-      pthread_mutex_unlock(&addr.cmd_recieve_server_resp_lock);
-      pthread_mutex_unlock(&bus_lock);
-      pthread_mutex_unlock(&ds->cmdserverlock);
-      // quit!
-      pthread_mutex_unlock(&main_lock);
-    }
-#endif
     for (int i = 0; i < 5; ++i) { // command is 5 32-bit payloads
       uint32_t ready = false;
       while(!ready) {

@@ -13,6 +13,7 @@ data_server *d_server;
 cmd_server *c_server;
 
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
+#include <ctime>
 
 #ifdef VSIM
 extern "C" void test_main_hook(uint32_t *exit_code)
@@ -21,22 +22,20 @@ extern "C" void test_main_hook(uint32_t *exit_code)
 int main(int argc, char **argv)
 #endif
 {
-  d_server = new data_server;
+  //fpga_setup(0);
+  // d_server = new data_server;
   c_server = new cmd_server;
-  d_server->start();
+  // d_server->start();
   c_server->start();
-  fpga_setup(0);
-  response_poller poller;
-  poller.start_poller();
-#ifdef VSIM
-  int pid = fork();
-  if (pid == 0) {
-    execv((std::string(getenv("COMPOSER_ROOT")) + "/Composer-Examples/build/alutest").c_str(), nullptr);
+  //response_poller poller;
+  //poller.start_poller();
+  //pthread_mutex_lock(&main_lock);
+  //pthread_mutex_lock(&main_lock);
+  //fpga_shutdown();
+  for(int i = 0; i < 400; ++i) {
+	  printf("WAKEUP CHRIS GOGOGOGOGOGOGO\t");
   }
-#endif
-  pthread_mutex_lock(&main_lock);
-  pthread_mutex_lock(&main_lock);
-  fpga_shutdown();
+  sleep(25);
 #ifdef VSIM
   *exit_code = 0;
 #endif

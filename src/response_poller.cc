@@ -23,7 +23,7 @@ response_poller::response_poller() {
 static void* poll_thread(void * in) {
   int flights;
   int tries = 0;
-  while(tries < 20) {
+  while(tries < 200) {
 	  tries ++;
     pthread_mutex_lock(&csf->process_waiting_count_lock);
     flights = csf->processes_waiting;
@@ -38,8 +38,13 @@ static void* poll_thread(void * in) {
         while (!resp_ready) {
           rc |= fpga_pci_peek(pci_bar_handle, RESP_READY, &resp_ready);
           if (not resp_ready) {
-            std::this_thread::sleep_for(1ms);
+            std::this_thread::sleep_for(300ms);
           }
+	  tries++;
+	  if (tries >= 200) {
+		  pthread_mutex_unlock(&main_lock);
+		  return nullptr;
+	  }
         }
         rc |= fpga_pci_peek(pci_bar_handle, RESP_BITS, &i);
         rc |= fpga_pci_poke(pci_bar_handle, RESP_VALID, 1);

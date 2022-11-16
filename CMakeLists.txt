@@ -34,6 +34,7 @@ if ("${TARGET}" STREQUAL "sim")
     set(BUILD_SIM 1)
 elseif ("${TARGET}" STREQUAL "vsim")
     add_library(Composer_Verilator STATIC ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc)
+    #add_executable(Composer_Verilator ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc)
     include_directories(${AWS_SDK}/hdk/common/software/include ${AWS_SDK}/sdk/userspace/include ${AWS_SDK}/sdk/userspace/include/utils/)
     target_compile_definitions(Composer_Verilator PUBLIC VSIM FPGA)
     target_link_options(Composer_Verilator PRIVATE -lfpga_mgmt -lpthread -lrt)
@@ -50,7 +51,7 @@ endif ()
 
 # Tie in composer
 set_target_properties(Composer_Verilator PROPERTIES
-        CXX_STANDARD 20
+        CXX_STANDARD 17
         CXX_STANDARD_REQUIRED YES
         CXX_EXTENSIONS NO
         )
