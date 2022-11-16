@@ -16,6 +16,7 @@ pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 #include <ctime>
 
 #ifdef VSIM
+#include <sh_dpi_tasks.h>
 extern "C" void test_main_hook(uint32_t *exit_code)
 #else
 
@@ -32,8 +33,11 @@ int main(int argc, char **argv)
   //pthread_mutex_lock(&main_lock);
   //pthread_mutex_lock(&main_lock);
   //fpga_shutdown();
-  for(int i = 0; i < 400; ++i) {
-	  printf("WAKEUP CHRIS GOGOGOGOGOGOGO\t");
+  for (int j = 0; j < 5; ++j) {
+    for (int i = 0; i < 400; ++i) {
+      cosim_printf("WAKEUP CHRIS GOGOGOGOGOGOGO\t");
+    }
+    cosim_printf("\n");
   }
   sleep(25);
 #ifdef VSIM
