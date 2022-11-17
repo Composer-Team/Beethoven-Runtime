@@ -52,7 +52,7 @@ static void *poll_thread(void *in) {
         fprintf(stderr, "Error in fpga pci peek/poke\t%s\n", strerror(errno));
         throw std::exception();
       }
-      c_server->register_reponse(buf);
+      register_reponse(buf);
       pthread_mutex_lock(&csf->process_waiting_count_lock);
       csf->processes_waiting--;
       pthread_mutex_unlock(&csf->process_waiting_count_lock);

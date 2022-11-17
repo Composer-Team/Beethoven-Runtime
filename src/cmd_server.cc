@@ -35,8 +35,12 @@ using namespace composer;
 
 cmd_server_file *csf;
 
-static void* cmd_server_f(void* server) {
-  auto ds = (cmd_server*)server;
+pthread_mutex_t cmdserverlock = PTHREAD_MUTEX_INITIALIZER;
+std::queue<composer::rocc_cmd> cmds;
+std::unordered_map<system_core_pair, std::queue<int>*> in_flight;
+
+
+static void* cmd_server_f(void* _) {
   // map in the shared file
   int fd_composer = shm_open(cmd_server_file_name.c_str(), O_CREAT | O_RDWR, S_IROTH | S_IWOTH);
   if (fd_composer < 0) {
@@ -55,7 +59,8 @@ static void* cmd_server_f(void* server) {
   std::vector<std::pair<int, FILE*>> alloc;
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
-  while(!ds->stop_cond) {
+  bool quit = false;
+  while(not quit) {
     // allocate space for response
     pthread_mutex_lock(&addr.free_list_lock);
     int id = addr.free_list[addr.free_list_idx];
@@ -68,7 +73,7 @@ static void* cmd_server_f(void* server) {
 
     // enqueue command for main simulation thread to handle
     addr.pthread_wait_id = id;
-    pthread_mutex_lock(&ds->cmdserverlock);
+    pthread_mutex_lock(&cmdserverlock);
 #if defined(FPGA) || defined(VSIM)
     pthread_mutex_lock(&bus_lock);
     auto *pack = addr.cmd.pack(pack_cfg);
@@ -97,7 +102,7 @@ static void* cmd_server_f(void* server) {
     // let main thread know how to return result
     if (addr.cmd.getXd()) {
       const auto key = system_core_pair(addr.cmd.getSystemId(), addr.cmd.getCoreId());
-      auto &m = ds->in_flight;
+      auto &m = in_flight;
       std::queue<int> *q;
       auto iterator = m.find(key);
       if (iterator == m.end()) {
@@ -108,7 +113,7 @@ static void* cmd_server_f(void* server) {
       q->push(id);
     }
     pthread_mutex_unlock(&addr.cmd_recieve_server_resp_lock);
-    pthread_mutex_unlock(&ds->cmdserverlock);
+    pthread_mutex_unlock(&cmdserverlock);
     // re-lock self to stall
     pthread_mutex_lock(&addr.server_mut);
   }
@@ -118,16 +123,11 @@ static void* cmd_server_f(void* server) {
 }
 
 void cmd_server::start() {
-  pthread_create(&thread, nullptr, cmd_server_f, this);
+  pthread_t thread;
+  pthread_create(&thread, nullptr, cmd_server_f, nullptr);
 }
 
-void cmd_server::stop() {
-  stop_cond = true;
-  pthread_mutex_unlock(&csf->server_mut);
-  pthread_join(thread, nullptr);
-}
-
-void cmd_server::register_reponse(uint32_t *r_buffer) {
+void register_reponse(uint32_t *r_buffer) {
   composer::rocc_response r(r_buffer, pack_cfg);
   system_core_pair pr(r.system_id, r.core_id);
   pthread_mutex_lock(&cmdserverlock);

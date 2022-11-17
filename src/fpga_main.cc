@@ -25,12 +25,8 @@ int main(int argc, char **argv)
 #endif
 {
   fpga_setup(0);
-
-//  d_server = new data_server;
-  c_server = new cmd_server;
-
-//  d_server->start();
-  c_server->start();
+  data_server::start();
+  cmd_server::start();
   pthread_mutex_lock(&main_lock);
   pthread_mutex_lock(&main_lock);
   fpga_shutdown();

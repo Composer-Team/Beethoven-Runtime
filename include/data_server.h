@@ -29,18 +29,8 @@ struct address_translator {
 
 };
 
-class data_server {
-  pthread_t thread;
-  bool stop_cond = false;
-public:
-  address_translator at;
-  void start();
-  void stop();
-
-  [[nodiscard]] bool isStopCond() const;
-  data_server() {
-    at.mappings.clear();
-  }
+struct data_server {
+  static void start();
 };
 
 

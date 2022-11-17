@@ -29,17 +29,12 @@ struct std::hash<system_core_pair> {
 };
 
 struct cmd_server {
-  bool stop_cond;
-
-  pthread_mutex_t cmdserverlock = PTHREAD_MUTEX_INITIALIZER;
-  std::queue<composer::rocc_cmd> cmds;
-  std::unordered_map<system_core_pair, std::queue<int>*> in_flight;
-  void start();
-  void stop();
-  void register_reponse(uint32_t *r_buffer);
+  static void start();
 private:
   pthread_t thread;
 };
+
+void register_reponse(uint32_t *r_buffer);
 
 extern cmd_server *c_server;
 

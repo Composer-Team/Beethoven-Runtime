@@ -26,8 +26,9 @@ extern bool kill_sig;
 using namespace composer;
 
 static composer::data_server_file *cf;
+address_translator at;
 
-static void *data_server_f(void *server) {
+[[noreturn]] static void *data_server_f(void *server) {
   auto *ds = (data_server *) server;
 
   int fd_composer = shm_open(data_server_file_name.c_str(), O_CREAT | O_RDWR, S_IROTH | S_IWOTH);
@@ -45,7 +46,7 @@ static void *data_server_f(void *server) {
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
   data_server_file::init(addr);
-  while (!ds->isStopCond()) {
+  while (true) {
     // get file name, descriptor, expand the file, and map it to address space
     switch (addr.operation) {
       case data_server_op::ALLOC: {
@@ -61,14 +62,14 @@ static void *data_server_f(void *server) {
         // allocate memory
         auto fpga_addr = allocator->malloc(addr.op_argument);
         // add mapping in server
-        ds->at.add_mapping(fpga_addr.getFpgaAddr(), addr.op_argument, naddr);
+        at.add_mapping(fpga_addr.getFpgaAddr(), addr.op_argument, naddr);
         // return fpga address
         addr.op_argument = fpga_addr.getFpgaAddr();
         break;
       }
       case data_server_op::FREE:
         allocator->free(composer::remote_ptr(addr.op_argument, 0));
-        ds->at.remove_mapping(addr.op_argument);
+        at.remove_mapping(addr.op_argument);
         break;
 #ifdef SIM
         case data_server_op::MOVE_TO_FPGA:
@@ -100,17 +101,8 @@ static void *data_server_f(void *server) {
 }
 
 void data_server::start() {
-  pthread_create(&thread, nullptr, data_server_f, this);
-}
-
-void data_server::stop() {
-  stop_cond = true;
-  pthread_mutex_unlock(&cf->server_mut);
-  pthread_join(thread, nullptr);
-}
-
-bool data_server::isStopCond() const {
-  return stop_cond;
+  pthread_t thread;
+  pthread_create(&thread, nullptr, data_server_f, nullptr);
 }
 
 void *address_translator::translate(uint64_t fp_addr) {
