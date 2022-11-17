@@ -16,7 +16,9 @@ pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 #include <ctime>
 
 #ifdef VSIM
+extern "C" {
 #include <sh_dpi_tasks.h>
+};
 extern "C" void test_main_hook(uint32_t *exit_code)
 #else
 
