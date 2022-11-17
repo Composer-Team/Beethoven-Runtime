@@ -6,9 +6,8 @@
 #include "sh_dpi_tasks.h"
 #include <composer/rocc_cmd.h>
 
-extern "C" void test_main(int *rc) {
+extern "C" void test_main_hook(int *rc) {
   cosim_printf("enter function\n");
-  fpga_pci_init();
   fpga_mgmt_init();
   cosim_printf("initialized\n");
 

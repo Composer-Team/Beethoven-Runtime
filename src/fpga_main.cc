@@ -34,7 +34,7 @@ int main(int argc, char **argv)
   //poller.start_poller();
   //pthread_mutex_lock(&main_lock);
   //pthread_mutex_lock(&main_lock);
-  //fpga_shutdown();
+  //fpga_shutdown();~
   for (int j = 0; j < 5; ++j) {
     for (int i = 0; i < 400; ++i) {
       cosim_printf("WAKEUP CHRIS GOGOGOGOGOGOGO\t");
