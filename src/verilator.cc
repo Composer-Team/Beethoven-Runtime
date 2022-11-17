@@ -284,9 +284,14 @@ void run_verilator(int argc, char **argv) {
           }
           trans->progress++;
 
+          if (not trans->fixed) {
+            trans->addr += trans->size;
+          }
+
           if (*inter.w->last) {
             printf("Enqueuing %d to be succeeded \n", trans->id);
             inter.write_transactions.pop();
+
 #ifdef USE_DRAMSIM
             trans->dram_tx_progress = 0;
             trans->dram_tx_len = trans->len * trans->size >> 3;
@@ -296,9 +301,6 @@ void run_verilator(int argc, char **argv) {
             inter.b->to_enqueue = trans->id;
             delete trans;
 #endif
-          }
-          if (not trans->fixed) {
-            trans->addr += trans->size;
           }
         }
       } else {
