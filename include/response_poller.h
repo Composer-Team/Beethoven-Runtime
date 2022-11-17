@@ -12,10 +12,7 @@
 extern composer::cmd_server_file *csf;
 
 struct response_poller {
-  void start_poller();
-
-public:
-  explicit response_poller();
+  static void start_poller();
 };
 
 #endif //COMPOSER_VERILATOR_RESPONSE_POLLER_H

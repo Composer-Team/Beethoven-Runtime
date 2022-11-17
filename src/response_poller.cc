@@ -19,9 +19,6 @@
 
 using namespace std::chrono_literals;
 
-response_poller::response_poller() {
-}
-
 static void *poll_thread(void *in) {
   int flights;
   int tries = 0;

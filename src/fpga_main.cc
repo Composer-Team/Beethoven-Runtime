@@ -11,10 +11,8 @@
 
 //data_server *d_server;
 cmd_server *c_server;
-
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 
-#include <ctime>
 
 #ifdef VSIM
 extern "C" {
@@ -30,11 +28,9 @@ int main(int argc, char **argv)
 
 //  d_server = new data_server;
   c_server = new cmd_server;
-  response_poller poller;
 
 //  d_server->start();
   c_server->start();
-//  poller.start_poller();
   pthread_mutex_lock(&main_lock);
   pthread_mutex_lock(&main_lock);
   fpga_shutdown();

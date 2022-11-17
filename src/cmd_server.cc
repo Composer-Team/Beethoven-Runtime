@@ -15,6 +15,8 @@
 #include <cassert>
 #include <cerrno>
 
+#include "response_poller.h"
+
 // for shared memory
 #include <fcntl.h>
 
@@ -35,6 +37,7 @@ cmd_server_file *csf;
 
 static void* cmd_server_f(void* server) {
   auto ds = (cmd_server*)server;
+  // map in the shared file
   int fd_composer = shm_open(cmd_server_file_name.c_str(), O_CREAT | O_RDWR, S_IROTH | S_IWOTH);
   if (fd_composer < 0) {
     printf("Failed to initialize cmd_file\n");
@@ -44,7 +47,11 @@ static void* cmd_server_f(void* server) {
   auto &addr = *(cmd_server_file*)mmap(nullptr, sizeof(cmd_server_file), PROT_READ | PROT_WRITE,
                                  MAP_SHARED, fd_composer, 0);
   csf = &addr;
+  // we need to initialize it! This used to be a race condition, where the cmd_server thread was racing against the
+  // poller thread to get to the file. The poller often won, found old dat anad mucked everything up :(
   cmd_server_file::init(addr);
+  response_poller::start_poller();
+
   std::vector<std::pair<int, FILE*>> alloc;
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
