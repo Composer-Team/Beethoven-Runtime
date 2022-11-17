@@ -34,7 +34,7 @@ int main(int argc, char **argv)
 
 //  d_server->start();
   c_server->start();
-  poller.start_poller();
+//  poller.start_poller();
   pthread_mutex_lock(&main_lock);
   pthread_mutex_lock(&main_lock);
   fpga_shutdown();
