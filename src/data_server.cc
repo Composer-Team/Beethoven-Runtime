@@ -40,12 +40,12 @@ address_translator at;
   fprintf(stderr, "Constructing allocator\n");
   auto allocator = new composer_allocator();
   fprintf(stderr, "Constructed allocator\n");
+  data_server_file::init(addr);
 
   int req_num = 0;
   pthread_mutex_lock(&addr.data_cmd_recieve_resp_lock);
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
-  data_server_file::init(addr);
   while (true) {
     printf("data server got cmd\n"); fflush(stdout);
     // get file name, descriptor, expand the file, and map it to address space
