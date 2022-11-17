@@ -48,7 +48,7 @@ static void* cmd_server_f(void* server) {
   std::vector<std::pair<int, FILE*>> alloc;
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
-  while(true) {
+  while(!ds->stop_cond) {
     // allocate space for response
     pthread_mutex_lock(&addr.free_list_lock);
     int id = addr.free_list[addr.free_list_idx];

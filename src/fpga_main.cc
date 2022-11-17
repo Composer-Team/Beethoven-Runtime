@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-data_server *d_server;
+//data_server *d_server;
 cmd_server *c_server;
 
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
