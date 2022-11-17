@@ -10,12 +10,13 @@ extern "C" {
 
 extern "C" void test_main_hook(int *rc) {
   cosim_printf("enter function\n");
+  fflush(stdout);
   fpga_mgmt_init();
   cosim_printf("initialized\n");
+  fflush(stdout);
 
-  auto co = composer::rocc_cmd::start_cmd(ALUSystem_ID, 0, 0, true, composer::R0, 0, 0, 0, 32,  64);
-  auto p = co.pack(pack_cfg);
-  cosim_printf("packed command\n");
+  uint32_t p[] = {0x2200407b, 0x0, 0x20, 0x0, 0x40};
+
   pci_bar_handle_t pci_bar_handle = PCI_BAR_HANDLE_INIT;
   for (int i = 0; i < 5; ++i) {
     cosim_printf("testing %d\n", i);
@@ -27,6 +28,16 @@ extern "C" void test_main_hook(int *rc) {
     fpga_pci_poke(pci_bar_handle, CMD_BITS, p[i]);
     fpga_pci_poke(pci_bar_handle, CMD_VALID, 1);
   }
+
+  for (int i = 0; i < 3; ++i) {
+    uint32_t ready = 0;
+    while (!ready) fpga_pci_peek(pci_bar_handle, RESP_VALID, &ready);
+    uint32_t dat;
+    fpga_pci_peek(pci_bar_handle, RESP_BITS, &dat);
+    cosim_printf("dat %x\n", dat);
+    fpga_pci_poke(pci_bar_handle, RESP_READY, 1);
+  }
+
 
   fpga_mgmt_close();
   *rc = 0;
