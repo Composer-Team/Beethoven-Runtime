@@ -26,8 +26,9 @@ struct address_translator {
   void* translate(uint64_t fp_addr);
   void add_mapping(uint64_t fpga_addr, uint64_t mapping_length, void * cpu_addr);
   void remove_mapping(uint64_t fpga_addr);
-
 };
+
+extern address_translator at;
 
 struct data_server {
   static void start();

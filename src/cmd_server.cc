@@ -54,13 +54,14 @@ static void* cmd_server_f(void* _) {
   // we need to initialize it! This used to be a race condition, where the cmd_server thread was racing against the
   // poller thread to get to the file. The poller often won, found old dat anad mucked everything up :(
   cmd_server_file::init(addr);
+#ifndef SIM
   response_poller::start_poller();
+#endif
 
   std::vector<std::pair<int, FILE*>> alloc;
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
-  bool quit = false;
-  while(not quit) {
+  while(true) {
     // allocate space for response
     pthread_mutex_lock(&addr.free_list_lock);
     int id = addr.free_list[addr.free_list_idx];
@@ -74,6 +75,10 @@ static void* cmd_server_f(void* _) {
     // enqueue command for main simulation thread to handle
     addr.pthread_wait_id = id;
     pthread_mutex_lock(&cmdserverlock);
+    if (addr.quit) {
+      pthread_mutex_unlock(&main_lock);
+      return nullptr;
+    }
 #if defined(FPGA) || defined(VSIM)
     pthread_mutex_lock(&bus_lock);
     auto *pack = addr.cmd.pack(pack_cfg);
@@ -97,7 +102,7 @@ static void* cmd_server_f(void* _) {
     free(pack);
     pthread_mutex_unlock(&bus_lock);
 #else
-    ds->cmds.push(addr.cmd);
+    cmds.push(addr.cmd);
 #endif
     // let main thread know how to return result
     if (addr.cmd.getXd()) {

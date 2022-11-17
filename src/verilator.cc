@@ -29,8 +29,11 @@ uint64_t main_time = 0;
 data_server *d_server;
 cmd_server *c_server;
 
+extern pthread_mutex_t cmdserverlock;
+extern std::queue<composer::rocc_cmd> cmds;
+extern std::unordered_map<system_core_pair, std::queue<int>*> in_flight;
+
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
-extern data_server *d_server;
 bool kill_sig = false;
 
 #ifdef USE_DRAMSIM
@@ -42,7 +45,7 @@ std::map<uint64_t, std::queue<memory_transaction *> *> in_flight_writes;
 
 void enqueue_transaction(v_address_channel<QData> &chan, std::queue<memory_transaction *> &lst) {
   if (*chan.valid && *chan.ready) {
-    char *addr = (char *) d_server->at.translate(*chan.addr);
+    char *addr = (char *) at.translate(*chan.addr);
     auto tx = new memory_transaction(addr, 1 << *chan.size,
                                      *chan.len + 1, 0, *chan.burst == 0, *chan.id, *chan.addr);
     lst.push(tx);
@@ -461,20 +464,20 @@ void run_verilator(int argc, char **argv) {
         break;
       case CMD_INACTIVE:
         if (ongoing_cmd.ready_for_command && !bus_occupied) {
-          pthread_mutex_lock(&c_server->cmdserverlock);
-          if (not c_server->cmds.empty()) {
+          pthread_mutex_lock(&cmdserverlock);
+          if (not cmds.empty()) {
             printf("\tGot command from cmd_server!\n");
             bus_occupied = true;
             ongoing_cmd.state = CMD_BITS_WRITE_ADDR;
-            ongoing_cmd.cmdbuf = c_server->cmds.front().pack(pack_cfg);
-            kill_sig = c_server->cmds.front().getOpcode() == ROCC_OP_FLUSH;
-            std::cout << c_server->cmds.front() << std::endl << std::endl;
+            ongoing_cmd.cmdbuf = cmds.front().pack(pack_cfg);
+            kill_sig = cmds.front().getOpcode() == ROCC_OP_FLUSH;
+            std::cout << cmds.front() << std::endl << std::endl;
             ongoing_cmd.progress = 0;
-            if (c_server->cmds.front().getXd() == 1)
+            if (cmds.front().getXd() == 1)
               cmds_in_flight++;
-            c_server->cmds.pop();
+            cmds.pop();
           }
-          pthread_mutex_unlock(&c_server->cmdserverlock);
+          pthread_mutex_unlock(&cmdserverlock);
         }
         break;
     }
@@ -520,7 +523,7 @@ void run_verilator(int argc, char **argv) {
         if (top->ocl_0_b_valid) {
           if (top->ocl_0_b_bits_resp == 0) {
             if (ongoing_rsp.progress == response_transaction::payload_length) {
-              c_server->register_reponse(ongoing_rsp.resbuf);
+              register_reponse(ongoing_rsp.resbuf);
               cmds_in_flight--;
               bus_occupied = false;
               printf("respt-ready-b -> respt-inactive\n");
@@ -623,12 +626,6 @@ void run_verilator(int argc, char **argv) {
     top->eval();
   }
 
-  printf("trying to close data\n");
-  fflush(stdout);
-  d_server->stop();
-  printf("trying to close cmd\n");
-  fflush(stdout);
-  c_server->stop();
   printf("printing traces\n");
   fflush(stdout);
   tfp->close();
