@@ -24,6 +24,9 @@
 #include "fpga_utils.h"
 #include <composer_allocator_declaration.h>
 #endif
+#ifdef SIM
+extern bool kill_sig;
+#endif
 #include <ctime>
 
 system_core_pair::system_core_pair(int system, int core) {
@@ -77,6 +80,9 @@ static void* cmd_server_f(void* _) {
     pthread_mutex_lock(&cmdserverlock);
     if (addr.quit) {
       pthread_mutex_unlock(&main_lock);
+#ifdef SIM
+      kill_sig = true;
+#endif
       return nullptr;
     }
 #if defined(FPGA) || defined(VSIM)
