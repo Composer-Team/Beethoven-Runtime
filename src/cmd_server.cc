@@ -3,8 +3,10 @@
 //
 
 #include <composer/verilator_server.h>
+#include <composer_allocator_declaration.h>
 #include "../include/cmd_server.h"
 #include "../include/data_server.h"
+#include "fpga_utils.h"
 
 #include <cstdio>
 #include <sys/mman.h>

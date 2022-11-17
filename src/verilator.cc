@@ -25,6 +25,11 @@ using namespace dramsim3;
 
 Vcomposer *top;
 uint64_t main_time = 0;
+
+data_server *d_server;
+cmd_server *c_server;
+
+pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 extern data_server *d_server;
 bool kill_sig = false;
 
@@ -98,6 +103,12 @@ void run_verilator(int argc, char **argv) {
   // start servers to communicate with user programs
   Verilated::commandArgs(argc, argv);
   top = new Vcomposer;
+
+  auto c = composer::rocc_cmd::start_cmd(ALUSystem_ID, 0, 0, true, composer::R0, 0, 0,0, 32, 64);
+  auto p = c.pack(pack_cfg);
+  for (int i = 0; i < 5; ++i) {
+    printf("%x\n", p[i]);
+  }
 
   Verilated::traceEverOn(true);
   auto tfp = new VerilatedVcdC;
@@ -623,11 +634,6 @@ void run_verilator(int argc, char **argv) {
   tfp->close();
   exit(0);
 }
-
-data_server *d_server;
-cmd_server *c_server;
-
-pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 
 int main(int argc, char **argv) {
   d_server = new data_server;

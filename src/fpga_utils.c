@@ -11,7 +11,6 @@
 #include <stdlib.h>
 
 pthread_mutex_t bus_lock;
-int slot_id;
 int pci_bar_handle;
 int xdma_write_fd;
 int xdma_read_fd;
@@ -24,12 +23,8 @@ void check_rc(int rc, const char *message) {
   }
 }
 
-void fpga_setup(int id) {
-  int rc = fpga_pci_init();
-  check_rc(rc, "fpga_pci_init FAILED");
-  slot_id = id;
-
-  rc = fpga_mgmt_init();
+void fpga_setup(int slot_id) {
+  int rc = fpga_mgmt_init();
   check_rc(rc, "fpga_mgmt_init FAILED");
 #ifndef VSIM
   /* check AFI status */
