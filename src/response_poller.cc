@@ -4,9 +4,11 @@
 
 #include "response_poller.h"
 #include "fpga_utils.h"
+
 #ifdef VSIM
 #include "sh_dpi_tasks.h"
 #endif
+
 #include "cmd_server.h"
 #include <composer_allocator_declaration.h>
 #include <cinttypes>
@@ -20,11 +22,11 @@ using namespace std::chrono_literals;
 response_poller::response_poller() {
 }
 
-static void* poll_thread(void * in) {
+static void *poll_thread(void *in) {
   int flights;
   int tries = 0;
-  while(tries < 200) {
-	  tries ++;
+  while (tries < 200) {
+    tries++;
     pthread_mutex_lock(&csf->process_waiting_count_lock);
     flights = csf->processes_waiting;
     pthread_mutex_unlock(&csf->process_waiting_count_lock);
@@ -33,21 +35,21 @@ static void* poll_thread(void * in) {
     if (flights) {
       uint32_t buf[3];
       int rc = 0;
-      for (unsigned int & i : buf) {
+      for (unsigned int &i: buf) {
         uint32_t resp_ready = 0;
         while (!resp_ready) {
-          rc |= fpga_pci_peek(pci_bar_handle, RESP_READY, &resp_ready);
+          rc |= fpga_pci_peek(pci_bar_handle, RESP_VALID, &resp_ready);
           if (not resp_ready) {
             std::this_thread::sleep_for(300ms);
           }
-	  tries++;
-	  if (tries >= 200) {
-		  pthread_mutex_unlock(&main_lock);
-		  return nullptr;
-	  }
+          tries++;
+          if (tries >= 200) {
+            pthread_mutex_unlock(&main_lock);
+            return nullptr;
+          }
         }
         rc |= fpga_pci_peek(pci_bar_handle, RESP_BITS, &i);
-        rc |= fpga_pci_poke(pci_bar_handle, RESP_VALID, 1);
+        rc |= fpga_pci_poke(pci_bar_handle, RESP_READY, 1);
       }
       if (rc) {
         fprintf(stderr, "Error in fpga pci peek/poke\t%s\n", strerror(errno));
@@ -64,6 +66,7 @@ static void* poll_thread(void * in) {
   pthread_mutex_unlock(&main_lock);
   return nullptr;
 }
+
 void response_poller::start_poller() {
   pthread_t thread;
   pthread_create(&thread, nullptr, poll_thread, nullptr);

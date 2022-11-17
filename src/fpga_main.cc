@@ -28,17 +28,16 @@ int main(int argc, char **argv)
 {
   fpga_setup(0);
 
-  d_server = new data_server;
+//  d_server = new data_server;
   c_server = new cmd_server;
   response_poller poller;
 
-  d_server->start();
+//  d_server->start();
   c_server->start();
   poller.start_poller();
   pthread_mutex_lock(&main_lock);
   pthread_mutex_lock(&main_lock);
   fpga_shutdown();
-  sleep(25);
 #ifdef VSIM
   *exit_code = 0;
 #endif

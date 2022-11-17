@@ -27,7 +27,7 @@ int main() {
 #ifndef USEMAIN
   pci_bar_handle_t pci_bar_handle = PCI_BAR_HANDLE_INIT;
 #else
-  pci_bar_handle = PCI_BAR_HANDLE_INIT;
+  int pci_bar_handle = PCI_BAR_HANDLE_INIT;
   int rc = fpga_pci_attach(0, FPGA_APP_PF, APP_PF_BAR0, 0, &pci_bar_handle);
   check_rc(rc, "fpga_pci_attach FAILED");
 #endif
