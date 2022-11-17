@@ -67,7 +67,7 @@ void fpga_setup(int slot_id) {
 
 
 void fpga_shutdown() {
-  int rc = fpga_pci_detach(pci_bar_handle);
+  int rc = fpga_mgmt_close();
   // don't call check_rc because of fpga_shutdown call. do it manually:
   check_rc(rc, "Failure while detaching from the fpga");
 }

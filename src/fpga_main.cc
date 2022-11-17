@@ -13,6 +13,7 @@ data_server *d_server;
 cmd_server *c_server;
 
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
+
 #include <ctime>
 
 #ifdef VSIM
@@ -25,22 +26,18 @@ extern "C" void test_main_hook(uint32_t *exit_code)
 int main(int argc, char **argv)
 #endif
 {
-  //fpga_setup(0);
-  // d_server = new data_server;
+  fpga_setup(0);
+
+  d_server = new data_server;
   c_server = new cmd_server;
-  // d_server->start();
+  response_poller poller;
+
+  d_server->start();
   c_server->start();
-  //response_poller poller;
-  //poller.start_poller();
-  //pthread_mutex_lock(&main_lock);
-  //pthread_mutex_lock(&main_lock);
-  //fpga_shutdown();~
-  for (int j = 0; j < 5; ++j) {
-    for (int i = 0; i < 400; ++i) {
-      cosim_printf("WAKEUP CHRIS GOGOGOGOGOGOGO\t");
-    }
-    cosim_printf("\n");
-  }
+  poller.start_poller();
+  pthread_mutex_lock(&main_lock);
+  pthread_mutex_lock(&main_lock);
+  fpga_shutdown();
   sleep(25);
 #ifdef VSIM
   *exit_code = 0;
