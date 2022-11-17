@@ -46,8 +46,12 @@ std::map<uint64_t, std::queue<memory_transaction *> *> in_flight_writes;
 void enqueue_transaction(v_address_channel<QData> &chan, std::queue<memory_transaction *> &lst) {
   if (*chan.valid && *chan.ready) {
     char *addr = (char *) at.translate(*chan.addr);
-    auto tx = new memory_transaction(addr, 1 << *chan.size,
-                                     *chan.len + 1, 0, *chan.burst == 0, *chan.id, *chan.addr);
+    int sz = 1 << *chan.size;
+    int len = 1 + *chan.len; // per axi
+    bool is_fixed = *chan.burst == 0;
+    int id = *chan.id;
+    uint64_t fpga_addr = *chan.addr;
+    auto tx = new memory_transaction(addr, sz, len, 0, is_fixed, id, fpga_addr);
     lst.push(tx);
   }
 }
