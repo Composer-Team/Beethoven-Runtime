@@ -2,8 +2,10 @@
 // Created by Chris Kjellqvist on 11/17/22.
 //
 #include "composer_allocator_declaration.h"
+extern "C" {
 #include "fpga_pci_sv.h"
 #include "sh_dpi_tasks.h"
+};
 #include <composer/rocc_cmd.h>
 
 extern "C" void test_main_hook(int *rc) {
