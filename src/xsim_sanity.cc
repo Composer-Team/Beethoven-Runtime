@@ -25,11 +25,14 @@ int main() {
   uint32_t p[] = {0x2200407b, 0x0, 0x20, 0x0, 0x40};
 
 #ifndef USEMAIN
-  pci_bar_handle_t pci_bar_handle = PCI_BAR_HANDLE_INIT;
+  int pci_bar_handle_t pci_bar_handle = PCI_BAR_HANDLE_INIT;
 #else
-  pci_bar_handle = PCI_BAR_HANDLE_INIT;
+  int pci_bar_handle = PCI_BAR_HANDLE_INIT;
   int rc = fpga_pci_attach(0, FPGA_APP_PF, APP_PF_BAR0, 0, &pci_bar_handle);
-  check_rc(rc, "fpga_pci_attach FAILED");
+  if (rc) {
+	  printf("Fail\n");
+	  exit(1);
+  }
 #endif
   for (int i = 0; i < 5; ++i) {
     cosim_printf("testing %d\n", i);
