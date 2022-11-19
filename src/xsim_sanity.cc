@@ -25,7 +25,7 @@ int main() {
   uint32_t p[] = {0x2200407b, 0x0, 0x20, 0x0, 0x40};
 
 #ifndef USEMAIN
-  int pci_bar_handle_t pci_bar_handle = PCI_BAR_HANDLE_INIT;
+  pci_bar_handle_t pci_bar_handle = PCI_BAR_HANDLE_INIT;
 #else
   int pci_bar_handle = PCI_BAR_HANDLE_INIT;
   int rc = fpga_pci_attach(0, FPGA_APP_PF, APP_PF_BAR0, 0, &pci_bar_handle);
