@@ -72,13 +72,12 @@ address_translator at;
         allocator->free(composer::remote_ptr(addr.op_argument, 0));
         at.remove_mapping(addr.op_argument);
         break;
-#ifdef SIM
+#if defined(SIM)
         case data_server_op::MOVE_TO_FPGA:
         case data_server_op::MOVE_FROM_FPGA:
           // noop
           break;
-#endif
-#ifdef FPGA
+#elif defined (FPGA)
       case data_server_op::MOVE_FROM_FPGA: {
         auto *dst = (uint8_t *) addr.op_argument;
         wrapper_fpga_dma_burst_read(xdma_read_fd, dst, addr.op3_argument, addr.op2_argument);
@@ -91,6 +90,8 @@ address_translator at;
         printf("finished transfering\n"); fflush(stdout);
         break;
       }
+#else
+#error("Doesn't appear that we're covering all cases inside data server")
 #endif
     }
     // un-lock client to read response
