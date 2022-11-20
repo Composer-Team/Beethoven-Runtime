@@ -45,13 +45,13 @@ std::unordered_map<system_core_pair, std::queue<int>*> in_flight;
 
 static void* cmd_server_f(void* _) {
   // map in the shared file
-  int fd_composer = shm_open(cmd_server_file_name.c_str(), O_CREAT | O_RDWR, S_IROTH | S_IWOTH);
+  int fd_composer = shm_open(cmd_server_file_name.c_str(), O_CREAT | O_RDWR, file_access_flags);
   if (fd_composer < 0) {
-    printf("Failed to initialize cmd_file\n");
+    printf("Failed to initialize cmd_file\n%s\n", strerror(errno));
     exit(errno);
   }
   ftruncate(fd_composer, sizeof(cmd_server_file));
-  auto &addr = *(cmd_server_file*)mmap(nullptr, sizeof(cmd_server_file), PROT_READ | PROT_WRITE,
+  auto &addr = *(cmd_server_file*)mmap(nullptr, sizeof(cmd_server_file), file_access_prots,
                                  MAP_SHARED, fd_composer, 0);
   csf = &addr;
   // we need to initialize it! This used to be a race condition, where the cmd_server thread was racing against the

@@ -31,9 +31,9 @@ address_translator at;
 [[noreturn]] static void *data_server_f(void *server) {
   auto *ds = (data_server *) server;
 
-  int fd_composer = shm_open(data_server_file_name.c_str(), O_CREAT | O_RDWR, S_IROTH | S_IWOTH);
+  int fd_composer = shm_open(data_server_file_name.c_str(), O_CREAT | O_RDWR, file_access_flags);
   ftruncate(fd_composer, sizeof(data_server_file));
-  auto &addr = *(data_server_file *) mmap(nullptr, sizeof(data_server_file), PROT_READ | PROT_WRITE,
+  auto &addr = *(data_server_file *) mmap(nullptr, sizeof(data_server_file), file_access_prots,
                                           MAP_SHARED, fd_composer, 0);
   cf = &addr;
 
@@ -53,9 +53,9 @@ address_translator at;
       case data_server_op::ALLOC: {
         auto fname = "/composer_file_" + std::to_string(req_num);
         req_num++;
-        int nfd = shm_open(fname.c_str(), O_CREAT | O_RDWR, S_IWUSR | S_IRUSR);
+        int nfd = shm_open(fname.c_str(), O_CREAT | O_RDWR, file_access_flags);
         ftruncate(nfd, (off_t) addr.op_argument);
-        void *naddr = mmap(nullptr, addr.op_argument, PROT_READ | PROT_WRITE,
+        void *naddr = mmap(nullptr, addr.op_argument, file_access_prots,
                            MAP_SHARED, nfd, 0);
         //write response
         // copy file name to response field

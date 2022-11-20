@@ -6,34 +6,34 @@
 #define COMPOSER_VERILATOR_DDR_MACROS_H
 
 #define init_ddr_interface(DDR_NUM) \
-axi4_mems[DDR_NUM].aw = new v_address_channel(&top->axi4_mem_ ## DDR_NUM ## _aw_ready, \
-                                      &top->axi4_mem_ ## DDR_NUM ## _aw_valid, \
-                                      &top->axi4_mem_ ## DDR_NUM ## _aw_bits_id, \
-                                      &top->axi4_mem_ ## DDR_NUM ## _aw_bits_size, \
-                                      &top->axi4_mem_ ## DDR_NUM ## _aw_bits_burst, \
-                                      &top->axi4_mem_ ## DDR_NUM ## _aw_bits_addr, \
-                                      &top->axi4_mem_ ## DDR_NUM ## _aw_bits_len); \
-axi4_mems[DDR_NUM].ar = new v_address_channel(&top->axi4_mem_ ## DDR_NUM ## _ar_ready, \
-                                      &top->axi4_mem_ ## DDR_NUM ## _ar_valid, \
-                                      &top->axi4_mem_ ## DDR_NUM ## _ar_bits_id, \
-                                      &top->axi4_mem_ ## DDR_NUM ## _ar_bits_size, \
-                                      &top->axi4_mem_ ## DDR_NUM ## _ar_bits_burst, \
-                                      &top->axi4_mem_ ## DDR_NUM ## _ar_bits_addr, \
-                                      &top->axi4_mem_ ## DDR_NUM ## _ar_bits_len); \
-axi4_mems[DDR_NUM].w = new data_channel(&top->axi4_mem_ ## DDR_NUM ## _w_ready, \
-                                  &top->axi4_mem_ ## DDR_NUM ## _w_valid, \
-                                  &top->axi4_mem_ ## DDR_NUM ## _w_bits_data, \
-                                  &top->axi4_mem_ ## DDR_NUM ## _w_bits_strb, \
-                                  &top->axi4_mem_ ## DDR_NUM ## _w_bits_last, \
+axi4_mems[DDR_NUM].aw = new v_address_channel(&top->mem_ ## DDR_NUM ## _aw_ready, \
+                                      &top->mem_ ## DDR_NUM ## _aw_valid, \
+                                      &top->mem_ ## DDR_NUM ## _aw_bits_id, \
+                                      &top->mem_ ## DDR_NUM ## _aw_bits_size, \
+                                      &top->mem_ ## DDR_NUM ## _aw_bits_burst, \
+                                      &top->mem_ ## DDR_NUM ## _aw_bits_addr, \
+                                      &top->mem_ ## DDR_NUM ## _aw_bits_len); \
+axi4_mems[DDR_NUM].ar = new v_address_channel(&top->mem_ ## DDR_NUM ## _ar_ready, \
+                                      &top->mem_ ## DDR_NUM ## _ar_valid, \
+                                      &top->mem_ ## DDR_NUM ## _ar_bits_id, \
+                                      &top->mem_ ## DDR_NUM ## _ar_bits_size, \
+                                      &top->mem_ ## DDR_NUM ## _ar_bits_burst, \
+                                      &top->mem_ ## DDR_NUM ## _ar_bits_addr, \
+                                      &top->mem_ ## DDR_NUM ## _ar_bits_len); \
+axi4_mems[DDR_NUM].w = new data_channel(&top->mem_ ## DDR_NUM ## _w_ready, \
+                                  &top->mem_ ## DDR_NUM ## _w_valid, \
+                                  &top->mem_ ## DDR_NUM ## _w_bits_data, \
+                                  &top->mem_ ## DDR_NUM ## _w_bits_strb, \
+                                  &top->mem_ ## DDR_NUM ## _w_bits_last, \
                                   nullptr); \
-axi4_mems[DDR_NUM].r = new data_channel(&top->axi4_mem_ ## DDR_NUM ## _r_ready, \
-                                  &top->axi4_mem_ ## DDR_NUM ## _r_valid, \
-                                  &top->axi4_mem_ ## DDR_NUM ## _r_bits_data, \
+axi4_mems[DDR_NUM].r = new data_channel(&top->mem_ ## DDR_NUM ## _r_ready, \
+                                  &top->mem_ ## DDR_NUM ## _r_valid, \
+                                  &top->mem_ ## DDR_NUM ## _r_bits_data, \
                                   nullptr, \
-                                  &top->axi4_mem_ ## DDR_NUM ## _r_bits_last, \
-                                  &top->axi4_mem_ ## DDR_NUM ## _r_bits_id); \
-axi4_mems[DDR_NUM].b = new response_channel(&top->axi4_mem_ ## DDR_NUM ## _b_ready, \
-                                      &top->axi4_mem_ ## DDR_NUM ## _b_valid, \
-                                      &top->axi4_mem_ ## DDR_NUM ## _b_bits_id); \
+                                  &top->mem_ ## DDR_NUM ## _r_bits_last, \
+                                  &top->mem_ ## DDR_NUM ## _r_bits_id); \
+axi4_mems[DDR_NUM].b = new response_channel(&top->mem_ ## DDR_NUM ## _b_ready, \
+                                      &top->mem_ ## DDR_NUM ## _b_valid, \
+                                      &top->mem_ ## DDR_NUM ## _b_bits_id); \
 
 #endif //COMPOSER_VERILATOR_DDR_MACROS_H
