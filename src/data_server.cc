@@ -12,12 +12,12 @@
 #include <composer/verilator_server.h>
 
 #include "../include/data_server.h"
-#include "verilator.h"
 
 #include <fcntl.h>
 
 #ifdef SIM
 extern bool kill_sig;
+#include "verilator.h"
 #include "verilated_vcd_c.h"
 
 #endif

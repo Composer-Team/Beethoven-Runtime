@@ -14,6 +14,7 @@
 #include <tuple>
 #include <cassert>
 #include <cerrno>
+#include <cstring>
 
 #include "response_poller.h"
 
