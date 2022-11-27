@@ -12,11 +12,14 @@
 #include <composer/verilator_server.h>
 
 #include "../include/data_server.h"
+#include "verilator.h"
 
 #include <fcntl.h>
 
 #ifdef SIM
 extern bool kill_sig;
+#include "verilated_vcd_c.h"
+
 #endif
 
 #ifdef FPGA
@@ -99,9 +102,6 @@ address_translator at;
     // re-lock self to stall
     pthread_mutex_lock(&addr.server_mut);
   }
-
-  delete allocator;
-  return nullptr;
 }
 
 void data_server::start() {
@@ -120,11 +120,9 @@ void *address_translator::translate(uint64_t fp_addr) {
   if (it == mappings.end()) {
     fprintf(stderr, "BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: %llx\n", fp_addr);
 #ifdef SIM
-    kill_sig = true;
-    return nullptr;
-#else
-    exit(1);
+    tfp->close();
 #endif
+    throw std::exception();
   }
   if (it->fpga_addr + it->mapping_length <= fp_addr) {
     fprintf(stderr, "ADDRESS IS OUT OF BOUNDS FROM FPGA -> CPU\n");

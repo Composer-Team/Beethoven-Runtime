@@ -5,8 +5,10 @@
 #ifndef COMPOSER_VERILATOR_VERILATOR_H
 #define COMPOSER_VERILATOR_VERILATOR_H
 #include <verilated.h>
+#include "dram_system.h"
+extern VerilatedVcdC *tfp;
 
-void run_verilator(int argc, char **argv);
+void run_verilator();
 template<typename addr_ty>
 struct v_address_channel {
   CData *ready = nullptr;
@@ -36,12 +38,12 @@ struct v_address_channel {
 };
 
 struct data_channel {
-  CData *ready;
-  CData *valid;
-  VlWide<16> *data;
-  CData *id;
-  QData *strobe;
-  CData *last;
+  CData * ready;
+   CData *valid;
+   VlWide<16> *data;
+   CData * const id;
+   QData *strobe;
+   CData *last;
 
   explicit data_channel(CData *ready,
                         CData *valid,
@@ -81,7 +83,12 @@ struct mem_interface {
   response_channel *b = nullptr;
   std::queue<memory_transaction*> write_transactions;
   std::queue<memory_transaction*> read_transactions;
+  int id;
 #ifdef USE_DRAMSIM
+  std::map<uint64_t, std::queue<memory_transaction *> *> in_flight_reads;
+  std::map<uint64_t, std::queue<memory_transaction *> *> in_flight_writes;
+  dramsim3::JedecDRAMSystem *mem_sys;
+
   memory_transaction* to_enqueue_read = nullptr;
   memory_transaction* to_enqueue_write = nullptr;
   int r_progress = 0;

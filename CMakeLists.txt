@@ -78,7 +78,7 @@ include_directories($ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src)
 if (${BUILD_SIM})
     verilate(Composer_Verilator
             SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v TOP_MODULE ComposerTop
-            VERILATOR_ARGS -LDFLAGS "-undefined dynamic_lookup -lpthread" # --threads 2
+            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "-undefined dynamic_lookup -lpthread" --threads 4
             TRACE
             )
 endif ()
