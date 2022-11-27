@@ -5,7 +5,9 @@
 #ifndef COMPOSER_VERILATOR_VERILATOR_H
 #define COMPOSER_VERILATOR_VERILATOR_H
 #include <verilated.h>
+#ifdef USE_DRAMSIM
 #include "dram_system.h"
+#endif
 extern VerilatedVcdC *tfp;
 
 void run_verilator();

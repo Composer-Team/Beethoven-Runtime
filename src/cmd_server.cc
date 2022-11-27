@@ -67,17 +67,22 @@ static void* cmd_server_f(void* _) {
   pthread_mutex_lock(&addr.server_mut);
   while(true) {
     // allocate space for response
-    pthread_mutex_lock(&addr.free_list_lock);
-    int id = addr.free_list[addr.free_list_idx];
-    addr.free_list_idx--;
-    pthread_mutex_unlock(&addr.free_list_lock);
+    int id;
+    if (addr.cmd.getXd()) {
+      pthread_mutex_lock(&addr.free_list_lock);
+      id = addr.free_list[addr.free_list_idx];
+      addr.free_list_idx--;
+      pthread_mutex_unlock(&addr.free_list_lock);
 
-    // return response handle to client
-    addr.pthread_wait_id = id;
-    // end return response handle to client
+      // return response handle to client
+      addr.pthread_wait_id = id;
+      // end return response handle to client
 
-    // enqueue command for main simulation thread to handle
-    addr.pthread_wait_id = id;
+      // enqueue command for main simulation thread to handle
+      addr.pthread_wait_id = id;
+    } else {
+      addr.pthread_wait_id = id = 0xffff;
+    }
     pthread_mutex_lock(&cmdserverlock);
     if (addr.quit) {
       pthread_mutex_unlock(&main_lock);
@@ -122,6 +127,7 @@ static void* cmd_server_f(void* _) {
         m[key] = q;
       } else
         q = iterator->second;
+      assert(id != 0xffff);
       q->push(id);
     }
     pthread_mutex_unlock(&addr.cmd_recieve_server_resp_lock);
