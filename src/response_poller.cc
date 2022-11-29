@@ -37,10 +37,10 @@ static void *poll_thread(void *in) {
         while (!resp_ready) {
           rc |= fpga_pci_peek(pci_bar_handle, RESP_VALID, &resp_ready);
           if (not resp_ready) {
-            std::this_thread::sleep_for(300ms);
+            std::this_thread::sleep_for(1ms);
           }
           tries++;
-          printf(".");
+//          printf(".");
         }
         rc |= fpga_pci_peek(pci_bar_handle, RESP_BITS, &i);
         rc |= fpga_pci_poke(pci_bar_handle, RESP_READY, 1);

@@ -50,7 +50,7 @@ address_translator at;
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
   while (true) {
-    printf("data server got cmd\n"); fflush(stdout);
+//    printf("data server got cmd\n"); fflush(stdout);
     // get file name, descriptor, expand the file, and map it to address space
     switch (addr.operation) {
       case data_server_op::ALLOC: {
@@ -99,9 +99,9 @@ address_translator at;
       }
       case data_server_op::MOVE_TO_FPGA: {
         auto *src = (uint8_t *) addr.op2_argument;
-        printf("trying to transfer\n"); fflush(stdout);
+//        printf("trying to transfer\n"); fflush(stdout);
         wrapper_fpga_dma_burst_write(xdma_write_fd, src, addr.op3_argument, addr.op2_argument);
-        printf("finished transfering\n"); fflush(stdout);
+//        printf("finished transfering\n"); fflush(stdout);
         break;
       }
 #else
