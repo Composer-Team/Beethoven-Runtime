@@ -57,9 +57,20 @@ address_translator at;
         auto fname = "/composer_file_" + std::to_string(req_num);
         req_num++;
         int nfd = shm_open(fname.c_str(), O_CREAT | O_RDWR, file_access_flags);
-        ftruncate(nfd, (off_t) addr.op_argument);
-        void *naddr = mmap(nullptr, addr.op_argument, file_access_prots,
-                           MAP_SHARED, nfd, 0);
+        if (nfd < 0) {
+          printf("Failed to open shared memory segment: %s\n", strerror(errno));
+          throw std::exception();
+        }
+//        int rc = ftruncate(nfd, (off_t) addr.op_argument);
+//        if (rc) {
+//          printf("Failed to truncate! - %d, %d, %llu\t %s\n", rc, nfd, (off_t)addr.op_argument, strerror(errno));
+//          throw std::exception();
+//        }
+        void *naddr = mmap(nullptr, addr.op_argument, file_access_prots, MAP_SHARED, nfd, 0);
+
+        if (naddr == nullptr) {
+          printf("Failed to mmap address! - %s\n", strerror(errno));
+        }
         //write response
         // copy file name to response field
         strcpy(addr.fname, fname.c_str());

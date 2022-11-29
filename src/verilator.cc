@@ -86,6 +86,7 @@ enum update_state {
 struct command_transaction {
   uint32_t *cmdbuf = nullptr;
   int8_t progress = 0;
+  int id = 0;
   cmd_transfer_state state = CMD_INACTIVE;
   bool ready_for_command = false;
 
@@ -190,6 +191,8 @@ void run_verilator() {
   top->dma_b_valid = 0;
   top->dma_r_valid = 0;
 
+  std::map<std::tuple<int, int>, unsigned long long> start_times;
+
   for (int i = 0; i < 50; ++i) {
     top->clock = 0;
     top->eval();
@@ -213,7 +216,7 @@ void run_verilator() {
   while (not kill_sig) {
     // clock is high after posedge - changes now are taking place after posedge,
     // and will take effect on negedge
-    if (main_time % 10000 <= 1) {
+    if (main_time % 1000000 <= 1) {
       printf("main time: %lld\n", main_time);
     }
 
@@ -232,7 +235,7 @@ void run_verilator() {
         top->ocl_0_aw_bits_addr = CMD_BITS;
         if (top->ocl_0_aw_ready) {
           ongoing_cmd.state = CMD_BITS_WRITE_DAT;
-          printf("to write dat\n");
+//          printf("to write dat\n");
         }
         break;
         // send the command over the PCIE bus
@@ -241,8 +244,8 @@ void run_verilator() {
         top->ocl_0_w_bits_data = ongoing_cmd.cmdbuf[ongoing_cmd.progress];
         if (top->ocl_0_w_ready) {
           ongoing_cmd.state = CMD_BITS_WRITE_B;
-          printf("wrote %d, going to bits write response. BITS: %08x\n", ongoing_cmd.progress,
-                 ongoing_cmd.cmdbuf[ongoing_cmd.progress]);
+//          printf("wrote %d, going to bits write response. BITS: %08x\n", ongoing_cmd.progress,
+//                 ongoing_cmd.cmdbuf[ongoing_cmd.progress]);
         }
         break;
       case CMD_BITS_WRITE_B:
@@ -250,7 +253,7 @@ void run_verilator() {
         if (top->ocl_0_b_valid) {
           if (top->ocl_0_b_bits_resp == 0) {
             ongoing_cmd.state = CMD_VALID_ADDR;
-            printf("to valid addr\n");
+//            printf("to valid addr\n");
           } else {
             fprintf(stderr, "Recieved error from write response!");
             exit(1);
@@ -264,7 +267,7 @@ void run_verilator() {
         top->ocl_0_aw_bits_len = 0; // length is actually one - see AXI spec
         top->ocl_0_aw_bits_id = 0;
         if (top->ocl_0_aw_ready) {
-          printf("to valid dat\n");
+//          printf("to valid dat\n");
           ongoing_cmd.state = CMD_VALID_DAT;
         }
         break;
@@ -273,7 +276,7 @@ void run_verilator() {
         top->ocl_0_w_valid = 1;
         top->ocl_0_w_bits_data = 1;
         if (top->ocl_0_w_ready) {
-          printf("to valid b\n");
+//          printf("to valid b\n");
           ongoing_cmd.state = CMD_VALID_WRITE_B;
         }
         break;
@@ -284,12 +287,13 @@ void run_verilator() {
             ongoing_cmd.progress++;
             // send last thing, yield bus
             if (ongoing_cmd.progress == command_transaction::payload_length) {
-              printf("Command finished. To CMD_INACTIVE\n");
+//              printf("Command finished. To CMD_INACTIVE\n");
+              // TODO
               ongoing_cmd.state = CMD_INACTIVE;
               bus_occupied = false;
             } else {
-              printf("Progress %d/%d. Continuing to CMD_RECHECK_READY_ADDR\n", ongoing_cmd.progress,
-                     command_transaction::payload_length);
+//              printf("Progress %d/%d. Continuing to CMD_RECHECK_READY_ADDR\n", ongoing_cmd.progress,
+//                     command_transaction::payload_length);
               // else, need to send the next 32-bit chunk and see that the channel is "ready"
               ongoing_cmd.state = CMD_RECHECK_READY_ADDR;
             }
@@ -329,9 +333,13 @@ void run_verilator() {
             printf("\tGot command from cmd_server!\n");
             bus_occupied = true;
             ongoing_cmd.state = CMD_BITS_WRITE_ADDR;
+            if (cmds.front().getXd()) {
+              auto id = std::tuple<int, int>(cmds.front().getSystemId(), cmds.front().getCoreId());
+              start_times[id] = main_time;
+            }
             ongoing_cmd.cmdbuf = cmds.front().pack(pack_cfg);
             kill_sig = cmds.front().getOpcode() == ROCC_OP_FLUSH;
-            std::cout << cmds.front() << std::endl << std::endl;
+//            std::cout << cmds.front() << std::endl << std::endl;
             ongoing_cmd.progress = 0;
             if (cmds.front().getXd() == 1)
               cmds_in_flight++;
@@ -350,14 +358,14 @@ void run_verilator() {
         top->ocl_0_ar_valid = 1;
         top->ocl_0_ar_bits_id = 0;
         if (top->ocl_0_ar_ready) {
-          printf("respt-bits-addr -> respt-bits-read\n");
+//          printf("respt-bits-addr -> respt-bits-read\n");
           ongoing_rsp.state = RESPT_BITS_READ;
         }
       case RESPT_BITS_READ:
         top->ocl_0_r_ready = 1;
         if (top->ocl_0_r_valid) {
           ongoing_rsp.resbuf[ongoing_rsp.progress++] = top->ocl_0_r_bits_data;
-          printf("respt-bits-read -> respt-ready-addr\n");
+//          printf("respt-bits-read -> respt-ready-addr\n");
           ongoing_rsp.state = RESPT_READY_ADDR;
         }
         break;
@@ -367,7 +375,7 @@ void run_verilator() {
         top->ocl_0_aw_bits_addr = RESP_READY;
         top->ocl_0_aw_bits_id = 0;
         if (top->ocl_0_aw_ready) {
-          printf("respt-ready-addr -> respt-ready-write\n");
+//          printf("respt-ready-addr -> respt-ready-write\n");
           ongoing_rsp.state = RESPT_READY_WRITE;
         }
         break;
@@ -375,7 +383,7 @@ void run_verilator() {
         top->ocl_0_w_valid = 1;
         top->ocl_0_w_bits_data = 1;
         if (top->ocl_0_w_ready) {
-          printf("respt-ready-write -> respt-ready-b\n");
+//          printf("respt-ready-write -> respt-ready-b\n");
           ongoing_rsp.state = RESPT_READY_WRITE_B;
         }
       case RESPT_READY_WRITE_B:
@@ -383,14 +391,18 @@ void run_verilator() {
         if (top->ocl_0_b_valid) {
           if (top->ocl_0_b_bits_resp == 0) {
             if (ongoing_rsp.progress == response_transaction::payload_length) {
+              composer::rocc_response r(ongoing_rsp.resbuf, pack_cfg);
+              auto id = std::tuple<int, int>(r.system_id, r.core_id);
+              auto start = start_times[id];
+              printf("Command took %f us\n", float((main_time-start )>>1)/1000);
               register_reponse(ongoing_rsp.resbuf);
               cmds_in_flight--;
               bus_occupied = false;
-              printf("respt-ready-b -> respt-inactive\n");
+//              printf("respt-ready-b -> respt-inactive\n");
               ongoing_rsp.state = RESPT_INACTIVE;
             } else {
-              printf("Not done yet %d/%d. respt-ready-b -> respt-recheck-valid-address\n", ongoing_rsp.progress,
-                     response_transaction::payload_length);
+//              printf("Not done yet %d/%d. respt-ready-b -> respt-recheck-valid-address\n", ongoing_rsp.progress,
+//                     response_transaction::payload_length);
               ongoing_rsp.state = RESPT_RECHECK_VALID_ADDR;
             }
           } else {
