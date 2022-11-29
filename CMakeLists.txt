@@ -73,12 +73,21 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 
 set(COMPOSER_HWDIR $ENV{COMPOSER_ROOT}/Composer-Hardware)
 
+if(APPLE)
+	message("Building for Apple")
+	set(verilator_args "-undefined dynamic_lookup ")
+elseif(UNIX)
+	message("Building for Linux")
+else()
+	message(FATAL_ERROR "Unsupported platform")
+endif()
+
 include_directories($ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src)
 
 if (${BUILD_SIM})
     verilate(Composer_Verilator
             SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v TOP_MODULE ComposerTop
-            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "-undefined dynamic_lookup -lpthread" --threads 4
+	    VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" --threads 4
             TRACE
             )
 endif ()
