@@ -61,11 +61,11 @@ address_translator at;
           printf("Failed to open shared memory segment: %s\n", strerror(errno));
           throw std::exception();
         }
-//        int rc = ftruncate(nfd, (off_t) addr.op_argument);
-//        if (rc) {
-//          printf("Failed to truncate! - %d, %d, %llu\t %s\n", rc, nfd, (off_t)addr.op_argument, strerror(errno));
-//          throw std::exception();
-//        }
+        int rc = ftruncate(nfd, (off_t) addr.op_argument);
+        if (rc) {
+          printf("Failed to truncate! - %d, %d, %llu\t %s\n", rc, nfd, (off_t)addr.op_argument, strerror(errno));
+          throw std::exception();
+        }
         void *naddr = mmap(nullptr, addr.op_argument, file_access_prots, MAP_SHARED, nfd, 0);
 
         if (naddr == nullptr) {
