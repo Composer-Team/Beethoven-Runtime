@@ -64,7 +64,6 @@ uint64_t f1_hack_addr(uint64_t addr) {
   data_server_file::init(addr);
 
   int req_num = 0;
-  pthread_mutex_lock(&addr.data_cmd_recieve_resp_lock);
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
   while (true) {
