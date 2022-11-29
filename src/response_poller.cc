@@ -22,12 +22,12 @@ using namespace std::chrono_literals;
 static void *poll_thread(void *in) {
   int flights;
   int tries = 0;
-  while (tries < 200) {
+  while (true) {
     tries++;
     pthread_mutex_lock(&csf->process_waiting_count_lock);
     flights = csf->processes_waiting;
     pthread_mutex_unlock(&csf->process_waiting_count_lock);
-    printf("Polling! In-flight: %d\n", flights);
+//    printf("Polling! In-flight: %d\n", flights);
 
     if (flights) {
       uint32_t buf[3];

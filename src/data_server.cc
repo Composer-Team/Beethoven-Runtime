@@ -77,11 +77,13 @@ uint64_t f1_hack_addr(uint64_t addr) {
           printf("Failed to open shared memory segment: %s\n", strerror(errno));
           throw std::exception();
         }
+	/*
         int rc = ftruncate(nfd, (off_t) addr.op_argument);
         if (rc) {
           printf("Failed to truncate! - %d, %d, %llu\t %s\n", rc, nfd, (off_t)addr.op_argument, strerror(errno));
           throw std::exception();
         }
+	*/
         void *naddr = mmap(nullptr, addr.op_argument, file_access_prots, MAP_SHARED, nfd, 0);
 
         if (naddr == nullptr) {
@@ -110,13 +112,14 @@ uint64_t f1_hack_addr(uint64_t addr) {
 #elif defined (FPGA)
       case data_server_op::MOVE_FROM_FPGA: {
         auto *dst = (uint8_t *) addr.op_argument;
-        wrapper_fpga_dma_burst_read(xdma_read_fd, dst, addr.op3_argument, f1_hack_addr(addr.op2_argument));
+        wrapper_fpga_dma_burst_read(xdma_read_fd, dst, addr.op3_argument, addr.op2_argument);
+	for (int i = 0; i < addr.op3_argument; ++i) printf("%d", dst[i]);
         break;
       }
       case data_server_op::MOVE_TO_FPGA: {
         auto *src = (uint8_t *) addr.op2_argument;
 //        printf("trying to transfer\n"); fflush(stdout);
-        wrapper_fpga_dma_burst_write(xdma_write_fd, src, addr.op3_argument, f1_hack_addr(addr.op2_argument));
+        wrapper_fpga_dma_burst_write(xdma_write_fd, src, addr.op3_argument, addr.op2_argument);
 //        printf("finished transfering\n"); fflush(stdout);
         break;
       }

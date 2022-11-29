@@ -66,6 +66,7 @@ static void* cmd_server_f(void* _) {
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
   while(true) {
+//    printf("got cmd\n");
     // allocate space for response
     int id;
     if (addr.cmd.getXd()) {
