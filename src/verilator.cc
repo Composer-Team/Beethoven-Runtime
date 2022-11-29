@@ -38,13 +38,13 @@ Config dramsim3config("../DRAMsim3/configs/DDR4_8Gb_x16_2666.ini", "./");
 #endif
 
 void enqueue_transaction(v_address_channel<QData> &chan, std::queue<memory_transaction *> &lst) {
-  if (*chan.valid && *chan.ready) {
-    char *addr = (char *) at.translate(*chan.addr);
-    int sz = 1 << *chan.size;
-    int len = 1 + *chan.len; // per axi
-    bool is_fixed = *chan.burst == 0;
-    int id = *chan.id;
-    uint64_t fpga_addr = *chan.addr;
+  if (chan.getValid() && chan.getValid()) {
+    char *addr = (char *) at.translate(chan.getAddr());
+    int sz = 1 << chan.getSize();
+    int len = 1 + chan.getLen(); // per axi
+    bool is_fixed = chan.getBurst() == 0;
+    int id = chan.getId();
+    uint64_t fpga_addr = chan.getAddr();
     auto tx = new memory_transaction(addr, sz, len, 0, is_fixed, id, fpga_addr);
     lst.push(tx);
   }
@@ -136,6 +136,19 @@ void run_verilator() {
   for (int i = 0; i < NUM_DDR_CHANNELS; ++i) {
     axi4_mems[i].id = i;
   }
+
+  mem_interface<QData> dma;
+  dma.aw = new v_address_channel<QData>(top->dma_aw_ready, top->dma_aw_valid, top->dma_aw_bits_id,
+                                        top->dma_aw_bits_size, top->dma_aw_bits_burst,
+                                        top->dma_aw_bits_addr, top->dma_aw_bits_len);
+  dma.ar = new v_address_channel<QData>(top->dma_ar_ready, top->dma_ar_valid, top->dma_ar_bits_id,
+                                        top->dma_ar_bits_size, top->dma_ar_bits_burst,
+                                        top->dma_ar_bits_addr, top->dma_ar_bits_len);
+  dma.w = new data_channel(top->dma_w_ready, top->dma_w_valid, top->dma_w_bits_data,
+                           &top->dma_w_bits_strb, top->dma_w_bits_last, nullptr);
+  dma.r = new data_channel(top->dma_r_ready, top->dma_r_valid, top->dma_r_bits_data,
+                           nullptr, top->dma_r_bits_last, &top->dma_r_bits_id);
+  dma.b = new response_channel(top->dma_b_ready, top->dma_b_valid, top->dma_b_bits_id);
 #ifdef USE_DRAMSIM
   for (auto &axi4_mem: axi4_mems) {
     axi4_mem.mem_sys = new JedecDRAMSystem(
@@ -179,12 +192,12 @@ void run_verilator() {
 
   for (auto &mem: axi4_mems) {
 #ifndef USE_DRAMSIM
-    *mem.ar->ready = 1;
-    *mem.w->ready = 0;
+    mem.ar->setReady(1);
+    mem.w->setReady(0);
 #endif
-    *mem.r->valid = 0;
-    *mem.b->valid = 0;
-    *mem.aw->ready = 1;
+    mem.r->setValid(0);
+    mem.b->setValid(0);
+    mem.aw->setReady(1);
   }
   top->dma_ar_valid = 0;
   top->dma_aw_valid = 0;
@@ -497,13 +510,13 @@ void run_verilator() {
     }
 #endif
     for (auto &inter: axi4_mems) {
-      if (*inter.r->valid && *inter.r->ready) {
+      if (inter.r->getValid() && inter.r->getReady()) {
         auto tx = inter.read_transactions.front();
         tx->progress++;
         if (not tx->fixed) {
           tx->addr += tx->size;
         }
-        if (*inter.r->last) {
+        if (inter.r->getLast()) {
           inter.read_transactions.pop();
           delete tx;
           tx = nullptr;
@@ -518,28 +531,28 @@ void run_verilator() {
 
     // ------------ HANDLE MEMORY INTERFACES ----------------
     for (mem_interface<QData> &inter: axi4_mems) {
-      if (not inter.read_transactions.empty() && not*inter.r->valid) {
+      if (not inter.read_transactions.empty() && not inter.r->getValid()) {
         auto tx = inter.read_transactions.front();
         int start = (tx->progress * tx->size) % DATA_BUS_WIDTH;
-        char *dest = (char *) inter.r->data->m_storage + start;
+        char *dest = (char *) inter.r->getData().m_storage + start;
         memcpy(dest, tx->addr, tx->size);
         bool am_done = tx->len == (tx->progress + 1);
-        *inter.r->valid = 1;
-        *inter.r->last = am_done;
-        *inter.r->id = tx->id;
+        inter.r->setValid(1);
+        inter.r->setLast(am_done);
+        inter.r->setId(tx->id);
       } else {
-        *inter.r->valid = 0;
+        inter.r->setValid(0);
       }
 
       // update all channels with new information now that we've updated states
       if (not inter.b->send_ids.empty()) {
-        *inter.b->valid = 1;
-        *inter.b->id = inter.b->send_ids.front();
-        if (*inter.b->ready) {
+        inter.b->setValid(1);
+        inter.b->setId(inter.b->send_ids.front());
+        if (inter.b->getReady()) {
           inter.b->send_ids.pop();
         }
       } else {
-        *inter.b->valid = 0;
+        inter.b->setValid(0);
       }
 
       if (inter.b->to_enqueue != -1) {
@@ -551,17 +564,17 @@ void run_verilator() {
       // write can respond before write address so just ahve to wait for address
       // to be recieved. ready and valid have to be high at the same time for this
       // to work
-      if (not inter.write_transactions.empty() and not*inter.w->ready) {
+      if (not inter.write_transactions.empty() and not inter.w->getReady()) {
 #ifdef USE_DRAMSIM
         *inter.w->ready = inter.to_enqueue_write == nullptr;
 #else
-        *inter.w->ready = 1;
+        inter.w->setReady(1);
 #endif
-        if (*inter.w->valid && *inter.w->ready) {
+        if (inter.w->getValid() && inter.w->getReady()) {
           auto trans = inter.write_transactions.front();
           // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
-          char *src = (char *) inter.w->data->m_storage;
-          uint64_t strobe = *inter.w->strobe;
+          char *src = (char *) inter.w->getData().m_storage;
+          uint64_t strobe =inter.w->getStrobe();
           uint32_t off = 0;
           // for writes, we need to account for alignment and strobe,so we're re-aligning address here
           // align to 64B - zero out bottom 6b
@@ -579,7 +592,7 @@ void run_verilator() {
             trans->addr += trans->size;
           }
 
-          if (*inter.w->last) {
+          if (inter.w->getLast()) {
             inter.write_transactions.pop();
 
 #ifdef USE_DRAMSIM
@@ -594,7 +607,7 @@ void run_verilator() {
           }
         }
       } else {
-        *inter.w->ready = 0;
+        inter.w->setReady(0);
       }
       enqueue_transaction(*inter.aw, inter.write_transactions);
 

@@ -63,7 +63,47 @@ uint64_t f1_hack_addr(uint64_t addr) {
   fprintf(stderr, "Constructed allocator\n");
   data_server_file::init(addr);
 
-  int req_num = 0;
+#ifdef FPGA
+  std::cerr << "Running FPGA MemCpy Sanity Checks..." << std::endl;
+  auto sanity_alloc = (uint8_t*)malloc(1024);
+  auto sanity_int = (uint32_t*)sanity_alloc;
+  unsigned long sanity_address = 0xDEAD0000L;
+  for (int i = 0; i < 1024 / 4; ++i) {
+    sanity_int[i] = 0xCAFEBEEF;
+  }
+  std::cerr << "Trying to write 1024B to FPGA." << std::endl;
+  int sanity_rc = wrapper_fpga_dma_burst_write(xdma_write_fd, sanity_alloc, 1024, sanity_address);
+  if (sanity_rc) {
+    std::cerr << "Failed to DMA write to FPGA. Error code: " << sanity_rc << std::endl;
+    throw std::exception();
+  } else {
+    std::cerr << "Success 1/3" << std::endl;
+  }
+  memset(sanity_alloc, 0, 1024);
+  sanity_rc = wrapper_fpga_dma_burst_read(xdma_read_fd, sanity_alloc, 1024, sanity_address);
+  if (sanity_rc) {
+    std::cerr << "Failed to DMA read from FPGA. Error code: " << sanity_rc << std::endl;
+    throw std::exception();
+  } else {
+    std::cerr << "Success 2/3" << std::endl;
+  }
+
+  for (int i = 0; i < 1024 / 4; ++i) {
+    if (sanity_int[i] != 0xCAFEBEEF) {
+      sanity_rc = 1;
+    }
+  }
+
+  if (sanity_rc) {
+    std::cerr << "While the DMA read operation succeeded, the data we read back was faulty (not 0xCAFEBEEF)." << std::endl;
+    throw std::exception();
+  } else {
+    std::cerr << "Success 3/3" << std::endl;
+  }
+
+#endif
+
+  srand(time(0));
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
   while (true) {
@@ -71,8 +111,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
     // get file name, descriptor, expand the file, and map it to address space
     switch (addr.operation) {
       case data_server_op::ALLOC: {
-        auto fname = "/composer_file_" + std::to_string(req_num);
-        req_num++;
+        auto fname = "/composer_file_" + std::to_string(rand());
         int nfd = shm_open(fname.c_str(), O_CREAT | O_RDWR, file_access_flags);
         if (nfd < 0) {
           printf("Failed to open shared memory segment: %s\n", strerror(errno));
@@ -89,7 +128,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
           printf("Failed to mmap address! - %s\n", strerror(errno));
         }
 
-	memset(naddr, 0, addr.op_argument);
+        memset(naddr, 0, addr.op_argument);
         //write response
         // copy file name to response field
         strcpy(addr.fname, fname.c_str());
@@ -113,29 +152,31 @@ uint64_t f1_hack_addr(uint64_t addr) {
 #elif defined (FPGA)
       case data_server_op::MOVE_FROM_FPGA: {
         auto shaddr = at.translate(addr.op2_argument);
-	std::cout << "from fpga addr: " << addr.op2_argument << std::endl;
-        int rc = wrapper_fpga_dma_burst_read(xdma_read_fd, (uint8_t*)shaddr, addr.op3_argument, addr.op2_argument);
-	for(int i = 0; i < addr.op3_argument / sizeof(int); ++i) 
-		printf("%d ", ((int*)shaddr)[i]);
-	fflush(stdout);
-	if (rc) {
-		fprintf(stderr, "Something failed inside MOVE_FROM_FPGA - %d %p %d %x\n", xdma_read_fd, shaddr, addr.op3_argument, addr.op2_argument);
-		exit(1);
-	}
+        std::cout << "from fpga addr: " << addr.op2_argument << std::endl;
+        int rc = wrapper_fpga_dma_burst_read(xdma_read_fd, (uint8_t *) shaddr, addr.op3_argument, addr.op2_argument);
+        for (int i = 0; i < addr.op3_argument / sizeof(int); ++i)
+          printf("%d ", ((int *) shaddr)[i]);
+        fflush(stdout);
+        if (rc) {
+          fprintf(stderr, "Something failed inside MOVE_FROM_FPGA - %d %p %d %x\n", xdma_read_fd, shaddr,
+                  addr.op3_argument, addr.op2_argument);
+          exit(1);
+        }
         break;
       }
       case data_server_op::MOVE_TO_FPGA: {
         auto shaddr = at.translate(addr.op_argument);
 //        printf("trying to transfer\n"); fflush(stdout);
-	std::cout << "to fpga addr: " << addr.op_argument << std::endl;
-	for(int i = 0; i < addr.op3_argument / sizeof(int); ++i) 
-		printf("%d ", ((int*)shaddr)[i]);
-	fflush(stdout);
-        int rc = wrapper_fpga_dma_burst_write(xdma_write_fd, (uint8_t*)shaddr, addr.op3_argument, addr.op_argument);
-	if (rc) {
-		fprintf(stderr, "Something failed inside MOVE_TO_FPGA - %d %p %d %x\n", xdma_write_fd, shaddr, addr.op3_argument, addr.op2_argument);
-		exit(1);
-	}
+        std::cout << "to fpga addr: " << addr.op_argument << std::endl;
+        for (int i = 0; i < addr.op3_argument / sizeof(int); ++i)
+          printf("%d ", ((int *) shaddr)[i]);
+        fflush(stdout);
+        int rc = wrapper_fpga_dma_burst_write(xdma_write_fd, (uint8_t *) shaddr, addr.op3_argument, addr.op_argument);
+        if (rc) {
+          fprintf(stderr, "Something failed inside MOVE_TO_FPGA - %d %p %d %x\n", xdma_write_fd, shaddr,
+                  addr.op3_argument, addr.op2_argument);
+          exit(1);
+        }
 //        printf("finished transfering\n"); fflush(stdout);
         break;
       }
