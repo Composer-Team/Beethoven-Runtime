@@ -90,9 +90,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
           printf("Failed to mmap address! - %s\n", strerror(errno));
         }
 
-        for (int i = 0; i < addr.op_argument; ++i) {
-          ((char*)naddr)[i] = 0;
-        }
+	memset(naddr, 0, addr.op_argument);
         //write response
         // copy file name to response field
         strcpy(addr.fname, fname.c_str());
@@ -116,14 +114,29 @@ uint64_t f1_hack_addr(uint64_t addr) {
 #elif defined (FPGA)
       case data_server_op::MOVE_FROM_FPGA: {
         auto shaddr = at.translate(addr.op2_argument);
-        wrapper_fpga_dma_burst_read(xdma_read_fd, (uint8_t*)shaddr, addr.op3_argument, addr.op2_argument);
-        for (int i = 0; i < addr.op3_argument; ++i) printf("%d", shaddr);
+	std::cout << "from fpga addr: " << addr.op2_argument << std::endl;
+        int rc = wrapper_fpga_dma_burst_read(xdma_read_fd, (uint8_t*)shaddr, addr.op3_argument, addr.op2_argument);
+	for(int i = 0; i < addr.op3_argument / sizeof(int); ++i) 
+		printf("%d ", ((int*)shaddr)[i]);
+	fflush(stdout);
+	if (rc) {
+		fprintf(stderr, "Something failed inside MOVE_FROM_FPGA - %d %p %d %x\n", xdma_read_fd, shaddr, addr.op3_argument, addr.op2_argument);
+		exit(1);
+	}
         break;
       }
       case data_server_op::MOVE_TO_FPGA: {
-        auto shaddr = at.translate(addr.op2_argument);
+        auto shaddr = at.translate(addr.op_argument);
 //        printf("trying to transfer\n"); fflush(stdout);
-        wrapper_fpga_dma_burst_write(xdma_write_fd, (uint8_t*)shaddr, addr.op3_argument, addr.op2_argument);
+	std::cout << "to fpga addr: " << addr.op_argument << std::endl;
+	for(int i = 0; i < addr.op3_argument / sizeof(int); ++i) 
+		printf("%d ", ((int*)shaddr)[i]);
+	fflush(stdout);
+        int rc = wrapper_fpga_dma_burst_write(xdma_write_fd, (uint8_t*)shaddr, addr.op3_argument, addr.op_argument);
+	if (rc) {
+		fprintf(stderr, "Something failed inside MOVE_TO_FPGA - %d %p %d %x\n", xdma_write_fd, shaddr, addr.op3_argument, addr.op2_argument);
+		exit(1);
+	}
 //        printf("finished transfering\n"); fflush(stdout);
         break;
       }

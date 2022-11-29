@@ -27,8 +27,9 @@ static void *poll_thread(void *in) {
     pthread_mutex_lock(&csf->process_waiting_count_lock);
     flights = csf->processes_waiting;
     pthread_mutex_unlock(&csf->process_waiting_count_lock);
-//    printf("Polling! In-flight: %d\n", flights);
 
+    printf(".");
+    fflush(stdout);
     if (flights) {
       uint32_t buf[3];
       int rc = 0;
