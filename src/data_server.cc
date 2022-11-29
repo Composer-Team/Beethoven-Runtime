@@ -31,6 +31,22 @@ using namespace composer;
 static composer::data_server_file *cf;
 address_translator at;
 
+uint64_t f1_hack_addr(uint64_t addr) {
+  // 1 2 0 3
+  // 0 1 2 3
+  uint64_t dimm = addr >> 34;
+  switch (dimm) {
+    case 0:
+      return 0x800000000 | (addr & 0x3ffffffff);
+    case 1:
+      return addr & 0x3ffffffff;
+    case 2:
+      return 0x100000000 | (addr & 0x3ffffffff);
+    default:
+      return addr;
+  }
+}
+
 [[noreturn]] static void *data_server_f(void *server) {
   auto *ds = (data_server *) server;
 
@@ -94,13 +110,13 @@ address_translator at;
 #elif defined (FPGA)
       case data_server_op::MOVE_FROM_FPGA: {
         auto *dst = (uint8_t *) addr.op_argument;
-        wrapper_fpga_dma_burst_read(xdma_read_fd, dst, addr.op3_argument, addr.op2_argument);
+        wrapper_fpga_dma_burst_read(xdma_read_fd, dst, addr.op3_argument, f1_hack_addr(addr.op2_argument));
         break;
       }
       case data_server_op::MOVE_TO_FPGA: {
         auto *src = (uint8_t *) addr.op2_argument;
 //        printf("trying to transfer\n"); fflush(stdout);
-        wrapper_fpga_dma_burst_write(xdma_write_fd, src, addr.op3_argument, addr.op2_argument);
+        wrapper_fpga_dma_burst_write(xdma_write_fd, src, addr.op3_argument, f1_hack_addr(addr.op2_argument));
 //        printf("finished transfering\n"); fflush(stdout);
         break;
       }
