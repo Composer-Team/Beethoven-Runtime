@@ -52,7 +52,11 @@ static void* cmd_server_f(void* _) {
     printf("Failed to initialize cmd_file\n%s\n", strerror(errno));
     exit(errno);
   }
-  ftruncate(fd_composer, sizeof(cmd_server_file));
+  int tr_rc = ftruncate(fd_composer, sizeof(cmd_server_file));
+  if (tr_rc) {
+    std::cerr << "Failed to truncate cmd_server file" << std::endl;
+    throw std::exception();
+  }
   auto &addr = *(cmd_server_file*)mmap(nullptr, sizeof(cmd_server_file), file_access_prots,
                                  MAP_SHARED, fd_composer, 0);
   csf = &addr;
@@ -147,7 +151,7 @@ void register_reponse(uint32_t *r_buffer) {
   pthread_mutex_lock(&cmdserverlock);
   auto it = in_flight.find(pr);
   if (it == in_flight.end()) {
-    fprintf(stderr, "Error: Got bad response from HW: %x %x %x\n", r_buffer[0], r_buffer[1], r_buffer[2]);
+    std::cerr << "Error: Got bad response from HW: " << r_buffer[0] << " " << r_buffer[1] << " " << r_buffer[2] << std::endl;
     pthread_mutex_unlock(&cmdserverlock);
     pthread_mutex_unlock(&main_lock);
   } else {

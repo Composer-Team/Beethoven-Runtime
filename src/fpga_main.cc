@@ -24,12 +24,16 @@ extern "C" void test_main_hook(uint32_t *exit_code)
 int main(int argc, char **argv)
 #endif
 {
+#ifdef F1
   fpga_setup(0);
+#endif
   data_server::start();
   cmd_server::start();
   pthread_mutex_lock(&main_lock);
   pthread_mutex_lock(&main_lock);
+#ifdef F1
   fpga_shutdown();
+#endif
 #ifdef VSIM
   *exit_code = 0;
 #endif

@@ -58,9 +58,9 @@ uint64_t f1_hack_addr(uint64_t addr) {
                                           MAP_SHARED, fd_composer, 0);
   cf = &addr;
 
-  fprintf(stderr, "Constructing allocator\n");
+  std::cerr << "Constructing allocator" << std::endl;
   auto allocator = new composer_allocator();
-  fprintf(stderr, "Constructed allocator\n");
+  std::cerr << "Allocator constructed - data server ready" << std::endl;
   data_server_file::init(addr);
 
 #ifdef FPGA
@@ -124,18 +124,20 @@ uint64_t f1_hack_addr(uint64_t addr) {
         auto fname = "/composer_file_" + std::to_string(rand());
         int nfd = shm_open(fname.c_str(), O_CREAT | O_RDWR, file_access_flags);
         if (nfd < 0) {
-          printf("Failed to open shared memory segment: %s\n", strerror(errno));
+          std::cerr << "Failed to open shared memory segment: " << std::string(strerror(errno)) << std::endl;
           throw std::exception();
         }
         int rc = ftruncate(nfd, (off_t) addr.op_argument);
         if (rc) {
-          printf("Failed to truncate! - %d, %d, %llu\t %s\n", rc, nfd, (off_t) addr.op_argument, strerror(errno));
+          std::cerr << "Failed to truncate!" << std::endl;
+//          printf("Failed to truncate! - %d, %d, %llu\t %s\n", rc, nfd, (off_t) addr.op_argument, strerror(errno));
           throw std::exception();
         }
         void *naddr = mmap(nullptr, addr.op_argument, file_access_prots, MAP_SHARED, nfd, 0);
 
         if (naddr == nullptr) {
-          printf("Failed to mmap address! - %s\n", strerror(errno));
+          std::cerr << "Failed to mmap address: " << std::string(strerror(errno)) << std::endl;
+          throw std::exception();
         }
 
         memset(naddr, 0, addr.op_argument);
@@ -215,15 +217,15 @@ void *address_translator::translate(uint64_t fp_addr) {
     it++;
   }
   if (it == mappings.end()) {
-    fprintf(stderr, "BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: %llx\n", fp_addr);
+    std::cerr << "BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: " << fp_addr << std::endl;
 #ifdef SIM
     tfp->close();
 #endif
     throw std::exception();
   }
   if (it->fpga_addr + it->mapping_length <= fp_addr) {
-    fprintf(stderr, "ADDRESS IS OUT OF BOUNDS FROM FPGA -> CPU\n");
-    exit(1);
+    std::cerr << "ADDRESS IS OUT OF BOUNDS FROM FPGA -> CPU\n" << std::endl;
+    throw std::exception();
   }
   return (char *) it->cpu_addr + (fp_addr - it->fpga_addr);
 }
@@ -236,8 +238,8 @@ void address_translator::remove_mapping(uint64_t fpga_addr) {
   addr_pair a(fpga_addr, nullptr, 0);
   auto it = mappings.find(a);
   if (it == mappings.end()) {
-    printf("ERROR - could not remove mapping in data server because could not find address...\n");
-    exit(1);
+    std::cerr << "ERROR - could not remove mapping in data server because could not find address...\n" << std::endl;
+    throw std::exception();
   }
   mappings.erase(it);
 }
