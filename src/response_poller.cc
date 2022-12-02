@@ -4,7 +4,7 @@
 
 #include "response_poller.h"
 #include "fpga_utils.h"
-
+#include "mmio.h"
 #ifdef VSIM
 #include "sh_dpi_tasks.h"
 #endif
@@ -36,15 +36,14 @@ static void *poll_thread(void *in) {
       for (unsigned int &i: buf) {
         uint32_t resp_ready = 0;
         while (!resp_ready) {
-          rc |= fpga_pci_peek(pci_bar_handle, RESP_VALID, &resp_ready);
+          resp_ready = peek_mmio(RESP_VALID);
           if (not resp_ready) {
             std::this_thread::sleep_for(1ms);
           }
           tries++;
-//          printf(".");
         }
-        rc |= fpga_pci_peek(pci_bar_handle, RESP_BITS, &i);
-        rc |= fpga_pci_poke(pci_bar_handle, RESP_READY, 1);
+        i = peek_mmio(RESP_BITS);
+        poke_mmio(RESP_READY, 1);
       }
       if (rc) {
         fprintf(stderr, "Error in fpga pci peek/poke\t%s\n", strerror(errno));

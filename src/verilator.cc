@@ -20,9 +20,6 @@
 using namespace dramsim3;
 #endif
 
-// in bytes
-#define DATA_BUS_WIDTH 64
-
 Vcomposer *top;
 uint64_t main_time = 0;
 
@@ -37,7 +34,7 @@ bool kill_sig = false;
 Config dramsim3config("../DRAMsim3/configs/DDR4_8Gb_x16_2666.ini", "./");
 #endif
 
-void enqueue_transaction(v_address_channel<QData> &chan, std::queue<memory_transaction *> &lst) {
+void enqueue_transaction(v_address_channel &chan, std::queue<memory_transaction *> &lst) {
   if (chan.getValid() && chan.getValid()) {
     char *addr = (char *) at.translate(chan.getAddr());
     int sz = 1 << chan.getSize();
@@ -132,11 +129,12 @@ void run_verilator() {
   top->trace(tfp, 100);
   tfp->open("trace.vcd");
 
-  mem_interface<QData> axi4_mems[NUM_DDR_CHANNELS];
+  mem_interface axi4_mems[NUM_DDR_CHANNELS];
   for (int i = 0; i < NUM_DDR_CHANNELS; ++i) {
     axi4_mems[i].id = i;
   }
 
+#if defined(COMPOSER_HAS_DMA)
   mem_interface<QData> dma;
   dma.aw = new v_address_channel<QData>(top->dma_aw_ready, top->dma_aw_valid, top->dma_aw_bits_id,
                                         top->dma_aw_bits_size, top->dma_aw_bits_burst,
@@ -149,6 +147,7 @@ void run_verilator() {
   dma.r = new data_channel(top->dma_r_ready, top->dma_r_valid, top->dma_r_bits_data,
                            nullptr, top->dma_r_bits_last, &top->dma_r_bits_id);
   dma.b = new response_channel(top->dma_b_ready, top->dma_b_valid, top->dma_b_bits_id);
+#endif
 #ifdef USE_DRAMSIM
   for (auto &axi4_mem: axi4_mems) {
     axi4_mem.mem_sys = new JedecDRAMSystem(
@@ -189,7 +188,6 @@ void run_verilator() {
 #endif
   // reset circuit
   top->reset = 1;
-
   for (auto &mem: axi4_mems) {
 #ifndef USE_DRAMSIM
     mem.ar->setReady(1);
@@ -199,10 +197,12 @@ void run_verilator() {
     mem.b->setValid(0);
     mem.aw->setReady(1);
   }
+#ifdef COMPOSER_HAS_DMA
   top->dma_ar_valid = 0;
   top->dma_aw_valid = 0;
   top->dma_b_valid = 0;
   top->dma_r_valid = 0;
+#endif
 
   std::map<std::tuple<int, int>, unsigned long long> start_times;
 
@@ -519,7 +519,6 @@ void run_verilator() {
         if (inter.r->getLast()) {
           inter.read_transactions.pop();
           delete tx;
-          tx = nullptr;
         }
       }
     }
@@ -530,11 +529,11 @@ void run_verilator() {
     tfp->dump(main_time);
 
     // ------------ HANDLE MEMORY INTERFACES ----------------
-    for (mem_interface<QData> &inter: axi4_mems) {
+    for (mem_interface &inter: axi4_mems) {
       if (not inter.read_transactions.empty() && not inter.r->getValid()) {
         auto tx = inter.read_transactions.front();
-        int start = (tx->progress * tx->size) % DATA_BUS_WIDTH;
-        char *dest = (char *) inter.r->getData().m_storage + start;
+        int start = (tx->progress * tx->size) % (DATA_BUS_WIDTH/8);
+        char *dest = (char *) inter.r->getData() + start;
         memcpy(dest, tx->addr, tx->size);
         bool am_done = tx->len == (tx->progress + 1);
         inter.r->setValid(1);
@@ -566,19 +565,19 @@ void run_verilator() {
       // to work
       if (not inter.write_transactions.empty() and not inter.w->getReady()) {
 #ifdef USE_DRAMSIM
-        *inter.w->ready = inter.to_enqueue_write == nullptr;
+        inter.w->setReady(inter.to_enqueue_write == nullptr);
 #else
         inter.w->setReady(1);
 #endif
         if (inter.w->getValid() && inter.w->getReady()) {
           auto trans = inter.write_transactions.front();
           // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
-          char *src = (char *) inter.w->getData().m_storage;
-          uint64_t strobe =inter.w->getStrobe();
+          char *src = inter.w->getData();
+          ComposerStrobeSimDtype strobe = inter.w->getStrobe();
           uint32_t off = 0;
           // for writes, we need to account for alignment and strobe,so we're re-aligning address here
           // align to 64B - zero out bottom 6b
-          auto addr = (char *) ((uint64_t) trans->addr & 0xFFFFFFFFFFFFFFC0);
+          auto addr = trans->addr;
           while (strobe != 0) {
             if (strobe & 1) {
               addr[off] = src[off];
@@ -612,15 +611,15 @@ void run_verilator() {
       enqueue_transaction(*inter.aw, inter.write_transactions);
 
 #ifdef USE_DRAMSIM
-      if (*(inter.ar->ready) && *(inter.ar->valid)) {
-        uint64_t addr = *inter.ar->addr;
+      if (inter.ar->getReady() && inter.ar->getValid()) {
+        uint64_t addr = inter.ar->getAddr();
         char *ad = (char *) at.translate(addr);
-        auto txsize = (int) pow(2, *inter.ar->size);
-        auto txlen = *inter.ar->len + 1;
+        auto txsize = (int) pow(2, inter.ar->getSize());
+        auto txlen = inter.ar->getLen() + 1;
         auto dram_txlen = txsize * txlen >> 3;
         if (dram_txlen == 0) dram_txlen = 1;
         auto tx = new memory_transaction(ad, txsize, txlen, dram_txlen, false,
-                                         *inter.ar->id, addr);
+                                         inter.ar->getId(), addr);
         // 64b per DRAM transaction
         tx->dram_tx_len = dram_txlen;
         inter.to_enqueue_read = tx;
@@ -660,7 +659,7 @@ void run_verilator() {
       }
 
       // to signify that the AXI4 DDR Controller is busy enqueueing another transaction in the DRAM
-      *inter.ar->ready = inter.to_enqueue_read == nullptr;
+      inter.ar->setReady(inter.to_enqueue_read == nullptr);
 #else
       enqueue_transaction(*inter.ar, inter.read_transactions);
 #endif

@@ -4,7 +4,8 @@
 
 #ifndef COMPOSER_VERILATOR_FPGA_UTILS_H
 #define COMPOSER_VERILATOR_FPGA_UTILS_H
-
+extern pthread_mutex_t main_lock;
+#ifdef F1
 #if defined(VSIM)
 #include "fpga_pci_sv.h"
 #elif defined(FPGA)
@@ -19,7 +20,6 @@ extern "C" {
 #include <pthread.h>
 
 extern pthread_mutex_t bus_lock;
-extern pthread_mutex_t main_lock;
 extern int pci_bar_handle;
 extern int xdma_write_fd;
 extern int xdma_read_fd;
@@ -41,5 +41,6 @@ int wrapper_fpga_dma_burst_read(int fd, uint8_t *buffer, size_t xfer_sz,
 }
 #endif
 
+#endif
 
 #endif //COMPOSER_VERILATOR_FPGA_UTILS_H

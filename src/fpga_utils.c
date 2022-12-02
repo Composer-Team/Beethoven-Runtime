@@ -2,6 +2,7 @@
 // Created by Chris Kjellqvist on 10/29/22.
 //
 
+#ifdef F1
 #include "fpga_utils.h"
 #ifndef VSIM
 #include "fpga_dma.h"
@@ -90,4 +91,4 @@ int wrapper_fpga_dma_burst_read(int fd, uint8_t *buffer, size_t xfer_sz,
 #endif
 }
 
-
+#endif

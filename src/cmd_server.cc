@@ -7,6 +7,7 @@
 #include "../include/cmd_server.h"
 #include "../include/data_server.h"
 #include "fpga_utils.h"
+#include "mmio.h"
 
 #include <cstdio>
 #include <sys/mman.h>
@@ -93,28 +94,22 @@ static void* cmd_server_f(void* _) {
       return nullptr;
     }
 #if defined(FPGA) || defined(VSIM)
+#ifdef F1
     pthread_mutex_lock(&bus_lock);
+#endif
     auto *pack = addr.cmd.pack(pack_cfg);
     for (int i = 0; i < 5; ++i) { // command is 5 32-bit payloads
       uint32_t ready = false;
-      while(!ready) {
-        int rc = fpga_pci_peek(pci_bar_handle, CMD_READY, &ready);
-        assert(rc == 0);
-      }
-
-      if (fpga_pci_poke(pci_bar_handle, CMD_BITS, pack[i])) {
-        fprintf(stderr, "error in CMD_BITS poke\n");
-        exit(1);
-      }
-
-      if (fpga_pci_poke(pci_bar_handle, CMD_VALID, 1)) {
-        fprintf(stderr, "error in CMD_VALID poke\n");
-        exit(1);
-      }
+      while(!peek_mmio(CMD_READY)){}
+      poke_mmio(CMD_BITS, pack[i]);
+      poke_mmio(CMD_VALID, 1);
     }
     free(pack);
+#ifdef F1
     pthread_mutex_unlock(&bus_lock);
+#endif
 #else
+    // sim only
     cmds.push(addr.cmd);
 #endif
     // let main thread know how to return result
@@ -136,9 +131,9 @@ static void* cmd_server_f(void* _) {
     // re-lock self to stall
     pthread_mutex_lock(&addr.server_mut);
   }
-  munmap(&addr, sizeof(cmd_server_file));
-  shm_unlink(cmd_server_file_name.c_str());
-  return nullptr;
+//  munmap(&addr, sizeof(cmd_server_file));
+//  shm_unlink(cmd_server_file_name.c_str());
+//  return nullptr;
 }
 
 void cmd_server::start() {

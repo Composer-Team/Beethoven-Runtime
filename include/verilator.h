@@ -5,20 +5,20 @@
 #ifndef COMPOSER_VERILATOR_VERILATOR_H
 #define COMPOSER_VERILATOR_VERILATOR_H
 #include <verilated.h>
+#include <composer_allocator_declaration.h>
 #ifdef USE_DRAMSIM
 #include "dram_system.h"
 #endif
 extern VerilatedVcdC *tfp;
 
 void run_verilator();
-template<typename addr_ty>
 class v_address_channel {
   CData *ready = nullptr;
   CData *valid = nullptr;
   CData *id = nullptr;
   CData *size = nullptr;
   CData *burst = nullptr;
-  addr_ty *addr = nullptr;
+  ComposerMemAddressSimDtype *addr = nullptr;
   CData *len = nullptr;
 public:
 
@@ -27,7 +27,7 @@ public:
                              CData &id,
                              CData &size ,
                              CData &burst,
-                             addr_ty &addr,
+                             ComposerMemAddressSimDtype &addr,
                              CData &len) :
           ready(&ready),
           valid(&valid),
@@ -77,11 +77,11 @@ public:
     *v_address_channel::burst = burst;
   }
 
-  addr_ty getAddr() const {
+  ComposerMemAddressSimDtype getAddr() const {
     return *addr;
   }
 
-  void setAddr(addr_ty addr) {
+  void setAddr(ComposerMemAddressSimDtype addr) {
     *v_address_channel::addr = addr;
   }
 
@@ -97,20 +97,20 @@ public:
 class data_channel {
   CData * ready;
    CData *valid;
-   VlWide<16> *data;
+   char *data;
    CData * id;
-   QData *strobe;
+   ComposerStrobeSimDtype *strobe;
    CData *last;
 public:
   explicit data_channel(CData &ready,
                         CData &valid,
-                        VlWide<16> &data,
-                        QData *strobe,
+                        char *data,
+                        ComposerStrobeSimDtype *strobe,
                         CData &last,
                         CData *id) :
           ready(&ready),
           valid(&valid),
-          data(&data),
+          data(data),
           strobe(strobe),
           last(&last),
           id(id) {}
@@ -131,8 +131,8 @@ public:
     *data_channel::valid = valid;
   }
 
-  VlWide<16>& getData() const {
-    return *data;
+  char* getData() const {
+    return data;
   }
 
   CData getId() const {
@@ -216,10 +216,9 @@ public:
   }
 };
 
-template<typename addr_ty>
 struct mem_interface {
-  v_address_channel<addr_ty> *aw = nullptr;
-  v_address_channel<addr_ty> *ar = nullptr;
+  v_address_channel *aw = nullptr;
+  v_address_channel *ar = nullptr;
   data_channel *w = nullptr;
   data_channel *r = nullptr;
   response_channel *b = nullptr;

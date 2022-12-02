@@ -40,10 +40,14 @@ elseif ("${TARGET}" STREQUAL "vsim")
     target_link_options(Composer_Verilator PRIVATE -lfpga_mgmt -lpthread -lrt)
     set(BUILD_FPGA 1)
 elseif ("${TARGET}" STREQUAL "fpga")
+
+    if ("${BACKEND}" STREQUAL "")
+        message(FATAL_ERROR "Must define backend for FPGA. F1 or Kria")
+    endif ()
     include_directories(${AWS_SDK}/sdk/userspace/include)
-    add_executable(Composer_Verilator ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc)
+    add_executable(Composer_Verilator ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc src/mmio.cc src/mmio.h)
     target_link_options(Composer_Verilator PRIVATE -lfpga_mgmt -lpthread -lrt)
-    target_compile_definitions(Composer_Verilator PUBLIC FPGA)
+    target_compile_definitions(Composer_Verilator PUBLIC FPGA=1 ${BACKEND})
     set(BUILD_FPGA 1)
 elseif ("${TARGET}" STREQUAL "sanity_xsim")
     add_library(Composer_Verilator STATIC ${FILE} ${AWS_SDK}/sdk/userspace/utils/sh_dpi_tasks.c)
@@ -73,21 +77,21 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 
 set(COMPOSER_HWDIR $ENV{COMPOSER_ROOT}/Composer-Hardware)
 
-if(APPLE)
-	message("Building for Apple")
-	set(verilator_args "-undefined dynamic_lookup ")
-elseif(UNIX)
-	message("Building for Linux")
-else()
-	message(FATAL_ERROR "Unsupported platform")
-endif()
+if (APPLE)
+    message("Building for Apple")
+    set(verilator_args "-undefined dynamic_lookup ")
+elseif (UNIX)
+    message("Building for Linux")
+else ()
+    message(FATAL_ERROR "Unsupported platform")
+endif ()
 
 include_directories($ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src)
 
 if (${BUILD_SIM})
     verilate(Composer_Verilator
             SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v TOP_MODULE ComposerTop
-	    VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" --threads 4
+            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" #--threads 1
             TRACE
             )
 endif ()
