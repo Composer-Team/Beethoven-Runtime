@@ -53,7 +53,11 @@ uint64_t f1_hack_addr(uint64_t addr) {
   auto *ds = (data_server *) server;
 
   int fd_composer = shm_open(data_server_file_name.c_str(), O_CREAT | O_RDWR, file_access_flags);
-  ftruncate(fd_composer, sizeof(data_server_file));
+  int fd_tr = ftruncate(fd_composer, sizeof(data_server_file));
+  if (fd_tr) {
+    std::cerr << "Failed to truncate data_server file" << std::endl;
+    throw std::exception();
+  }
   auto &addr = *(data_server_file *) mmap(nullptr, sizeof(data_server_file), file_access_prots,
                                           MAP_SHARED, fd_composer, 0);
   cf = &addr;
