@@ -7,7 +7,7 @@
 #include <iostream>
 #include <atomic>
 
-void poke_mmio(uint64_t addr, int val) {
+void poke_mmio(uint64_t addr, uint32_t val){
 #ifdef F1
   int rc = fpga_pci_poke(pci_bar_handle, addr, val);
   if (rc) {
@@ -15,7 +15,7 @@ void poke_mmio(uint64_t addr, int val) {
     throw std::exception();
   }
 #elif defined(Kria)
-  *(int*)(ComposerMMIOOffset | addr) = val;
+  *(uint32_t*)(ComposerMMIOOffset | addr) = val;
 #endif
 }
 uint32_t peek_mmio(uint64_t addr) {
