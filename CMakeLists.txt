@@ -11,8 +11,8 @@ if ("$ENV{COMPOSER_ROOT}" STREQUAL "")
     message(FATAL_ERROR "Environment variable $COMPOSER_ROOT is not defined")
 endif ()
 
-if (NOT EXISTS $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v)
-    message(FATAL_ERROR "$ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v does not exist. Try building your project.")
+if (NOT EXISTS $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer_allocator_declaration.h)
+    message(FATAL_ERROR "$ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer_allocator_declaration.h does not exist. Try building your project or moving this file into the directory.")
 endif ()
 
 set(AWS_SDK "$ENV{COMPOSER_ROOT}/aws-fpga")
