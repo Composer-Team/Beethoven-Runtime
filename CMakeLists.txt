@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(Composer_Verilator)
+project(ComposerRuntime)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -21,60 +21,63 @@ include_directories(include)
 # customize make based on simulator (verilator) or fpga (aws) target
 if ("${TARGET}" STREQUAL "sim")
     find_package(verilator REQUIRED)
-    add_executable(Composer_Verilator ${SRC} src/verilator.cc)
+    add_executable(ComposerRuntime ${SRC} src/verilator.cc)
+    #
+    add_executable(ComposerDMASimTest src/dma_sim_test.cc)
+    target_link_libraries(ComposerDMASimTest PUBLIC APEX::composer)
+
     if ("${USE_DRAMSIM}" STREQUAL "1")
         add_subdirectory(DRAMsim3)
-        target_compile_definitions(Composer_Verilator PRIVATE USE_DRAMSIM=1)
-        target_link_libraries(Composer_Verilator PRIVATE dramsim3 args)
+        target_compile_definitions(ComposerRuntime PRIVATE USE_DRAMSIM=1)
+        target_link_libraries(ComposerRuntime PRIVATE dramsim3 args)
     endif ()
     if ("${USE_WAVES}" STREQUAL "")
         set(vargs "${vargs} --trace")
     endif ()
-    target_compile_definitions(Composer_Verilator PUBLIC SIM)
+    target_compile_definitions(ComposerRuntime PUBLIC SIM)
     set(BUILD_SIM 1)
 elseif ("${TARGET}" STREQUAL "vsim")
-    add_library(Composer_Verilator STATIC ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc ${AWS_SDK}/sdk/userspace/utils/sh_dpi_tasks.c)
-    #add_executable(Composer_Verilator ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc)
+    add_library(ComposerRuntime STATIC ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc ${AWS_SDK}/sdk/userspace/utils/sh_dpi_tasks.c)
     include_directories(${AWS_SDK}/hdk/common/software/include ${AWS_SDK}/sdk/userspace/include ${AWS_SDK}/sdk/userspace/include/utils/)
-    target_compile_definitions(Composer_Verilator PUBLIC VSIM FPGA)
-    target_link_options(Composer_Verilator PRIVATE -lfpga_mgmt -lpthread -lrt)
+    target_compile_definitions(ComposerRuntime PUBLIC VSIM FPGA)
+    target_link_options(ComposerRuntime PRIVATE -lfpga_mgmt -lpthread -lrt)
     set(BUILD_FPGA 1)
 elseif ("${TARGET}" STREQUAL "fpga")
     if ("${BACKEND}" STREQUAL "")
         message(FATAL_ERROR "Must define backend for FPGA. F1 or Kria")
     endif ()
     include_directories(${AWS_SDK}/sdk/userspace/include)
-    add_executable(Composer_Verilator ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc src/mmio.cc src/mmio.h)
+    add_executable(ComposerRuntime ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc src/mmio.cc src/mmio.h)
     if ("${BACKEND}" STREQUAL "F1")
-        target_link_options(Composer_Verilator PRIVATE -lfpga_mgmt -lpthread -lrt)
+        target_link_options(ComposerRuntime PRIVATE -lfpga_mgmt -lpthread -lrt)
     else ()
-        target_link_options(Composer_Verilator PRIVATE -lpthread -lrt)
+        target_link_options(ComposerRuntime PRIVATE -lpthread -lrt)
     endif ()
-    target_compile_definitions(Composer_Verilator PUBLIC FPGA=1 ${BACKEND})
+    target_compile_definitions(ComposerRuntime PUBLIC FPGA=1 ${BACKEND})
     set(BUILD_FPGA 1)
 elseif ("${TARGET}" STREQUAL "sanity_xsim")
-    add_library(Composer_Verilator STATIC ${FILE} ${AWS_SDK}/sdk/userspace/utils/sh_dpi_tasks.c)
+    add_library(ComposerRuntime STATIC ${FILE} ${AWS_SDK}/sdk/userspace/utils/sh_dpi_tasks.c)
     include_directories(${AWS_SDK}/hdk/common/software/include ${AWS_SDK}/sdk/userspace/include ${AWS_SDK}/sdk/userspace/include/utils/)
-    target_compile_definitions(Composer_Verilator PUBLIC VSIM)
-    target_link_options(Composer_Verilator PRIVATE -lfpga_mgmt -lpthread -lrt)
+    target_compile_definitions(ComposerRuntime PUBLIC VSIM)
+    target_link_options(ComposerRuntime PRIVATE -lfpga_mgmt -lpthread -lrt)
     set(BUILD_FPGA 1)
 elseif ("${TARGET}" STREQUAL "sanity_fpga")
-    add_executable(Composer_Verilator ${FILE} ${AWS_SDK}/sdk/userspace/utils/sh_dpi_tasks.c)
+    add_executable(ComposerRuntime ${FILE} ${AWS_SDK}/sdk/userspace/utils/sh_dpi_tasks.c)
     include_directories(${AWS_SDK}/hdk/common/software/include ${AWS_SDK}/sdk/userspace/include ${AWS_SDK}/sdk/userspace/include/utils/)
-    target_compile_definitions(Composer_Verilator PUBLIC VSIM FPGA)
-    target_link_options(Composer_Verilator PRIVATE -lfpga_mgmt -lpthread -lrt)
+    target_compile_definitions(ComposerRuntime PUBLIC VSIM FPGA)
+    target_link_options(ComposerRuntime PRIVATE -lfpga_mgmt -lpthread -lrt)
     set(BUILD_FPGA 1)
 else ()
     message(FATAL_ERROR "Must define build target: 'sim', 'fpga', or 'vsim'. Got '${TARGET}'. -DTARGET=<opt>")
 endif ()
 
 # Tie in composer
-set_target_properties(Composer_Verilator PROPERTIES
+set_target_properties(ComposerRuntime PROPERTIES
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED YES
         CXX_EXTENSIONS NO
         )
-target_link_libraries(Composer_Verilator PUBLIC APEX::composer)
+target_link_libraries(ComposerRuntime PUBLIC APEX::composer)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 
 
@@ -92,7 +95,12 @@ endif ()
 include_directories($ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src)
 
 if (${BUILD_SIM})
-    verilate(Composer_Verilator
+    verilate(ComposerRuntime
+            SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v TOP_MODULE ComposerTop
+            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" #--threads 1
+            TRACE
+            )
+    verilate(ComposerDMASimTest
             SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v TOP_MODULE ComposerTop
             VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" #--threads 1
             TRACE

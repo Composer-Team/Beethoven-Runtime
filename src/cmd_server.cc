@@ -8,6 +8,7 @@
 #include "../include/data_server.h"
 #include "fpga_utils.h"
 #include "mmio.h"
+#include <sys/stat.h>
 
 #include <cstdio>
 #include <sys/mman.h>
@@ -52,10 +53,15 @@ static void* cmd_server_f(void* _) {
     printf("Failed to initialize cmd_file\n%s\n", strerror(errno));
     exit(errno);
   }
-  int tr_rc = ftruncate(fd_composer, sizeof(cmd_server_file));
-  if (tr_rc) {
-    std::cerr << "Failed to truncate cmd_server file" << std::endl;
-    throw std::exception();
+  // check the file size. It might already exist in which case we don't need to truncate it again
+  struct stat shm_stats{};
+  fstat(fd_composer, &shm_stats);
+  if (shm_stats.st_size < sizeof(cmd_server_file)) {
+    int tr_rc = ftruncate(fd_composer, sizeof(cmd_server_file));
+    if (tr_rc) {
+      std::cerr << "Failed to truncate cmd_server file" << std::endl;
+      throw std::exception();
+    }
   }
   auto &addr = *(cmd_server_file*)mmap(nullptr, sizeof(cmd_server_file), file_access_prots,
                                  MAP_SHARED, fd_composer, 0);

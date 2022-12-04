@@ -9,13 +9,16 @@
 #ifdef USE_DRAMSIM
 #include "dram_system.h"
 #endif
+#define TRACE
+#ifdef TRACE
 extern VerilatedVcdC *tfp;
+#endif
 
 void run_verilator();
 class v_address_channel {
   CData *ready = nullptr;
   CData *valid = nullptr;
-  CData *id = nullptr;
+  ComposerMemIDDtype *id = nullptr;
   CData *size = nullptr;
   CData *burst = nullptr;
   ComposerMemAddressSimDtype *addr = nullptr;
@@ -24,7 +27,7 @@ public:
 
   explicit v_address_channel(CData &ready,
                              CData &valid,
-                             CData &id,
+                             ComposerMemIDDtype &id,
                              CData &size ,
                              CData &burst,
                              ComposerMemAddressSimDtype &addr,
@@ -53,11 +56,11 @@ public:
     *v_address_channel::valid = valid;
   }
 
-  CData getId() const {
+  ComposerMemIDDtype getId() const {
     return *id;
   }
 
-  void setId(CData id) {
+  void setId(ComposerMemIDDtype id) {
     *v_address_channel::id = id;
   }
 
@@ -98,7 +101,7 @@ class data_channel {
   CData * ready;
    CData *valid;
    char *data;
-   CData * id;
+   ComposerMemIDDtype * id;
    ComposerStrobeSimDtype *strobe;
    CData *last;
 public:
@@ -107,7 +110,7 @@ public:
                         char *data,
                         ComposerStrobeSimDtype *strobe,
                         CData &last,
-                        CData *id) :
+                        ComposerMemIDDtype *id) :
           ready(&ready),
           valid(&valid),
           data(data),
@@ -135,19 +138,20 @@ public:
     return data;
   }
 
-  CData getId() const {
+  ComposerMemIDDtype getId() const {
     return *id;
   }
 
-  void setId(CData id) {
+  void setId(ComposerMemIDDtype id) {
     *data_channel::id = id;
+//    std::cerr << "Got " << id << ", set as " << *data_channel::id << std::endl;
   }
 
-  QData getStrobe() const {
+  ComposerStrobeSimDtype getStrobe() const {
     return *strobe;
   }
 
-  void setStrobe(QData strobe) {
+  void setStrobe(ComposerStrobeSimDtype strobe) {
     *data_channel::strobe = strobe;
   }
 
@@ -163,14 +167,14 @@ public:
 class response_channel {
   CData *ready;
   CData *valid;
-  CData *id;
+  ComposerMemIDDtype *id;
 public:
 
   std::queue<int> send_ids;
   int to_enqueue = -1;
   explicit response_channel(CData &ready,
                             CData &valid,
-                            CData &id) :
+                            ComposerMemIDDtype &id) :
           ready(&ready),
           valid(&valid),
           id(&id) {}
@@ -191,11 +195,11 @@ public:
     *response_channel::valid = valid;
   }
 
-  CData getId() const {
+  ComposerMemIDDtype getId() const {
     return *id;
   }
 
-  void setId(CData id) {
+  void setId(ComposerMemIDDtype id) {
     *response_channel::id = id;
   }
 

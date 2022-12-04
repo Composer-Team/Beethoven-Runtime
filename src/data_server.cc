@@ -53,11 +53,23 @@ uint64_t f1_hack_addr(uint64_t addr) {
   auto *ds = (data_server *) server;
 
   int fd_composer = shm_open(data_server_file_name.c_str(), O_CREAT | O_RDWR, file_access_flags);
-  int fd_tr = ftruncate(fd_composer, sizeof(data_server_file));
-  if (fd_tr) {
-    std::cerr << "Failed to truncate data_server file" << std::endl;
+  if (fd_composer < 0) {
+    std::cerr << "Failed to open data_server file" << std::endl;
     throw std::exception();
   }
+
+  struct stat shm_stats{};
+  fstat(fd_composer, &shm_stats);
+  std::cerr << shm_stats.st_size << std::endl;
+  std::cerr << sizeof(data_server_file) << std::endl;
+  if (shm_stats.st_size < sizeof(data_server_file)) {
+    int tr_rc = ftruncate(fd_composer, sizeof(data_server_file));
+    if (tr_rc) {
+      std::cerr << "Failed to truncate data_server file" << std::endl;
+      throw std::exception();
+    }
+  }
+
   auto &addr = *(data_server_file *) mmap(nullptr, sizeof(data_server_file), file_access_prots,
                                           MAP_SHARED, fd_composer, 0);
   cf = &addr;
@@ -222,7 +234,7 @@ void *address_translator::translate(uint64_t fp_addr) {
   }
   if (it == mappings.end()) {
     std::cerr << "BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: " << fp_addr << std::endl;
-#ifdef SIM
+#if defined(SIM) && defined(TRACE)
     tfp->close();
 #endif
     throw std::exception();

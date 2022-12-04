@@ -113,8 +113,11 @@ static uint64_t get_dimm_address(uint64_t addr) {
   }
   return acc;
 }
-
+#ifdef TRACE
 VerilatedVcdC *tfp;
+#endif
+
+//#define TRACE
 
 void run_verilator() {
   // start servers to communicate with user programs
@@ -125,9 +128,11 @@ void run_verilator() {
   top = new Vcomposer;
 
   Verilated::traceEverOn(true);
+#if defined(TRACE)
   tfp = new VerilatedVcdC;
   top->trace(tfp, 100);
   tfp->open("trace.vcd");
+#endif
 
   mem_interface axi4_mems[NUM_DDR_CHANNELS];
   for (int i = 0; i < NUM_DDR_CHANNELS; ++i) {
@@ -135,16 +140,16 @@ void run_verilator() {
   }
 
 #if defined(COMPOSER_HAS_DMA)
-  mem_interface<QData> dma;
-  dma.aw = new v_address_channel<QData>(top->dma_aw_ready, top->dma_aw_valid, top->dma_aw_bits_id,
+  mem_interface dma;
+  dma.aw = new v_address_channel(top->dma_aw_ready, top->dma_aw_valid, top->dma_aw_bits_id,
                                         top->dma_aw_bits_size, top->dma_aw_bits_burst,
                                         top->dma_aw_bits_addr, top->dma_aw_bits_len);
-  dma.ar = new v_address_channel<QData>(top->dma_ar_ready, top->dma_ar_valid, top->dma_ar_bits_id,
+  dma.ar = new v_address_channel(top->dma_ar_ready, top->dma_ar_valid, top->dma_ar_bits_id,
                                         top->dma_ar_bits_size, top->dma_ar_bits_burst,
                                         top->dma_ar_bits_addr, top->dma_ar_bits_len);
-  dma.w = new data_channel(top->dma_w_ready, top->dma_w_valid, top->dma_w_bits_data,
+  dma.w = new data_channel(top->dma_w_ready, top->dma_w_valid, (char*)top->dma_w_bits_data.m_storage,
                            &top->dma_w_bits_strb, top->dma_w_bits_last, nullptr);
-  dma.r = new data_channel(top->dma_r_ready, top->dma_r_valid, top->dma_r_bits_data,
+  dma.r = new data_channel(top->dma_r_ready, top->dma_r_valid, (char*)top->dma_r_bits_data.m_storage,
                            nullptr, top->dma_r_bits_last, &top->dma_r_bits_id);
   dma.b = new response_channel(top->dma_b_ready, top->dma_b_valid, top->dma_b_bits_id);
 #endif
@@ -209,11 +214,15 @@ void run_verilator() {
   for (int i = 0; i < 50; ++i) {
     top->clock = 0;
     top->eval();
+#ifdef TRACE
     tfp->dump(main_time);
+#endif
     main_time++;
     top->clock = 1;
     top->eval();
+#ifdef TRACE
     tfp->dump(main_time);
+#endif
     main_time++;
   }
   top->reset = 0;
@@ -526,10 +535,15 @@ void run_verilator() {
     top->clock = 1; // posedge
     main_time++;
     top->eval();
+#ifdef TRACE
     tfp->dump(main_time);
+#endif
 
     // ------------ HANDLE MEMORY INTERFACES ----------------
     for (mem_interface &inter: axi4_mems) {
+      if (inter.b->getReady() && inter.b->getValid()) {
+        inter.b->send_ids.pop();
+      }
       if (not inter.read_transactions.empty() && not inter.r->getValid()) {
         auto tx = inter.read_transactions.front();
         int start = (tx->progress * tx->size) % (DATA_BUS_WIDTH/8);
@@ -547,9 +561,6 @@ void run_verilator() {
       if (not inter.b->send_ids.empty()) {
         inter.b->setValid(1);
         inter.b->setId(inter.b->send_ids.front());
-        if (inter.b->getReady()) {
-          inter.b->send_ids.pop();
-        }
       } else {
         inter.b->setValid(0);
       }
@@ -670,12 +681,15 @@ void run_verilator() {
     top->clock = 0; // negedge
     top->eval();
     main_time++;
+#ifdef TRACE
     tfp->dump(main_time);
+#endif
   }
-
+#ifdef TRACE
   printf("printing traces\n");
   fflush(stdout);
   tfp->close();
+#endif
   exit(0);
 }
 
