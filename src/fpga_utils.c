@@ -53,12 +53,14 @@ void fpga_setup(int slot_id) {
   pci_bar_handle = PCI_BAR_HANDLE_INIT;
   rc = fpga_pci_attach(slot_id, FPGA_APP_PF, APP_PF_BAR0, 0, &pci_bar_handle);
   check_rc(rc, "fpga_pci_attach FAILED");
+
+
   xdma_read_fd = fpga_dma_open_queue(FPGA_DMA_XDMA, slot_id, 0, true);
   if (xdma_read_fd < 0) {
     fprintf(stderr, "Error opening XDMA read fd\n");
     exit(1);
   }
-  xdma_write_fd = fpga_dma_open_queue(FPGA_DMA_XDMA, slot_id, 1, false);
+  xdma_write_fd = fpga_dma_open_queue(FPGA_DMA_XDMA, slot_id, 0, false);
   if (xdma_write_fd < 0) {
     fprintf(stderr, "Error opening XDMA write fd\n");
     exit(1);
