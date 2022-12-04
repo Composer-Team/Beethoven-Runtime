@@ -16,7 +16,19 @@
 #include <fcntl.h>
 
 #ifdef SIM
+#ifdef COMPOSER_HAS_DMA
+pthread_mutex_t dma_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t dma_wait_lock = PTHREAD_MUTEX_INITIALIZER;
+bool dma_in_progress = false;
+uint64_t dma_fpga_addr;
+bool dma_valid = false;
+char *dma_ptr;
+size_t dma_len;
+bool dma_write;
+
+#endif
 extern bool kill_sig;
+
 #include "verilator.h"
 #include "verilated_vcd_c.h"
 
@@ -132,6 +144,9 @@ uint64_t f1_hack_addr(uint64_t addr) {
   srand(time(0));
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
+#if defined(SIM) && defined(COMPOSER_HAS_DMA)
+  pthread_mutex_lock(&dma_wait_lock);
+#endif
   while (true) {
 //    printf("data server got cmd\n"); fflush(stdout);
     // get file name, descriptor, expand the file, and map it to address space
@@ -173,41 +188,70 @@ uint64_t f1_hack_addr(uint64_t addr) {
         at.remove_mapping(addr.op_argument);
         break;
 #if defined(SIM) or defined(Kria)
-        case data_server_op::MOVE_TO_FPGA:
-        case data_server_op::MOVE_FROM_FPGA:
-          // noop
-          break;
+      case data_server_op::MOVE_TO_FPGA:
+#if defined(COMPOSER_HAS_DMA)
+        pthread_mutex_lock(&dma_lock);
+        std::cerr << "got to fpga" << std::endl;
+        dma_len = addr.op3_argument;
+        dma_ptr = (char *) at.translate(addr.op_argument);
+        dma_fpga_addr = addr.op_argument;
+        dma_valid = true;
+        dma_write = true;
+        dma_in_progress = false;
+        pthread_mutex_unlock(&dma_lock);
+        pthread_mutex_lock(&dma_wait_lock);
+#endif
+        break;
+      case data_server_op::MOVE_FROM_FPGA:
+#if defined(COMPOSER_HAS_DMA)
+        pthread_mutex_lock(&dma_lock);
+        dma_len = addr.op3_argument;
+        dma_ptr = (char *) at.translate(addr.op2_argument);
+        dma_fpga_addr = addr.op2_argument;
+        dma_valid = true;
+        dma_write = false;
+        dma_in_progress = false;
+        pthread_mutex_unlock(&dma_lock);
+        pthread_mutex_lock(&dma_wait_lock);
+#endif
+        // noop
+        break;
 #elif defined (FPGA)
-      case data_server_op::MOVE_FROM_FPGA: {
-        auto shaddr = at.translate(addr.op2_argument);
-        std::cout << "from fpga addr: " << addr.op2_argument << std::endl;
-        int rc = wrapper_fpga_dma_burst_read(xdma_read_fd, (uint8_t *) shaddr, addr.op3_argument, addr.op2_argument);
-        for (int i = 0; i < addr.op3_argument / sizeof(int); ++i)
-          printf("%d ", ((int *) shaddr)[i]);
-        fflush(stdout);
-        if (rc) {
-          fprintf(stderr, "Something failed inside MOVE_FROM_FPGA - %d %p %d %x\n", xdma_read_fd, shaddr,
-                  addr.op3_argument, addr.op2_argument);
-          exit(1);
+        case data_server_op::MOVE_FROM_FPGA: {
+          auto shaddr = at.translate(addr.op2_argument);
+  //        std::cout << "from fpga addr: " << addr.op2_argument << std::endl;
+          auto *mem = (uint8_t*)malloc(addr.op3_argument);
+          int rc = wrapper_fpga_dma_burst_read(xdma_read_fd, (uint8_t *) mem, addr.op3_argument, addr.op2_argument);\
+          memcpy(shaddr, mem, addr.op3_argument);
+          free(mem);
+  //        for (int i = 0; i < addr.op3_argument / sizeof(int); ++i)
+  //          printf("%d ", ((int *) shaddr)[i]);
+  //        fflush(stdout);
+          if (rc) {
+            fprintf(stderr, "Something failed inside MOVE_FROM_FPGA - %d %p %d %x\n", xdma_read_fd, shaddr,
+                    addr.op3_argument, addr.op2_argument);
+            exit(1);
+          }
+          break;
         }
-        break;
-      }
-      case data_server_op::MOVE_TO_FPGA: {
-        auto shaddr = at.translate(addr.op_argument);
-//        printf("trying to transfer\n"); fflush(stdout);
-        std::cout << "to fpga addr: " << addr.op_argument << std::endl;
-        for (int i = 0; i < addr.op3_argument / sizeof(int); ++i)
-          printf("%d ", ((int *) shaddr)[i]);
-        fflush(stdout);
-        int rc = wrapper_fpga_dma_burst_write(xdma_write_fd, (uint8_t *) shaddr, addr.op3_argument, addr.op_argument);
-        if (rc) {
-          fprintf(stderr, "Something failed inside MOVE_TO_FPGA - %d %p %d %x\n", xdma_write_fd, shaddr,
-                  addr.op3_argument, addr.op2_argument);
-          exit(1);
+        case data_server_op::MOVE_TO_FPGA: {
+          auto shaddr = at.translate(addr.op_argument);
+  //        printf("trying to transfer\n"); fflush(stdout);
+  //        std::cout << "to fpga addr: " << addr.op_argument << std::endl;
+  //        for (int i = 0; i < addr.op3_argument / sizeof(int); ++i)
+  //          printf("%d ", ((int *) shaddr)[i]);
+  //        fflush(stdout);
+          auto *mem = (uint8_t*)malloc(addr.op3_argument);
+          memcpy(mem, shaddr, addr.op3_argument);
+          int rc = wrapper_fpga_dma_burst_write(xdma_write_fd, (uint8_t *) shaddr, addr.op3_argument, addr.op_argument);
+          if (rc) {
+            fprintf(stderr, "Something failed inside MOVE_TO_FPGA - %d %p %d %x\n", xdma_write_fd, shaddr,
+                    addr.op3_argument, addr.op2_argument);
+            exit(1);
+          }
+  //        printf("finished transfering\n"); fflush(stdout);
+          break;
         }
-//        printf("finished transfering\n"); fflush(stdout);
-        break;
-      }
 #else
 #error("Doesn't appear that we're covering all cases inside data server")
 #endif

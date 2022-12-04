@@ -95,6 +95,10 @@ public:
   void setLen(CData len) {
     *v_address_channel::len = len;
   }
+
+  bool fire() {
+    return *ready && *valid;
+  }
 };
 
 class data_channel {
@@ -162,6 +166,11 @@ public:
   void setLast(CData last) {
     *data_channel::last = last;
   }
+
+  bool fire() {
+    return *ready && *valid;
+  }
+
 };
 
 class response_channel {
@@ -217,6 +226,10 @@ public:
 
   void setToEnqueue(int toEnqueue) {
     to_enqueue = toEnqueue;
+  }
+
+  bool fire() {
+    return *ready && *valid;
   }
 };
 

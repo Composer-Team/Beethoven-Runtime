@@ -141,6 +141,8 @@ void run_verilator() {
 
 #if defined(COMPOSER_HAS_DMA)
   mem_interface dma;
+  int dma_tx_progress = 0;
+  int dma_tx_length = 0;
   dma.aw = new v_address_channel(top->dma_aw_ready, top->dma_aw_valid, top->dma_aw_bits_id,
                                         top->dma_aw_bits_size, top->dma_aw_bits_burst,
                                         top->dma_aw_bits_addr, top->dma_aw_bits_len);
@@ -203,10 +205,11 @@ void run_verilator() {
     mem.aw->setReady(1);
   }
 #ifdef COMPOSER_HAS_DMA
-  top->dma_ar_valid = 0;
-  top->dma_aw_valid = 0;
-  top->dma_b_valid = 0;
-  top->dma_r_valid = 0;
+  dma.b->setReady(0);
+  dma.ar->setValid(0);
+  dma.aw->setValid(0);
+  dma.w->setValid(0);
+  dma.r->setReady(0);
 #endif
 
   std::map<std::tuple<int, int>, unsigned long long> start_times;
@@ -548,7 +551,7 @@ void run_verilator() {
         auto tx = inter.read_transactions.front();
         int start = (tx->progress * tx->size) % (DATA_BUS_WIDTH/8);
         char *dest = (char *) inter.r->getData() + start;
-        memcpy(dest, tx->addr, tx->size);
+        memcpy(dest, tx->addr + tx->size * tx->progress, tx->size);
         bool am_done = tx->len == (tx->progress + 1);
         inter.r->setValid(1);
         inter.r->setLast(am_done);
@@ -588,10 +591,26 @@ void run_verilator() {
           uint32_t off = 0;
           // for writes, we need to account for alignment and strobe,so we're re-aligning address here
           // align to 64B - zero out bottom 6b
-          auto addr = trans->addr;
+          auto addr = trans->addr + trans->size * trans->progress;
           while (strobe != 0) {
             if (strobe & 1) {
+#ifdef COMPOSER_HAS_DMA
+              auto curr_ptr = uintptr_t(addr+off);
+              auto base_ptr = uintptr_t(dma_ptr);
+              auto end_ptr = uintptr_t(dma_ptr+dma_len);
+              if (dma_in_progress and dma_write and curr_ptr < end_ptr and curr_ptr >= base_ptr) {
+                // we're performing a DMA into the same address space so just make sure that the values match up...
+                if (addr[off] != src[off]) {
+                  std::cerr << "DMA write was not a no-op. " << off << " " << int(addr[off]) << " " << int(src[off]) << std::endl;
+                  tfp->close();
+                  throw std::exception();
+                } else {
+                  std::cerr << " . " << std::endl;
+                }
+              }
+#else
               addr[off] = src[off];
+#endif
             }
             off += 1;
             strobe >>= 1;
@@ -677,7 +696,82 @@ void run_verilator() {
 
     }
 
+#ifdef COMPOSER_HAS_DMA
+    pthread_mutex_lock(&dma_lock);
+    // enqueue dma transaction into dma axi interface
+    dma.aw->setValid(0);
+    dma.ar->setValid(0);
+    dma.b->setReady(0);
+    dma.w->setValid(0);
+    dma.r->setReady(0);
+    if (dma_valid && not dma_in_progress) {
+      dma_tx_progress = 0;
+      dma_tx_length = dma_len >> 6;
+      if (dma_write) {
+        dma.aw->setValid(1);
+        dma.aw->setAddr(dma_fpga_addr);
+        dma.aw->setId(0);
+        dma.aw->setSize(6);
+        dma.aw->setLen((dma_len/64)-1);
+        dma.aw->setBurst(0);
+        if (dma.aw->fire()) {
+          dma_in_progress = true;
+        }
+      } else {
+        dma.ar->setValid(1);
+        dma.ar->setAddr(dma_fpga_addr);
+        dma.ar->setId(0);
+        dma.ar->setSize(6);
+        dma.ar->setLen((dma_len/64)-1);
+        dma.ar->setBurst(0);
+        if (dma.ar->fire()) {
+          dma_in_progress = true;
+        }
+      }
+    }
 
+    if (dma_in_progress) {
+      if (dma_write) {
+        if (dma_tx_progress < dma_tx_length) {
+          dma.w->setValid(1);
+          memcpy(dma.w->getData(), dma_ptr + 64 * dma_tx_progress, 64);
+          dma.w->setLast(dma_tx_progress + 1 == dma_tx_length);
+          dma.w->setStrobe(0xFFFFFFFFFFFFFFFFL);
+          if (dma.w->getReady()) {
+            dma_tx_progress++;
+          }
+        } else {
+          dma.b->setReady(1);
+          if (dma.b->fire()) {
+            dma_valid = false;
+            dma_in_progress = false;
+            pthread_mutex_unlock(&dma_wait_lock);
+          }
+        }
+      } else {
+        dma.r->setReady(1);
+        if (dma.r->fire()) {
+          char * rval = dma.r->getData();
+          char * src_val = dma_ptr + 64 * dma_tx_progress;
+          for (int i = 0; i < 64; ++i) {
+            if (rval[i] != src_val[i]) {
+              std::cerr << "Got an unexpected value from the DMA... " << i << " " << dma_tx_progress << " " << rval[i]
+                        << " " << src_val[i] << std::endl;
+              throw std::exception();
+            }
+          }
+          std::cerr << "Passed " << dma_tx_progress << std::endl;
+          dma_tx_progress++;
+          if (dma_tx_progress == dma_tx_length) {
+            dma_valid = false;
+            dma_in_progress = false;
+            pthread_mutex_unlock(&dma_wait_lock);
+          }
+        }
+      }
+    }
+    pthread_mutex_unlock(&dma_lock);
+#endif
     top->clock = 0; // negedge
     top->eval();
     main_time++;

@@ -7,7 +7,22 @@
 
 #include <queue>
 #include <set>
+#include <composer_allocator_declaration.h>
 
+#if defined(SIM) && defined(COMPOSER_HAS_DMA)
+#include <pthread.h>
+extern pthread_mutex_t dma_lock;
+extern pthread_mutex_t dma_wait_lock;
+extern bool dma_valid;
+extern char *dma_ptr;
+extern uint64_t dma_fpga_addr;
+extern size_t dma_len;
+extern bool dma_write;
+extern bool dma_in_progress;
+
+
+
+#endif
 struct address_translator {
   struct addr_pair {
     uint64_t fpga_addr;
