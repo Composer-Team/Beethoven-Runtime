@@ -355,7 +355,7 @@ void run_verilator() {
         if (ongoing_cmd.ready_for_command && !bus_occupied) {
           pthread_mutex_lock(&cmdserverlock);
           if (not cmds.empty()) {
-            printf("\tGot command from cmd_server!\n");
+//            printf("\tGot command from cmd_server!\n");
             bus_occupied = true;
             ongoing_cmd.state = CMD_BITS_WRITE_ADDR;
             if (cmds.front().getXd()) {
@@ -604,8 +604,6 @@ void run_verilator() {
                   std::cerr << "DMA write was not a no-op. " << off << " " << int(addr[off]) << " " << int(src[off]) << std::endl;
                   tfp->close();
                   throw std::exception();
-                } else {
-                  std::cerr << " . " << std::endl;
                 }
               }
 #else
@@ -760,7 +758,6 @@ void run_verilator() {
               throw std::exception();
             }
           }
-          std::cerr << "Passed " << dma_tx_progress << std::endl;
           dma_tx_progress++;
           if (dma_tx_progress == dma_tx_length) {
             dma_valid = false;

@@ -39,6 +39,7 @@ struct address_translator {
   std::set<addr_pair> mappings;
 
   void* translate(uint64_t fp_addr);
+  std::pair<void*, uint64_t> get_mapping(uint64_t fpga_addr);
   void add_mapping(uint64_t fpga_addr, uint64_t mapping_length, void * cpu_addr);
   void remove_mapping(uint64_t fpga_addr);
 };

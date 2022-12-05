@@ -166,6 +166,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
         }
         void *naddr = mmap(nullptr, addr.op_argument, file_access_prots, MAP_SHARED, nfd, 0);
 
+
         if (naddr == nullptr) {
           std::cerr << "Failed to mmap address: " << std::string(strerror(errno)) << std::endl;
           throw std::exception();
@@ -188,45 +189,67 @@ uint64_t f1_hack_addr(uint64_t addr) {
         at.remove_mapping(addr.op_argument);
         break;
 #if defined(SIM) or defined(Kria)
-      case data_server_op::MOVE_TO_FPGA:
-#if defined(COMPOSER_HAS_DMA)
-        pthread_mutex_lock(&dma_lock);
-        std::cerr << "got to fpga" << std::endl;
-        dma_len = addr.op3_argument;
-        dma_ptr = (char *) at.translate(addr.op_argument);
-        dma_fpga_addr = addr.op_argument;
-        dma_valid = true;
-        dma_write = true;
-        dma_in_progress = false;
-        pthread_mutex_unlock(&dma_lock);
-        pthread_mutex_lock(&dma_wait_lock);
+      case data_server_op::MOVE_TO_FPGA: {
+        std::cerr << at.get_mapping(addr.op2_argument).first << std::endl;
+#if defined(COMPOSER_HAS_DMA) and defined(SIM)
+        for (int i = 0; i < addr.op3_argument; i += 256*64) {
+          pthread_mutex_lock(&dma_lock);
+          auto remaining = addr.op3_argument - i;
+          if (remaining >= 256 * 64) {
+            dma_len = 256 * 64;
+          } else {
+            dma_len = remaining;
+          }
+          dma_ptr = ((char *) at.translate(addr.op_argument)) + i;
+          dma_fpga_addr = addr.op_argument + i;
+          dma_valid = true;
+          dma_write = true;
+          dma_in_progress = false;
+          pthread_mutex_unlock(&dma_lock);
+          pthread_mutex_lock(&dma_wait_lock);
+        }
 #endif
         break;
-      case data_server_op::MOVE_FROM_FPGA:
-#if defined(COMPOSER_HAS_DMA)
-        pthread_mutex_lock(&dma_lock);
-        dma_len = addr.op3_argument;
-        dma_ptr = (char *) at.translate(addr.op2_argument);
-        dma_fpga_addr = addr.op2_argument;
-        dma_valid = true;
-        dma_write = false;
-        dma_in_progress = false;
-        pthread_mutex_unlock(&dma_lock);
-        pthread_mutex_lock(&dma_wait_lock);
+      }
+      case data_server_op::MOVE_FROM_FPGA: {
+        std::cerr << at.get_mapping(addr.op2_argument).first << std::endl;
+#if defined(COMPOSER_HAS_DMA) and defined(SIM)
+        auto info = at.get_mapping(addr.op2_argument);
+        if (addr.op3_argument != info.second) {
+          throw std::exception();
+        }
+        for (int i = 0; i < addr.op3_argument; i += 256 * 64) {
+          pthread_mutex_lock(&dma_lock);
+          auto remaining = addr.op3_argument - i;
+          if (remaining >= 256 * 64) {
+            dma_len = 256 * 64;
+          } else {
+            dma_len = remaining;
+          }
+          dma_ptr = ((char *)std::get<0>(info)) + i;
+          dma_fpga_addr = addr.op2_argument + i;
+          dma_valid = true;
+          dma_write = true;
+          dma_in_progress = false;
+
+
+          pthread_mutex_unlock(&dma_lock);
+          pthread_mutex_lock(&dma_wait_lock);
+        }
 #endif
-        // noop
         break;
+      }
 #elif defined (FPGA)
         case data_server_op::MOVE_FROM_FPGA: {
           auto shaddr = at.translate(addr.op2_argument);
-  //        std::cout << "from fpga addr: " << addr.op2_argument << std::endl;
+    //        std::cout << "from fpga addr: " << addr.op2_argument << std::endl;
           auto *mem = (uint8_t*)malloc(addr.op3_argument);
           int rc = wrapper_fpga_dma_burst_read(xdma_read_fd, (uint8_t *) mem, addr.op3_argument, addr.op2_argument);\
           memcpy(shaddr, mem, addr.op3_argument);
           free(mem);
-  //        for (int i = 0; i < addr.op3_argument / sizeof(int); ++i)
-  //          printf("%d ", ((int *) shaddr)[i]);
-  //        fflush(stdout);
+    //        for (int i = 0; i < addr.op3_argument / sizeof(int); ++i)
+    //          printf("%d ", ((int *) shaddr)[i]);
+    //        fflush(stdout);
           if (rc) {
             fprintf(stderr, "Something failed inside MOVE_FROM_FPGA - %d %p %d %x\n", xdma_read_fd, shaddr,
                     addr.op3_argument, addr.op2_argument);
@@ -236,11 +259,11 @@ uint64_t f1_hack_addr(uint64_t addr) {
         }
         case data_server_op::MOVE_TO_FPGA: {
           auto shaddr = at.translate(addr.op_argument);
-  //        printf("trying to transfer\n"); fflush(stdout);
-  //        std::cout << "to fpga addr: " << addr.op_argument << std::endl;
-  //        for (int i = 0; i < addr.op3_argument / sizeof(int); ++i)
-  //          printf("%d ", ((int *) shaddr)[i]);
-  //        fflush(stdout);
+    //        printf("trying to transfer\n"); fflush(stdout);
+    //        std::cout << "to fpga addr: " << addr.op_argument << std::endl;
+    //        for (int i = 0; i < addr.op3_argument / sizeof(int); ++i)
+    //          printf("%d ", ((int *) shaddr)[i]);
+    //        fflush(stdout);
           auto *mem = (uint8_t*)malloc(addr.op3_argument);
           memcpy(mem, shaddr, addr.op3_argument);
           int rc = wrapper_fpga_dma_burst_write(xdma_write_fd, (uint8_t *) shaddr, addr.op3_argument, addr.op_argument);
@@ -249,7 +272,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
                     addr.op3_argument, addr.op2_argument);
             exit(1);
           }
-  //        printf("finished transfering\n"); fflush(stdout);
+    //        printf("finished transfering\n"); fflush(stdout);
           break;
         }
 #else
@@ -261,6 +284,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
     // re-lock self to stall
     pthread_mutex_lock(&addr.server_mut);
   }
+
 }
 
 void data_server::start() {
@@ -302,4 +326,16 @@ void address_translator::remove_mapping(uint64_t fpga_addr) {
     throw std::exception();
   }
   mappings.erase(it);
+}
+
+std::pair<void*, uint64_t> address_translator::get_mapping(uint64_t fpga_addr) {
+  auto it = mappings.begin();
+  while (it != mappings.end()) {
+    if (it->fpga_addr == fpga_addr) {
+      return std::make_pair(it->cpu_addr, it->mapping_length);
+    }
+    it++;
+  }
+  std::cerr << "Mapping not found!" << std::endl;
+  throw std::exception();
 }
