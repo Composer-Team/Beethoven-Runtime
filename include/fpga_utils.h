@@ -4,6 +4,7 @@
 
 #ifndef COMPOSER_VERILATOR_FPGA_UTILS_H
 #define COMPOSER_VERILATOR_FPGA_UTILS_H
+#include <pthread.h>
 extern pthread_mutex_t main_lock;
 #ifdef F1
 #if defined(VSIM)
@@ -17,7 +18,6 @@ extern pthread_mutex_t main_lock;
 extern "C" {
 #endif
 
-#include <pthread.h>
 
 extern pthread_mutex_t bus_lock;
 extern int pci_bar_handle;
