@@ -551,7 +551,7 @@ void run_verilator() {
         auto tx = inter.read_transactions.front();
         int start = (tx->progress * tx->size) % (DATA_BUS_WIDTH/8);
         char *dest = (char *) inter.r->getData() + start;
-        memcpy(dest, tx->addr + tx->size * tx->progress, tx->size);
+        memcpy(dest, tx->addr, tx->size);
         bool am_done = tx->len == (tx->progress + 1);
         inter.r->setValid(1);
         inter.r->setLast(am_done);
@@ -591,7 +591,7 @@ void run_verilator() {
           uint32_t off = 0;
           // for writes, we need to account for alignment and strobe,so we're re-aligning address here
           // align to 64B - zero out bottom 6b
-          auto addr = trans->addr + trans->size * trans->progress;
+          auto addr = trans->addr;
           while (strobe != 0) {
             if (strobe & 1) {
 #ifdef COMPOSER_HAS_DMA

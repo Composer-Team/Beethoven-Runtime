@@ -190,7 +190,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
         break;
 #if defined(SIM) or defined(Kria)
       case data_server_op::MOVE_TO_FPGA: {
-        std::cerr << at.get_mapping(addr.op2_argument).first << std::endl;
+        std::cerr << at.get_mapping(addr.op_argument).first << std::endl;
 #if defined(COMPOSER_HAS_DMA) and defined(SIM)
         for (int i = 0; i < addr.op3_argument; i += 256*64) {
           pthread_mutex_lock(&dma_lock);
