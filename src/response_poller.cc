@@ -28,8 +28,8 @@ static void *poll_thread(void *in) {
     flights = csf->processes_waiting;
     pthread_mutex_unlock(&csf->process_waiting_count_lock);
 
-    printf(".");
-    fflush(stdout);
+//    printf(".");
+//    fflush(stdout);
     if (flights) {
       uint32_t buf[3];
       int rc = 0;
@@ -54,7 +54,7 @@ static void *poll_thread(void *in) {
       csf->processes_waiting--;
       pthread_mutex_unlock(&csf->process_waiting_count_lock);
     } else {
-      std::this_thread::sleep_for(300ms);
+      std::this_thread::sleep_for(10ms);
     }
   }
   pthread_mutex_unlock(&main_lock);

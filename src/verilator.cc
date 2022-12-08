@@ -711,7 +711,7 @@ void run_verilator() {
         dma.aw->setId(0);
         dma.aw->setSize(6);
         dma.aw->setLen((dma_len/64)-1);
-        dma.aw->setBurst(0);
+        dma.aw->setBurst(1);
         if (dma.aw->fire()) {
           dma_in_progress = true;
         }
@@ -721,7 +721,7 @@ void run_verilator() {
         dma.ar->setId(0);
         dma.ar->setSize(6);
         dma.ar->setLen((dma_len/64)-1);
-        dma.ar->setBurst(0);
+        dma.ar->setBurst(1);
         if (dma.ar->fire()) {
           dma_in_progress = true;
         }
