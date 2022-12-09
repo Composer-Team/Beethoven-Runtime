@@ -34,7 +34,7 @@ bool kill_sig = false;
 Config dramsim3config("../DRAMsim3/configs/DDR4_8Gb_x16_2666.ini", "./");
 #endif
 
-void enqueue_transaction(v_address_channel &chan, std::queue<memory_transaction *> &lst) {
+void enqueue_transaction(v_address_channel<ComposerMemIDDtype> &chan, std::queue<memory_transaction *> &lst) {
   if (chan.getValid() && chan.getValid()) {
     char *addr = (char *) at.translate(chan.getAddr());
     int sz = 1 << chan.getSize();
@@ -134,26 +134,26 @@ void run_verilator() {
   tfp->open("trace.vcd");
 #endif
 
-  mem_interface axi4_mems[NUM_DDR_CHANNELS];
+  mem_interface<ComposerMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
   for (int i = 0; i < NUM_DDR_CHANNELS; ++i) {
     axi4_mems[i].id = i;
   }
 
 #if defined(COMPOSER_HAS_DMA)
-  mem_interface dma;
+  mem_interface<ComposerDMAIDtype> dma;
   int dma_tx_progress = 0;
   int dma_tx_length = 0;
-  dma.aw = new v_address_channel(top->dma_aw_ready, top->dma_aw_valid, top->dma_aw_bits_id,
+  dma.aw = new v_address_channel<ComposerDMAIDtype>(top->dma_aw_ready, top->dma_aw_valid, top->dma_aw_bits_id,
                                         top->dma_aw_bits_size, top->dma_aw_bits_burst,
                                         top->dma_aw_bits_addr, top->dma_aw_bits_len);
-  dma.ar = new v_address_channel(top->dma_ar_ready, top->dma_ar_valid, top->dma_ar_bits_id,
+  dma.ar = new v_address_channel<ComposerDMAIDtype>(top->dma_ar_ready, top->dma_ar_valid, top->dma_ar_bits_id,
                                         top->dma_ar_bits_size, top->dma_ar_bits_burst,
                                         top->dma_ar_bits_addr, top->dma_ar_bits_len);
-  dma.w = new data_channel(top->dma_w_ready, top->dma_w_valid, (char*)top->dma_w_bits_data.m_storage,
+  dma.w = new data_channel<ComposerDMAIDtype>(top->dma_w_ready, top->dma_w_valid, (char*)top->dma_w_bits_data.m_storage,
                            &top->dma_w_bits_strb, top->dma_w_bits_last, nullptr);
-  dma.r = new data_channel(top->dma_r_ready, top->dma_r_valid, (char*)top->dma_r_bits_data.m_storage,
+  dma.r = new data_channel<ComposerDMAIDtype>(top->dma_r_ready, top->dma_r_valid, (char*)top->dma_r_bits_data.m_storage,
                            nullptr, top->dma_r_bits_last, &top->dma_r_bits_id);
-  dma.b = new response_channel(top->dma_b_ready, top->dma_b_valid, top->dma_b_bits_id);
+  dma.b = new response_channel<ComposerDMAIDtype> (top->dma_b_ready, top->dma_b_valid, top->dma_b_bits_id);
 #endif
 #ifdef USE_DRAMSIM
   for (auto &axi4_mem: axi4_mems) {
@@ -543,7 +543,7 @@ void run_verilator() {
 #endif
 
     // ------------ HANDLE MEMORY INTERFACES ----------------
-    for (mem_interface &inter: axi4_mems) {
+    for (mem_interface<ComposerMemIDDtype> &inter: axi4_mems) {
       if (inter.b->getReady() && inter.b->getValid()) {
         inter.b->send_ids.pop();
       }
@@ -605,6 +605,8 @@ void run_verilator() {
                   tfp->close();
                   throw std::exception();
                 }
+              } else {
+                addr[off] = src[off];
               }
 #else
               addr[off] = src[off];
