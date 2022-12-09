@@ -209,6 +209,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
           pthread_mutex_lock(&dma_wait_lock);
         }
 #endif
+//        std::cerr << "finish DMA " << std::endl;
         break;
       }
       case data_server_op::MOVE_FROM_FPGA: {
