@@ -113,7 +113,6 @@ class data_channel {
 public:
   explicit data_channel(CData &ready,
                         CData &valid,
-                        char *data,
                         ComposerStrobeSimDtype *strobe,
                         CData &last,
                         idtype *id) :
@@ -123,6 +122,10 @@ public:
           strobe(strobe),
           last(&last),
           id(id) {}
+
+  void setData(char *data) {
+    data_channel::data = data;
+  }
 
   CData getReady() const {
     return *ready;

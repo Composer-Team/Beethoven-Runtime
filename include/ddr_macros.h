@@ -31,13 +31,11 @@ axi4_mems[DDR_NUM].ar = new v_address_channel<ComposerMemIDDtype>(top->mem_ ## D
                                       top->mem_ ## DDR_NUM ## _ar_bits_len); \
 axi4_mems[DDR_NUM].w = new data_channel<ComposerMemIDDtype>(top->mem_ ## DDR_NUM ## _w_ready, \
                                   top->mem_ ## DDR_NUM ## _w_valid, \
-                                  access_w(DDR_NUM), \
                                   &top->mem_ ## DDR_NUM ## _w_bits_strb, \
                                   top->mem_ ## DDR_NUM ## _w_bits_last, \
                                   nullptr); \
 axi4_mems[DDR_NUM].r = new data_channel<ComposerMemIDDtype>(top->mem_ ## DDR_NUM ## _r_ready, \
                                   top->mem_ ## DDR_NUM ## _r_valid, \
-                                  access_r(DDR_NUM), \
                                   nullptr, \
                                   top->mem_ ## DDR_NUM ## _r_bits_last, \
                                   &top->mem_ ## DDR_NUM ## _r_bits_id); \

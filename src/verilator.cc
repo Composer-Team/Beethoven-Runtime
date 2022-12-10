@@ -185,6 +185,8 @@ void run_verilator() {
   printf("There are %d DDR Channels\n", NUM_DDR_CHANNELS);
 #if NUM_DDR_CHANNELS >= 1
   init_ddr_interface(0)
+  axi4_mems[0].w->setData((char*)&top->mem_0_w_bits_data.at(0));
+  axi4_mems[0].r->setData((char*)&top->mem_0_r_bits_data.at(0));
 #if NUM_DDR_CHANNELS >= 2
   init_ddr_interface(1)
 #if NUM_DDR_CHANNELS >= 4
