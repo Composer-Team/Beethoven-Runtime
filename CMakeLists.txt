@@ -23,8 +23,8 @@ if ("${TARGET}" STREQUAL "sim")
     find_package(verilator REQUIRED)
     add_executable(ComposerRuntime ${SRC} src/verilator.cc)
     #
-    add_executable(ComposerDMASimTest src/dma_sim_test.cc)
-    target_link_libraries(ComposerDMASimTest PUBLIC APEX::composer)
+#    add_executable(ComposerDMASimTest src/dma_sim_test.cc)
+#    target_link_libraries(ComposerDMASimTest PUBLIC APEX::composer)
 
     if ("${USE_DRAMSIM}" STREQUAL "1")
         add_subdirectory(DRAMsim3)
@@ -100,9 +100,9 @@ if (${BUILD_SIM})
             VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread"#  --threads 4
             TRACE
             )
-    verilate(ComposerDMASimTest
-            SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v TOP_MODULE ComposerTop
-            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" #--threads 1
-            TRACE
-            )
+#    verilate(ComposerDMASimTest
+#            SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v TOP_MODULE ComposerTop
+#            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" #--threads 1
+#            TRACE
+#            )
 endif ()
