@@ -106,7 +106,7 @@ template <typename idtype>
 class data_channel {
   CData * ready;
    CData *valid;
-   char *data;
+   char *data = nullptr;
    idtype * id;
    ComposerStrobeSimDtype *strobe;
    CData *last;
@@ -118,7 +118,6 @@ public:
                         idtype *id) :
           ready(&ready),
           valid(&valid),
-          data(data),
           strobe(strobe),
           last(&last),
           id(id) {}

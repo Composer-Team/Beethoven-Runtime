@@ -20,7 +20,6 @@
 using namespace dramsim3;
 #endif
 
-Vcomposer *top;
 uint64_t main_time = 0;
 
 extern pthread_mutex_t cmdserverlock;
@@ -125,12 +124,12 @@ void run_verilator() {
 
   Verilated::commandArgs(3, v);
 
-  top = new Vcomposer;
+  Vcomposer top;
 
   Verilated::traceEverOn(true);
 #if defined(TRACE)
   tfp = new VerilatedVcdC;
-  top->trace(tfp, 100);
+  top.trace(tfp, 100);
   tfp->open("trace.vcd");
 #endif
 
@@ -143,17 +142,17 @@ void run_verilator() {
   mem_interface<ComposerDMAIDtype> dma;
   int dma_tx_progress = 0;
   int dma_tx_length = 0;
-  dma.aw = new v_address_channel<ComposerDMAIDtype>(top->dma_aw_ready, top->dma_aw_valid, top->dma_aw_bits_id,
-                                        top->dma_aw_bits_size, top->dma_aw_bits_burst,
-                                        top->dma_aw_bits_addr, top->dma_aw_bits_len);
-  dma.ar = new v_address_channel<ComposerDMAIDtype>(top->dma_ar_ready, top->dma_ar_valid, top->dma_ar_bits_id,
-                                        top->dma_ar_bits_size, top->dma_ar_bits_burst,
-                                        top->dma_ar_bits_addr, top->dma_ar_bits_len);
-  dma.w = new data_channel<ComposerDMAIDtype>(top->dma_w_ready, top->dma_w_valid, (char*)top->dma_w_bits_data.m_storage,
-                           &top->dma_w_bits_strb, top->dma_w_bits_last, nullptr);
-  dma.r = new data_channel<ComposerDMAIDtype>(top->dma_r_ready, top->dma_r_valid, (char*)top->dma_r_bits_data.m_storage,
-                           nullptr, top->dma_r_bits_last, &top->dma_r_bits_id);
-  dma.b = new response_channel<ComposerDMAIDtype> (top->dma_b_ready, top->dma_b_valid, top->dma_b_bits_id);
+  dma.aw = new v_address_channel<ComposerDMAIDtype>(top.dma_aw_ready, top.dma_aw_valid, top.dma_aw_bits_id,
+                                        top.dma_aw_bits_size, top.dma_aw_bits_burst,
+                                        top.dma_aw_bits_addr, top.dma_aw_bits_len);
+  dma.ar = new v_address_channel<ComposerDMAIDtype>(top.dma_ar_ready, top.dma_ar_valid, top.dma_ar_bits_id,
+                                        top.dma_ar_bits_size, top.dma_ar_bits_burst,
+                                        top.dma_ar_bits_addr, top.dma_ar_bits_len);
+  dma.w = new data_channel<ComposerDMAIDtype>(top.dma_w_ready, top.dma_w_valid, (char*)top.dma_w_bits_data.m_storage,
+                           &top.dma_w_bits_strb, top.dma_w_bits_last, nullptr);
+  dma.r = new data_channel<ComposerDMAIDtype>(top.dma_r_ready, top.dma_r_valid, (char*)top.dma_r_bits_data.m_storage,
+                           nullptr, top.dma_r_bits_last, &top.dma_r_bits_id);
+  dma.b = new response_channel<ComposerDMAIDtype> (top.dma_b_ready, top.dma_b_valid, top.dma_b_bits_id);
 #endif
 #ifdef USE_DRAMSIM
   for (auto &axi4_mem: axi4_mems) {
@@ -185,8 +184,8 @@ void run_verilator() {
   printf("There are %d DDR Channels\n", NUM_DDR_CHANNELS);
 #if NUM_DDR_CHANNELS >= 1
   init_ddr_interface(0)
-  axi4_mems[0].w->setData((char*)&top->mem_0_w_bits_data.at(0));
-  axi4_mems[0].r->setData((char*)&top->mem_0_r_bits_data.at(0));
+  axi4_mems[0].w->setData((char*)&top.mem_0_w_bits_data.at(0));
+  axi4_mems[0].r->setData((char*)&top.mem_0_r_bits_data.at(0));
 #if NUM_DDR_CHANNELS >= 2
   init_ddr_interface(1)
 #if NUM_DDR_CHANNELS >= 4
@@ -196,7 +195,7 @@ void run_verilator() {
 #endif
 #endif
   // reset circuit
-  top->reset = 1;
+  top.reset = 1;
   for (auto &mem: axi4_mems) {
 #ifndef USE_DRAMSIM
     mem.ar->setReady(1);
@@ -217,21 +216,21 @@ void run_verilator() {
   std::map<std::tuple<int, int>, unsigned long long> start_times;
 
   for (int i = 0; i < 50; ++i) {
-    top->clock = 0;
-    top->eval();
+    top.clock = 0;
+    top.eval();
 #ifdef TRACE
     tfp->dump(main_time);
 #endif
     main_time++;
-    top->clock = 1;
-    top->eval();
+    top.clock = 1;
+    top.eval();
 #ifdef TRACE
     tfp->dump(main_time);
 #endif
     main_time++;
   }
-  top->reset = 0;
-  top->clock = 0;
+  top.reset = 0;
+  top.clock = 0;
 
   command_transaction ongoing_cmd;
   response_transaction ongoing_rsp;
@@ -251,34 +250,34 @@ void run_verilator() {
 
 
     // start queueing up a new command if one is available
-    top->ocl_0_aw_valid = top->ocl_0_w_valid = top->ocl_0_r_ready = top->ocl_0_ar_valid = top->ocl_0_b_ready = 0;
+    top.ocl_0_aw_valid = top.ocl_0_w_valid = top.ocl_0_r_ready = top.ocl_0_ar_valid = top.ocl_0_b_ready = 0;
     switch (ongoing_cmd.state) {
       // tell the composer that we're going to send 32-bits of a command over the PCIE bus
       case CMD_BITS_WRITE_ADDR:
         ongoing_cmd.ready_for_command = false;
-        top->ocl_0_aw_valid = 1;
-        top->ocl_0_aw_bits_len = 0;
-        top->ocl_0_aw_bits_id = 0;
-        top->ocl_0_aw_bits_addr = CMD_BITS;
-        if (top->ocl_0_aw_ready) {
+        top.ocl_0_aw_valid = 1;
+        top.ocl_0_aw_bits_len = 0;
+        top.ocl_0_aw_bits_id = 0;
+        top.ocl_0_aw_bits_addr = CMD_BITS;
+        if (top.ocl_0_aw_ready) {
           ongoing_cmd.state = CMD_BITS_WRITE_DAT;
 //          printf("to write dat\n");
         }
         break;
         // send the command over the PCIE bus
       case CMD_BITS_WRITE_DAT:
-        top->ocl_0_w_valid = 1;
-        top->ocl_0_w_bits_data = ongoing_cmd.cmdbuf[ongoing_cmd.progress];
-        if (top->ocl_0_w_ready) {
+        top.ocl_0_w_valid = 1;
+        top.ocl_0_w_bits_data = ongoing_cmd.cmdbuf[ongoing_cmd.progress];
+        if (top.ocl_0_w_ready) {
           ongoing_cmd.state = CMD_BITS_WRITE_B;
 //          printf("wrote %d, going to bits write response. BITS: %08x\n", ongoing_cmd.progress,
 //                 ongoing_cmd.cmdbuf[ongoing_cmd.progress]);
         }
         break;
       case CMD_BITS_WRITE_B:
-        top->ocl_0_b_ready = 1;
-        if (top->ocl_0_b_valid) {
-          if (top->ocl_0_b_bits_resp == 0) {
+        top.ocl_0_b_ready = 1;
+        if (top.ocl_0_b_valid) {
+          if (top.ocl_0_b_bits_resp == 0) {
             ongoing_cmd.state = CMD_VALID_ADDR;
 //            printf("to valid addr\n");
           } else {
@@ -289,28 +288,28 @@ void run_verilator() {
         // We just send the 32-bits, now "simulate" the decoupled interface by toggling to the CMD_VALID bit to 1
         // This bit is visible from the CMD_VALID bit, so we need to perform an AXI transaction
       case CMD_VALID_ADDR:
-        top->ocl_0_aw_valid = 1;
-        top->ocl_0_aw_bits_addr = CMD_VALID;
-        top->ocl_0_aw_bits_len = 0; // length is actually one - see AXI spec
-        top->ocl_0_aw_bits_id = 0;
-        if (top->ocl_0_aw_ready) {
+        top.ocl_0_aw_valid = 1;
+        top.ocl_0_aw_bits_addr = CMD_VALID;
+        top.ocl_0_aw_bits_len = 0; // length is actually one - see AXI spec
+        top.ocl_0_aw_bits_id = 0;
+        if (top.ocl_0_aw_ready) {
 //          printf("to valid dat\n");
           ongoing_cmd.state = CMD_VALID_DAT;
         }
         break;
         // send the CMD_VALID bit
       case CMD_VALID_DAT:
-        top->ocl_0_w_valid = 1;
-        top->ocl_0_w_bits_data = 1;
-        if (top->ocl_0_w_ready) {
+        top.ocl_0_w_valid = 1;
+        top.ocl_0_w_bits_data = 1;
+        if (top.ocl_0_w_ready) {
 //          printf("to valid b\n");
           ongoing_cmd.state = CMD_VALID_WRITE_B;
         }
         break;
       case CMD_VALID_WRITE_B:
-        top->ocl_0_b_ready = 1;
-        if (top->ocl_0_b_valid) {
-          if (top->ocl_0_b_bits_resp == 0) {
+        top.ocl_0_b_ready = 1;
+        if (top.ocl_0_b_valid) {
+          if (top.ocl_0_b_bits_resp == 0) {
             ongoing_cmd.progress++;
             // send last thing, yield bus
             if (ongoing_cmd.progress == command_transaction::payload_length) {
@@ -333,20 +332,20 @@ void run_verilator() {
         // We just send 32-bits over the interface, check if it's ready for another 32b by requesting ready from the
         // CMD_READY bit
       case CMD_RECHECK_READY_ADDR:
-        top->ocl_0_ar_valid = 1;
-        top->ocl_0_ar_bits_addr = CMD_READY;
-        top->ocl_0_ar_bits_len = 0;
-        top->ocl_0_ar_bits_id = 0;
-        if (top->ocl_0_ar_ready) {
+        top.ocl_0_ar_valid = 1;
+        top.ocl_0_ar_bits_addr = CMD_READY;
+        top.ocl_0_ar_bits_len = 0;
+        top.ocl_0_ar_bits_id = 0;
+        if (top.ocl_0_ar_ready) {
           ongoing_cmd.state = CMD_RECHECK_READY_DAT;
         }
         break;
         // read the CMD_READY bit
       case CMD_RECHECK_READY_DAT:
-        top->ocl_0_r_ready = 1;
-        if (top->ocl_0_r_valid) {
+        top.ocl_0_r_ready = 1;
+        if (top.ocl_0_r_valid) {
           // if it's ready for another command
-          if (top->ocl_0_r_bits_data) {
+          if (top.ocl_0_r_bits_data) {
             ongoing_cmd.state = CMD_BITS_WRITE_ADDR;
           } else {
             ongoing_cmd.state = CMD_RECHECK_READY_ADDR;
@@ -380,43 +379,43 @@ void run_verilator() {
       case RESPT_INACTIVE:
         break;
       case RESPT_BITS_ADDR:
-        top->ocl_0_ar_bits_addr = RESP_BITS;
-        top->ocl_0_ar_bits_len = 0;
-        top->ocl_0_ar_valid = 1;
-        top->ocl_0_ar_bits_id = 0;
-        if (top->ocl_0_ar_ready) {
+        top.ocl_0_ar_bits_addr = RESP_BITS;
+        top.ocl_0_ar_bits_len = 0;
+        top.ocl_0_ar_valid = 1;
+        top.ocl_0_ar_bits_id = 0;
+        if (top.ocl_0_ar_ready) {
 //          printf("respt-bits-addr -> respt-bits-read\n");
           ongoing_rsp.state = RESPT_BITS_READ;
         }
       case RESPT_BITS_READ:
-        top->ocl_0_r_ready = 1;
-        if (top->ocl_0_r_valid) {
-          ongoing_rsp.resbuf[ongoing_rsp.progress++] = top->ocl_0_r_bits_data;
+        top.ocl_0_r_ready = 1;
+        if (top.ocl_0_r_valid) {
+          ongoing_rsp.resbuf[ongoing_rsp.progress++] = top.ocl_0_r_bits_data;
 //          printf("respt-bits-read -> respt-ready-addr\n");
           ongoing_rsp.state = RESPT_READY_ADDR;
         }
         break;
       case RESPT_READY_ADDR:
-        top->ocl_0_aw_valid = 1;
-        top->ocl_0_aw_bits_len = 0;
-        top->ocl_0_aw_bits_addr = RESP_READY;
-        top->ocl_0_aw_bits_id = 0;
-        if (top->ocl_0_aw_ready) {
+        top.ocl_0_aw_valid = 1;
+        top.ocl_0_aw_bits_len = 0;
+        top.ocl_0_aw_bits_addr = RESP_READY;
+        top.ocl_0_aw_bits_id = 0;
+        if (top.ocl_0_aw_ready) {
 //          printf("respt-ready-addr -> respt-ready-write\n");
           ongoing_rsp.state = RESPT_READY_WRITE;
         }
         break;
       case RESPT_READY_WRITE:
-        top->ocl_0_w_valid = 1;
-        top->ocl_0_w_bits_data = 1;
-        if (top->ocl_0_w_ready) {
+        top.ocl_0_w_valid = 1;
+        top.ocl_0_w_bits_data = 1;
+        if (top.ocl_0_w_ready) {
 //          printf("respt-ready-write -> respt-ready-b\n");
           ongoing_rsp.state = RESPT_READY_WRITE_B;
         }
       case RESPT_READY_WRITE_B:
-        top->ocl_0_b_ready = 1;
-        if (top->ocl_0_b_valid) {
-          if (top->ocl_0_b_bits_resp == 0) {
+        top.ocl_0_b_ready = 1;
+        if (top.ocl_0_b_valid) {
+          if (top.ocl_0_b_bits_resp == 0) {
             if (ongoing_rsp.progress == response_transaction::payload_length) {
               composer::rocc_response r(ongoing_rsp.resbuf, pack_cfg);
               auto id = std::tuple<int, int>(r.system_id, r.core_id);
@@ -439,18 +438,18 @@ void run_verilator() {
         }
         break;
       case RESPT_RECHECK_VALID_ADDR:
-        top->ocl_0_ar_valid = 1;
-        top->ocl_0_ar_bits_addr = RESP_VALID;
-        top->ocl_0_ar_bits_len = 0;
-        top->ocl_0_ar_bits_id = 0;
-        if (top->ocl_0_ar_ready) {
+        top.ocl_0_ar_valid = 1;
+        top.ocl_0_ar_bits_addr = RESP_VALID;
+        top.ocl_0_ar_bits_len = 0;
+        top.ocl_0_ar_bits_id = 0;
+        if (top.ocl_0_ar_ready) {
           ongoing_rsp.state = RESPT_RECHECK_VALID_READ;
         }
         break;
       case RESPT_RECHECK_VALID_READ:
-        top->ocl_0_r_ready = 1;
-        if (top->ocl_0_r_valid) {
-          if (top->ocl_0_r_bits_data) {
+        top.ocl_0_r_ready = 1;
+        if (top.ocl_0_r_valid) {
+          if (top.ocl_0_r_bits_data) {
             ongoing_rsp.state = RESPT_BITS_ADDR;
           } else {
             ongoing_rsp.state = RESPT_RECHECK_VALID_ADDR;
@@ -466,19 +465,19 @@ void run_verilator() {
         }
         break;
       case UPDATE_RESP_ADDR:
-        top->ocl_0_ar_valid = 1;
-        top->ocl_0_ar_bits_len = 0;
-        top->ocl_0_ar_bits_id = 0;
-        top->ocl_0_ar_bits_addr = RESP_VALID;
-        if (top->ocl_0_ar_ready) {
+        top.ocl_0_ar_valid = 1;
+        top.ocl_0_ar_bits_len = 0;
+        top.ocl_0_ar_bits_id = 0;
+        top.ocl_0_ar_bits_addr = RESP_VALID;
+        if (top.ocl_0_ar_ready) {
           ongoing_update = UPDATE_RESP_WAIT;
         }
         break;
       case UPDATE_RESP_WAIT:
-        top->ocl_0_r_ready = 1;
-        if (top->ocl_0_r_valid) {
+        top.ocl_0_r_ready = 1;
+        if (top.ocl_0_r_valid) {
           ongoing_rsp.progress = 0;
-          if (top->ocl_0_r_bits_data == 1) {
+          if (top.ocl_0_r_bits_data == 1) {
             ongoing_rsp.state = RESPT_BITS_ADDR;
           } else {
             bus_occupied = false;
@@ -493,18 +492,18 @@ void run_verilator() {
         }
         break;
       case UPDATE_CMD_ADDR:
-        top->ocl_0_ar_valid = 1;
-        top->ocl_0_ar_bits_id = 0;
-        top->ocl_0_ar_bits_addr = CMD_READY;
-        top->ocl_0_ar_bits_len = 0;
-        if (top->ocl_0_ar_ready) {
+        top.ocl_0_ar_valid = 1;
+        top.ocl_0_ar_bits_id = 0;
+        top.ocl_0_ar_bits_addr = CMD_READY;
+        top.ocl_0_ar_bits_len = 0;
+        if (top.ocl_0_ar_ready) {
           ongoing_update = UPDATE_CMD_WAIT;
         }
         break;
       case UPDATE_CMD_WAIT:
-        top->ocl_0_r_ready = 1;
-        if (top->ocl_0_r_valid) {
-          ongoing_cmd.ready_for_command = top->ocl_0_r_bits_data;
+        top.ocl_0_r_ready = 1;
+        if (top.ocl_0_r_valid) {
+          ongoing_cmd.ready_for_command = top.ocl_0_r_bits_data;
           if (cmds_in_flight > 0) {
             ongoing_update = UPDATE_IDLE_RESP;
           } else {
@@ -537,9 +536,9 @@ void run_verilator() {
       }
     }
 
-    top->clock = 1; // posedge
+    top.clock = 1; // posedge
     main_time++;
-    top->eval();
+    top.eval();
 #ifdef TRACE
     tfp->dump(main_time);
 #endif
@@ -773,8 +772,8 @@ void run_verilator() {
     }
     pthread_mutex_unlock(&dma_lock);
 #endif
-    top->clock = 0; // negedge
-    top->eval();
+    top.clock = 0; // negedge
+    top.eval();
     main_time++;
 #ifdef TRACE
     tfp->dump(main_time);
