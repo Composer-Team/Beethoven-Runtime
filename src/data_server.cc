@@ -192,22 +192,22 @@ uint64_t f1_hack_addr(uint64_t addr) {
       case data_server_op::MOVE_TO_FPGA: {
         std::cerr << at.get_mapping(addr.op_argument).first << std::endl;
 #if defined(COMPOSER_HAS_DMA) and defined(SIM)
-        for (int i = 0; i < addr.op3_argument; i += 256*64) {
-          pthread_mutex_lock(&dma_lock);
-          auto remaining = addr.op3_argument - i;
-          if (remaining >= 256 * 64) {
-            dma_len = 256 * 64;
-          } else {
-            dma_len = remaining;
-          }
-          dma_ptr = ((char *) at.translate(addr.op_argument)) + i;
-          dma_fpga_addr = addr.op_argument + i;
-          dma_valid = true;
-          dma_write = true;
-          dma_in_progress = false;
-          pthread_mutex_unlock(&dma_lock);
-          pthread_mutex_lock(&dma_wait_lock);
-        }
+//        for (int i = 0; i < addr.op3_argument; i += 256*64) {
+//          pthread_mutex_lock(&dma_lock);
+//          auto remaining = addr.op3_argument - i;
+//          if (remaining >= 256 * 64) {
+//            dma_len = 256 * 64;
+//          } else {
+//            dma_len = remaining;
+//          }
+//          dma_ptr = ((char *) at.translate(addr.op_argument)) + i;
+//          dma_fpga_addr = addr.op_argument + i;
+//          dma_valid = true;
+//          dma_write = true;
+//          dma_in_progress = false;
+//          pthread_mutex_unlock(&dma_lock);
+//          pthread_mutex_lock(&dma_wait_lock);
+//        }
 #endif
 //        std::cerr << "finish DMA " << std::endl;
         break;
@@ -215,28 +215,28 @@ uint64_t f1_hack_addr(uint64_t addr) {
       case data_server_op::MOVE_FROM_FPGA: {
         std::cerr << at.get_mapping(addr.op2_argument).first << std::endl;
 #if defined(COMPOSER_HAS_DMA) and defined(SIM)
-        auto info = at.get_mapping(addr.op2_argument);
-        if (addr.op3_argument != info.second) {
-          throw std::exception();
-        }
-        for (int i = 0; i < addr.op3_argument; i += 256 * 64) {
-          pthread_mutex_lock(&dma_lock);
-          auto remaining = addr.op3_argument - i;
-          if (remaining >= 256 * 64) {
-            dma_len = 256 * 64;
-          } else {
-            dma_len = remaining;
-          }
-          dma_ptr = ((char *)std::get<0>(info)) + i;
-          dma_fpga_addr = addr.op2_argument + i;
-          dma_valid = true;
-          dma_write = true;
-          dma_in_progress = false;
-
-
-          pthread_mutex_unlock(&dma_lock);
-          pthread_mutex_lock(&dma_wait_lock);
-        }
+//        auto info = at.get_mapping(addr.op2_argument);
+//        if (addr.op3_argument != info.second) {
+//          throw std::exception();
+//        }
+//        for (int i = 0; i < addr.op3_argument; i += 256 * 64) {
+//          pthread_mutex_lock(&dma_lock);
+//          auto remaining = addr.op3_argument - i;
+//          if (remaining >= 256 * 64) {
+//            dma_len = 256 * 64;
+//          } else {
+//            dma_len = remaining;
+//          }
+//          dma_ptr = ((char *)std::get<0>(info)) + i;
+//          dma_fpga_addr = addr.op2_argument + i;
+//          dma_valid = true;
+//          dma_write = true;
+//          dma_in_progress = false;
+//
+//
+//          pthread_mutex_unlock(&dma_lock);
+//          pthread_mutex_lock(&dma_wait_lock);
+//        }
 #endif
         break;
       }

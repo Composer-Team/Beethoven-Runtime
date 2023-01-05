@@ -112,6 +112,7 @@ static uint64_t get_dimm_address(uint64_t addr) {
   }
   return acc;
 }
+
 #ifdef TRACE
 VerilatedVcdC *tfp;
 #endif
@@ -148,10 +149,12 @@ void run_verilator() {
   dma.ar = new v_address_channel<ComposerDMAIDtype>(top.dma_ar_ready, top.dma_ar_valid, top.dma_ar_bits_id,
                                         top.dma_ar_bits_size, top.dma_ar_bits_burst,
                                         top.dma_ar_bits_addr, top.dma_ar_bits_len);
-  dma.w = new data_channel<ComposerDMAIDtype>(top.dma_w_ready, top.dma_w_valid, (char*)top.dma_w_bits_data.m_storage,
+  dma.w = new data_channel<ComposerDMAIDtype>(top.dma_w_ready, top.dma_w_valid,
                            &top.dma_w_bits_strb, top.dma_w_bits_last, nullptr);
-  dma.r = new data_channel<ComposerDMAIDtype>(top.dma_r_ready, top.dma_r_valid, (char*)top.dma_r_bits_data.m_storage,
+  dma.r = new data_channel<ComposerDMAIDtype>(top.dma_r_ready, top.dma_r_valid,
                            nullptr, top.dma_r_bits_last, &top.dma_r_bits_id);
+  dma.w->setData((char*)top.dma_r_bits_data.m_storage);
+  dma.r->setData((char*)top.dma_w_bits_data.m_storage);
   dma.b = new response_channel<ComposerDMAIDtype> (top.dma_b_ready, top.dma_b_valid, top.dma_b_bits_id);
 #endif
 #ifdef USE_DRAMSIM
@@ -184,8 +187,8 @@ void run_verilator() {
   printf("There are %d DDR Channels\n", NUM_DDR_CHANNELS);
 #if NUM_DDR_CHANNELS >= 1
   init_ddr_interface(0)
-  axi4_mems[0].w->setData((char*)&top.mem_0_w_bits_data.at(0));
-  axi4_mems[0].r->setData((char*)&top.mem_0_r_bits_data.at(0));
+  axi4_mems[0].w->setData((char *) &top.mem_0_w_bits_data.at(0));
+  axi4_mems[0].r->setData((char *) &top.mem_0_r_bits_data.at(0));
 #if NUM_DDR_CHANNELS >= 2
   init_ddr_interface(1)
 #if NUM_DDR_CHANNELS >= 4
@@ -221,13 +224,13 @@ void run_verilator() {
 #ifdef TRACE
     tfp->dump(main_time);
 #endif
-    main_time++;
+    main_time += 4;
     top.clock = 1;
     top.eval();
 #ifdef TRACE
     tfp->dump(main_time);
 #endif
-    main_time++;
+    main_time+=4;
   }
   top.reset = 0;
   top.clock = 0;
@@ -420,7 +423,7 @@ void run_verilator() {
               composer::rocc_response r(ongoing_rsp.resbuf, pack_cfg);
               auto id = std::tuple<int, int>(r.system_id, r.core_id);
               auto start = start_times[id];
-              printf("Command took %f us\n", float((main_time-start )>>1)/1000);
+              printf("Command took %f us\n", float((main_time - start)) / 1000);
               register_reponse(ongoing_rsp.resbuf);
               cmds_in_flight--;
               bus_occupied = false;
@@ -516,7 +519,7 @@ void run_verilator() {
 
 #ifdef USE_DRAMSIM
     // approx clock diff
-    for (int i = 0; i < 7; ++i) {
+    for (int i = 0; i < 13; ++i) {
       for (auto &mem: axi4_mems) {
         mem.mem_sys->ClockTick();
       }
@@ -537,7 +540,7 @@ void run_verilator() {
     }
 
     top.clock = 1; // posedge
-    main_time++;
+    main_time+=4;
     top.eval();
 #ifdef TRACE
     tfp->dump(main_time);
@@ -550,7 +553,7 @@ void run_verilator() {
       }
       if (not inter.read_transactions.empty() && not inter.r->getValid()) {
         auto tx = inter.read_transactions.front();
-        int start = (tx->progress * tx->size) % (DATA_BUS_WIDTH/8);
+        int start = (tx->progress * tx->size) % (DATA_BUS_WIDTH / 8);
         char *dest = (char *) inter.r->getData() + start;
         memcpy(dest, tx->addr, tx->size);
         bool am_done = tx->len == (tx->progress + 1);
@@ -774,7 +777,7 @@ void run_verilator() {
 #endif
     top.clock = 0; // negedge
     top.eval();
-    main_time++;
+    main_time+=4;
 #ifdef TRACE
     tfp->dump(main_time);
 #endif
