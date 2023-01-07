@@ -144,18 +144,18 @@ void run_verilator() {
   int dma_tx_progress = 0;
   int dma_tx_length = 0;
   dma.aw = new v_address_channel<ComposerDMAIDtype>(top.dma_aw_ready, top.dma_aw_valid, top.dma_aw_bits_id,
-                                        top.dma_aw_bits_size, top.dma_aw_bits_burst,
-                                        top.dma_aw_bits_addr, top.dma_aw_bits_len);
+                                                    top.dma_aw_bits_size, top.dma_aw_bits_burst,
+                                                    top.dma_aw_bits_addr, top.dma_aw_bits_len);
   dma.ar = new v_address_channel<ComposerDMAIDtype>(top.dma_ar_ready, top.dma_ar_valid, top.dma_ar_bits_id,
-                                        top.dma_ar_bits_size, top.dma_ar_bits_burst,
-                                        top.dma_ar_bits_addr, top.dma_ar_bits_len);
+                                                    top.dma_ar_bits_size, top.dma_ar_bits_burst,
+                                                    top.dma_ar_bits_addr, top.dma_ar_bits_len);
   dma.w = new data_channel<ComposerDMAIDtype>(top.dma_w_ready, top.dma_w_valid,
-                           &top.dma_w_bits_strb, top.dma_w_bits_last, nullptr);
+                                              &top.dma_w_bits_strb, top.dma_w_bits_last, nullptr);
   dma.r = new data_channel<ComposerDMAIDtype>(top.dma_r_ready, top.dma_r_valid,
-                           nullptr, top.dma_r_bits_last, &top.dma_r_bits_id);
-  dma.w->setData((char*)top.dma_r_bits_data.m_storage);
-  dma.r->setData((char*)top.dma_w_bits_data.m_storage);
-  dma.b = new response_channel<ComposerDMAIDtype> (top.dma_b_ready, top.dma_b_valid, top.dma_b_bits_id);
+                                              nullptr, top.dma_r_bits_last, &top.dma_r_bits_id);
+  dma.w->setData((char *) top.dma_r_bits_data.m_storage);
+  dma.r->setData((char *) top.dma_w_bits_data.m_storage);
+  dma.b = new response_channel<ComposerDMAIDtype>(top.dma_b_ready, top.dma_b_valid, top.dma_b_bits_id);
 #endif
 #ifdef USE_DRAMSIM
   for (auto &axi4_mem: axi4_mems) {
@@ -230,7 +230,7 @@ void run_verilator() {
 #ifdef TRACE
     tfp->dump(main_time);
 #endif
-    main_time+=4;
+    main_time += 4;
   }
   top.reset = 0;
   top.clock = 0;
@@ -316,13 +316,9 @@ void run_verilator() {
             ongoing_cmd.progress++;
             // send last thing, yield bus
             if (ongoing_cmd.progress == command_transaction::payload_length) {
-//              printf("Command finished. To CMD_INACTIVE\n");
-              // TODO
               ongoing_cmd.state = CMD_INACTIVE;
               bus_occupied = false;
             } else {
-//              printf("Progress %d/%d. Continuing to CMD_RECHECK_READY_ADDR\n", ongoing_cmd.progress,
-//                     command_transaction::payload_length);
               // else, need to send the next 32-bit chunk and see that the channel is "ready"
               ongoing_cmd.state = CMD_RECHECK_READY_ADDR;
             }
@@ -356,10 +352,11 @@ void run_verilator() {
         }
         break;
       case CMD_INACTIVE:
-        if (ongoing_cmd.ready_for_command && !bus_occupied) {
+        if (ongoing_cmd.ready_for_command &&
+            !bus_occupied &&
+            (ongoing_update == UPDATE_IDLE_CMD || ongoing_update == UPDATE_IDLE_RESP)) {
           pthread_mutex_lock(&cmdserverlock);
           if (not cmds.empty()) {
-//            printf("\tGot command from cmd_server!\n");
             bus_occupied = true;
             ongoing_cmd.state = CMD_BITS_WRITE_ADDR;
             if (cmds.front().getXd()) {
@@ -368,7 +365,6 @@ void run_verilator() {
             }
             ongoing_cmd.cmdbuf = cmds.front().pack(pack_cfg);
             kill_sig = cmds.front().getOpcode() == ROCC_OP_FLUSH;
-//            std::cout << cmds.front() << std::endl << std::endl;
             ongoing_cmd.progress = 0;
             if (cmds.front().getXd() == 1)
               cmds_in_flight++;
@@ -387,14 +383,12 @@ void run_verilator() {
         top.ocl_0_ar_valid = 1;
         top.ocl_0_ar_bits_id = 0;
         if (top.ocl_0_ar_ready) {
-//          printf("respt-bits-addr -> respt-bits-read\n");
           ongoing_rsp.state = RESPT_BITS_READ;
         }
       case RESPT_BITS_READ:
         top.ocl_0_r_ready = 1;
         if (top.ocl_0_r_valid) {
           ongoing_rsp.resbuf[ongoing_rsp.progress++] = top.ocl_0_r_bits_data;
-//          printf("respt-bits-read -> respt-ready-addr\n");
           ongoing_rsp.state = RESPT_READY_ADDR;
         }
         break;
@@ -404,7 +398,6 @@ void run_verilator() {
         top.ocl_0_aw_bits_addr = RESP_READY;
         top.ocl_0_aw_bits_id = 0;
         if (top.ocl_0_aw_ready) {
-//          printf("respt-ready-addr -> respt-ready-write\n");
           ongoing_rsp.state = RESPT_READY_WRITE;
         }
         break;
@@ -412,7 +405,6 @@ void run_verilator() {
         top.ocl_0_w_valid = 1;
         top.ocl_0_w_bits_data = 1;
         if (top.ocl_0_w_ready) {
-//          printf("respt-ready-write -> respt-ready-b\n");
           ongoing_rsp.state = RESPT_READY_WRITE_B;
         }
       case RESPT_READY_WRITE_B:
@@ -435,7 +427,7 @@ void run_verilator() {
               ongoing_rsp.state = RESPT_RECHECK_VALID_ADDR;
             }
           } else {
-            fprintf(stderr, "Recieved error from write response!");
+            fprintf(stderr, "Received error from write response!");
             exit(1);
           }
         }
@@ -481,6 +473,7 @@ void run_verilator() {
         if (top.ocl_0_r_valid) {
           ongoing_rsp.progress = 0;
           if (top.ocl_0_r_bits_data == 1) {
+            printf("Found valid response on cycle %lu!!! %d %d\n", main_time, top.ocl_0_r_valid, top.ocl_0_r_bits_data);
             ongoing_rsp.state = RESPT_BITS_ADDR;
           } else {
             bus_occupied = false;
@@ -537,10 +530,27 @@ void run_verilator() {
           delete tx;
         }
       }
+
+#ifdef USE_DRAMSIM
+      if (inter.ar->getReady() && inter.ar->getValid()) {
+        uint64_t addr = inter.ar->getAddr();
+        char *ad = (char *) at.translate(addr);
+        auto txsize = (int) pow(2, inter.ar->getSize());
+        auto txlen = inter.ar->getLen() + 1;
+        auto dram_txlen = txsize * txlen >> 3;
+        if (dram_txlen == 0) dram_txlen = 1;
+        auto tx = new memory_transaction(ad, txsize, txlen, dram_txlen, false,
+                                         inter.ar->getId(), addr);
+        // 64b per DRAM transaction
+        tx->dram_tx_len = dram_txlen;
+        inter.to_enqueue_read = tx;
+        tx->dram_tx_progress = 0;
+      }
+#endif
     }
 
     top.clock = 1; // posedge
-    main_time+=4;
+    main_time += 4;
     top.eval();
 #ifdef TRACE
     tfp->dump(main_time);
@@ -599,13 +609,14 @@ void run_verilator() {
           while (strobe != 0) {
             if (strobe & 1) {
 #ifdef COMPOSER_HAS_DMA
-              auto curr_ptr = uintptr_t(addr+off);
+              auto curr_ptr = uintptr_t(addr + off);
               auto base_ptr = uintptr_t(dma_ptr);
-              auto end_ptr = uintptr_t(dma_ptr+dma_len);
+              auto end_ptr = uintptr_t(dma_ptr + dma_len);
               if (dma_in_progress and dma_write and curr_ptr < end_ptr and curr_ptr >= base_ptr) {
                 // we're performing a DMA into the same address space so just make sure that the values match up...
                 if (addr[off] != src[off]) {
-                  std::cerr << "DMA write was not a no-op. " << off << " " << int(addr[off]) << " " << int(src[off]) << std::endl;
+                  std::cerr << "DMA write was not a no-op. " << off << " " << int(addr[off]) << " " << int(src[off])
+                            << std::endl;
                   tfp->close();
                   throw std::exception();
                 }
@@ -645,20 +656,6 @@ void run_verilator() {
       enqueue_transaction(*inter.aw, inter.write_transactions);
 
 #ifdef USE_DRAMSIM
-      if (inter.ar->getReady() && inter.ar->getValid()) {
-        uint64_t addr = inter.ar->getAddr();
-        char *ad = (char *) at.translate(addr);
-        auto txsize = (int) pow(2, inter.ar->getSize());
-        auto txlen = inter.ar->getLen() + 1;
-        auto dram_txlen = txsize * txlen >> 3;
-        if (dram_txlen == 0) dram_txlen = 1;
-        auto tx = new memory_transaction(ad, txsize, txlen, dram_txlen, false,
-                                         inter.ar->getId(), addr);
-        // 64b per DRAM transaction
-        tx->dram_tx_len = dram_txlen;
-        inter.to_enqueue_read = tx;
-        tx->dram_tx_progress = 0;
-      }
 
       if (inter.to_enqueue_read != nullptr) {
         auto &r = *inter.to_enqueue_read;
@@ -716,7 +713,7 @@ void run_verilator() {
         dma.aw->setAddr(dma_fpga_addr);
         dma.aw->setId(0);
         dma.aw->setSize(6);
-        dma.aw->setLen((dma_len/64)-1);
+        dma.aw->setLen((dma_len / 64) - 1);
         dma.aw->setBurst(1);
         if (dma.aw->fire()) {
           dma_in_progress = true;
@@ -726,7 +723,7 @@ void run_verilator() {
         dma.ar->setAddr(dma_fpga_addr);
         dma.ar->setId(0);
         dma.ar->setSize(6);
-        dma.ar->setLen((dma_len/64)-1);
+        dma.ar->setLen((dma_len / 64) - 1);
         dma.ar->setBurst(1);
         if (dma.ar->fire()) {
           dma_in_progress = true;
@@ -755,8 +752,8 @@ void run_verilator() {
       } else {
         dma.r->setReady(1);
         if (dma.r->fire()) {
-          char * rval = dma.r->getData();
-          char * src_val = dma_ptr + 64 * dma_tx_progress;
+          char *rval = dma.r->getData();
+          char *src_val = dma_ptr + 64 * dma_tx_progress;
           for (int i = 0; i < 64; ++i) {
             if (rval[i] != src_val[i]) {
               std::cerr << "Got an unexpected value from the DMA... " << i << " " << dma_tx_progress << " " << rval[i]
@@ -777,7 +774,7 @@ void run_verilator() {
 #endif
     top.clock = 0; // negedge
     top.eval();
-    main_time+=4;
+    main_time += 4;
 #ifdef TRACE
     tfp->dump(main_time);
 #endif
