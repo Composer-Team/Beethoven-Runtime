@@ -32,22 +32,17 @@ static void *poll_thread(void *in) {
 //    fflush(stdout);
     if (flights) {
       uint32_t buf[3];
-      int rc = 0;
       for (unsigned int &i: buf) {
         uint32_t resp_ready = 0;
         while (!resp_ready) {
           resp_ready = peek_mmio(RESP_VALID);
           if (not resp_ready) {
-            std::this_thread::sleep_for(1ms);
+            std::this_thread::sleep_for(1us);
           }
           tries++;
         }
         i = peek_mmio(RESP_BITS);
         poke_mmio(RESP_READY, 1);
-      }
-      if (rc) {
-        fprintf(stderr, "Error in fpga pci peek/poke\t%s\n", strerror(errno));
-        throw std::exception();
       }
       register_reponse(buf);
       pthread_mutex_lock(&csf->process_waiting_count_lock);
