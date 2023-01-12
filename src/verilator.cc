@@ -184,7 +184,9 @@ void run_verilator() {
 
   }
 #endif
+#ifdef VERBOSE
   printf("There are %d DDR Channels\n", NUM_DDR_CHANNELS);
+#endif
 #if NUM_DDR_CHANNELS >= 1
   init_ddr_interface(0)
   axi4_mems[0].w->setData((char *) &top.mem_0_w_bits_data.at(0));
@@ -241,12 +243,16 @@ void run_verilator() {
   int cmds_in_flight = 0;
   bool bus_occupied = false;
   int check_freq = 50;
+#ifdef VERBOSE
   printf("main time %lld\n", main_time);
+#endif
   while (not kill_sig) {
     // clock is high after posedge - changes now are taking place after posedge,
     // and will take effect on negedge
     if (main_time % 1000000 <= 1) {
+#ifdef VERBOSE
       printf("main time: %lld\n", main_time);
+#endif
     }
 
     // ------------ HANDLE COMMAND INTERFACE ----------------
@@ -415,7 +421,9 @@ void run_verilator() {
               composer::rocc_response r(ongoing_rsp.resbuf, pack_cfg);
               auto id = std::tuple<int, int>(r.system_id, r.core_id);
               auto start = start_times[id];
+#ifdef VERBOSE
               printf("Command took %f us\n", float((main_time - start)) / 1000);
+#endif
               register_reponse(ongoing_rsp.resbuf);
               cmds_in_flight--;
               bus_occupied = false;
