@@ -28,8 +28,6 @@ static void *poll_thread(void *in) {
     flights = csf->processes_waiting;
     pthread_mutex_unlock(&csf->process_waiting_count_lock);
 
-//    printf(".");
-//    fflush(stdout);
     if (flights) {
       uint32_t buf[3];
       for (unsigned int &i: buf) {

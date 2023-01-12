@@ -481,7 +481,9 @@ void run_verilator() {
         if (top.ocl_0_r_valid) {
           ongoing_rsp.progress = 0;
           if (top.ocl_0_r_bits_data == 1) {
+#ifdef VERBOSE
             printf("Found valid response on cycle %lu!!! %d %d\n", main_time, top.ocl_0_r_valid, top.ocl_0_r_bits_data);
+#endif
             ongoing_rsp.state = RESPT_BITS_ADDR;
           } else {
             bus_occupied = false;
@@ -788,7 +790,9 @@ void run_verilator() {
 #endif
   }
 #ifdef TRACE
+#ifdef VERBOSE
   printf("printing traces\n");
+#endif
   fflush(stdout);
   tfp->close();
 #endif
@@ -798,10 +802,14 @@ void run_verilator() {
 int main() {
   data_server::start();
   cmd_server::start();
+#ifdef VERBOSE
   printf("Entering verilator\n");
+#endif
   run_verilator();
   pthread_mutex_lock(&main_lock);
   pthread_mutex_lock(&main_lock);
+#ifdef VERBOSE
   printf("Main thread exiting\n");
+#endif
   exit(0);
 }

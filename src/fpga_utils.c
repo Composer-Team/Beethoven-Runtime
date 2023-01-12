@@ -41,10 +41,6 @@ void fpga_setup(int slot_id) {
     check_rc(rc, "AFI in Slot is not in READY state !");
   }
 
-  fprintf(stderr, "AFI PCI  Vendor ID: 0x%x, Device ID 0x%x\n",
-          info.spec.map[FPGA_APP_PF].vendor_id,
-          info.spec.map[FPGA_APP_PF].device_id);
-
     /* get local image description, contains status, vendor id, and device id. */
     rc = fpga_mgmt_describe_local_image(slot_id, &info, 0);
     check_rc(rc, "Unable to get AFI information from slot");

@@ -72,8 +72,10 @@ uint64_t f1_hack_addr(uint64_t addr) {
 
   struct stat shm_stats{};
   fstat(fd_composer, &shm_stats);
+#ifdef VERBOSE
   std::cerr << shm_stats.st_size << std::endl;
   std::cerr << sizeof(data_server_file) << std::endl;
+#endif
   if (shm_stats.st_size < sizeof(data_server_file)) {
     int tr_rc = ftruncate(fd_composer, sizeof(data_server_file));
     if (tr_rc) {
@@ -86,12 +88,17 @@ uint64_t f1_hack_addr(uint64_t addr) {
                                           MAP_SHARED, fd_composer, 0);
   cf = &addr;
 
+#ifdef VERBOSE
   std::cerr << "Constructing allocator" << std::endl;
+#endif
   auto allocator = new composer_allocator();
+#ifdef VERBOSE
   std::cerr << "Allocator constructed - data server ready" << std::endl;
+#endif
   data_server_file::init(addr);
 
 #ifdef FPGA
+#ifdef VERBOSE
   std::cerr << "Running FPGA MemCpy Sanity Checks..." << std::endl;
   auto sanity_alloc = (uint8_t*)malloc(1024);
   auto sanity_int = (uint32_t*)sanity_alloc;
@@ -100,6 +107,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
     sanity_int[i] = 0xCAFEBEEF;
   }
   std::cerr << "Trying to write 1024B to FPGA." << std::endl;
+#endif
 #ifdef F1
   int sanity_rc = wrapper_fpga_dma_burst_write(xdma_write_fd, sanity_alloc, 1024, sanity_address);
 #elif defined(Kria)
