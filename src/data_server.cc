@@ -97,8 +97,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
 #endif
   data_server_file::init(addr);
 
-#ifdef FPGA
-#ifdef VERBOSE
+#if defined(FPGA) && defined(F1)
   std::cerr << "Running FPGA MemCpy Sanity Checks..." << std::endl;
   auto sanity_alloc = (uint8_t*)malloc(1024);
   auto sanity_int = (uint32_t*)sanity_alloc;
@@ -107,12 +106,8 @@ uint64_t f1_hack_addr(uint64_t addr) {
     sanity_int[i] = 0xCAFEBEEF;
   }
   std::cerr << "Trying to write 1024B to FPGA." << std::endl;
-#endif
-#ifdef F1
+
   int sanity_rc = wrapper_fpga_dma_burst_write(xdma_write_fd, sanity_alloc, 1024, sanity_address);
-#elif defined(Kria)
-  int sanity_rc = 0;
-#endif
   if (sanity_rc) {
     std::cerr << "Failed to DMA write to FPGA. Error code: " << sanity_rc << std::endl;
     throw std::exception();
@@ -120,11 +115,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
     std::cerr << "Success 1/3" << std::endl;
   }
   memset(sanity_alloc, 0, 1024);
-#ifdef F1
   sanity_rc = wrapper_fpga_dma_burst_read(xdma_read_fd, sanity_alloc, 1024, sanity_address);
-#elif defined(Kria)
-  sanity_rc = 0;
-#endif
   if (sanity_rc) {
     std::cerr << "Failed to DMA read from FPGA. Error code: " << sanity_rc << std::endl;
     throw std::exception();
@@ -132,7 +123,6 @@ uint64_t f1_hack_addr(uint64_t addr) {
     std::cerr << "Success 2/3" << std::endl;
   }
 
-#ifdef F1
   for (int i = 0; i < 1024 / 4; ++i) {
     if (sanity_int[i] != 0xCAFEBEEF) {
       sanity_rc = 1;
@@ -145,7 +135,6 @@ uint64_t f1_hack_addr(uint64_t addr) {
   } else {
     std::cerr << "Success 3/3" << std::endl;
   }
-#endif
 
 #endif
 
