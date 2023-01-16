@@ -88,12 +88,14 @@ uint64_t f1_hack_addr(uint64_t addr) {
                                           MAP_SHARED, fd_composer, 0);
   cf = &addr;
 
+#ifdef COMPOSER_USE_CUSTOM_ALLOC
 #ifdef VERBOSE
   std::cerr << "Constructing allocator" << std::endl;
 #endif
   auto allocator = new composer_allocator();
 #ifdef VERBOSE
   std::cerr << "Allocator constructed - data server ready" << std::endl;
+#endif
 #endif
   data_server_file::init(addr);
 
@@ -174,16 +176,25 @@ uint64_t f1_hack_addr(uint64_t addr) {
         // copy file name to response field
         strcpy(addr.fname, fname.c_str());
         // allocate memory
+#ifdef COMPOSER_USE_CUSTOM_ALLOC
         auto fpga_addr = allocator->malloc(addr.op_argument);
-        // add mapping in server
         at.add_mapping(fpga_addr.getFpgaAddr(), addr.op_argument, naddr);
         // return fpga address
         addr.op_argument = fpga_addr.getFpgaAddr();
+#else
+        auto fpga_addr = (uint64_t)naddr;
+        at.add_mapping(fpga_addr, addr.op_argument, naddr);
+        addr.op_argument = fpga_addr;
+#endif
+        // add mapping in server
         break;
       }
       case data_server_op::FREE:
+#ifdef COMPOSER_USE_CUSTOM_ALLOC
         allocator->free(composer::remote_ptr(addr.op_argument, 0));
+#endif
         at.remove_mapping(addr.op_argument);
+        free((void*)addr.op_argument);
         break;
 #if defined(SIM) or defined(Kria)
       case data_server_op::MOVE_TO_FPGA: {
