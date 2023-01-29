@@ -98,10 +98,23 @@ include_directories($ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src)
 if ("${VERBOSE}" STREQUAL "ON")
     target_compile_definitions(ComposerRuntime PUBLIC VERBOSE)
 endif ()
+set(FPN_RESOURCE "$ENV{COMPOSER_ROOT}/Composer-Hardware/composer/src/main/resources/fpnew/src")
+set(FPN_SCRIPTS "$ENV{COMPOSER_ROOT}/Composer-Hardware/composer/src/main/resources/fpnew_scripts/")
 if (${BUILD_SIM})
     verilate(ComposerRuntime
-            SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v TOP_MODULE ComposerTop
-            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread"#  --threads 4
+            SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.sv
+                ${FPN_RESOURCE}/fpnew_pkg.sv
+                ${FPN_RESOURCE}/common_cells/src/cf_math_pkg.sv
+                ${FPN_RESOURCE}/fpu_div_sqrt_mvp/hdl/defs_div_sqrt_mvp.sv
+            INCLUDE_DIRS ${FPN_SCRIPTS}
+                ${CLASS_DIR}/fpnew_scripts/
+                ${FPN_RESOURCE}/
+                ${FPN_RESOURCE}/common_cells/src/
+                ${FPN_RESOURCE}/fpu_div_sqrt_mvp/hdl
+                ${FPN_RESOURCE}/common_cells/include/
+                ${FPN_SCRIPTS}
+            TOP_MODULE ComposerTop
+            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" -Wno-context -Wno-lint -Wno-style -Wno-unoptflat #  --threads 4
             TRACE
             )
     #    verilate(ComposerDMASimTest

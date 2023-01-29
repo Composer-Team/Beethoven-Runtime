@@ -35,14 +35,20 @@ Config dramsim3config("../DRAMsim3/configs/DDR4_8Gb_x16_2666.ini", "./");
 
 void enqueue_transaction(v_address_channel<ComposerMemIDDtype> &chan, std::queue<memory_transaction *> &lst) {
   if (chan.getValid() && chan.getValid()) {
-    char *addr = (char *) at.translate(chan.getAddr());
-    int sz = 1 << chan.getSize();
-    int len = 1 + chan.getLen(); // per axi
-    bool is_fixed = chan.getBurst() == 0;
-    int id = chan.getId();
-    uint64_t fpga_addr = chan.getAddr();
-    auto tx = new memory_transaction(addr, sz, len, 0, is_fixed, id, fpga_addr);
-    lst.push(tx);
+    try {
+      char *addr = (char *) at.translate(chan.getAddr());
+      int sz = 1 << chan.getSize();
+      int len = 1 + chan.getLen(); // per axi
+      bool is_fixed = chan.getBurst() == 0;
+      int id = chan.getId();
+      uint64_t fpga_addr = chan.getAddr();
+      auto tx = new memory_transaction(addr, sz, len, 0, is_fixed, id, fpga_addr);
+      lst.push(tx);
+    } catch (std::exception &e) {
+      tfp->dump(main_time);
+      tfp->close();
+      throw e;
+    }
   }
 }
 
@@ -116,6 +122,17 @@ static uint64_t get_dimm_address(uint64_t addr) {
 #ifdef TRACE
 VerilatedVcdC *tfp;
 #endif
+
+void tick(Vcomposer *top) {
+  try {
+    top->eval();
+  } catch (std::exception &e) {
+    tfp->dump(main_time);
+    tfp->close();
+    std::cerr << "Emergency dump!" << std::endl;
+    throw e;
+  }
+}
 
 //#define TRACE
 
@@ -223,13 +240,13 @@ void run_verilator() {
 
   for (int i = 0; i < 50; ++i) {
     top.clock = 0;
-    top.eval();
+    tick(&top);
 #ifdef TRACE
     tfp->dump(main_time);
 #endif
     main_time += 4;
     top.clock = 1;
-    top.eval();
+    tick(&top);
 #ifdef TRACE
     tfp->dump(main_time);
 #endif
@@ -562,7 +579,7 @@ void run_verilator() {
 
     top.clock = 1; // posedge
     main_time += 4;
-    top.eval();
+    tick(&top);
 #ifdef TRACE
     tfp->dump(main_time);
 #endif
@@ -784,7 +801,7 @@ void run_verilator() {
     pthread_mutex_unlock(&dma_lock);
 #endif
     top.clock = 0; // negedge
-    top.eval();
+    tick(&top);
     main_time += 4;
 #ifdef TRACE
     tfp->dump(main_time);
