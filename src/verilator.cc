@@ -33,6 +33,15 @@ bool kill_sig = false;
 Config dramsim3config("../DRAMsim3/configs/DDR4_8Gb_x16_2666.ini", "./");
 #endif
 
+void sig_handle(int sig) {
+#ifdef TRACE
+  tfp->close();
+  system("vcd2fst -v trace.vcd -f trace.fst");
+  std::cout << "fst written" << std::endl;
+#endif
+  exit(sig);
+}
+
 void enqueue_transaction(v_address_channel<ComposerMemIDDtype> &chan, std::queue<memory_transaction *> &lst) {
   if (chan.getValid() && chan.getValid()) {
     try {
@@ -309,7 +318,7 @@ void run_verilator() {
 //            printf("to valid addr\n");
           } else {
             fprintf(stderr, "Recieved error from write response!");
-            exit(1);
+            sig_handle(1);
           }
         }
         // We just send the 32-bits, now "simulate" the decoupled interface by toggling to the CMD_VALID bit to 1
@@ -348,7 +357,7 @@ void run_verilator() {
             }
           } else {
             fprintf(stderr, "Recieved error from write response!");
-            exit(1);
+            sig_handle(1);
           }
         }
         break;
@@ -454,7 +463,7 @@ void run_verilator() {
             }
           } else {
             fprintf(stderr, "Received error from write response!");
-            exit(1);
+            sig_handle(1);
           }
         }
         break;
@@ -570,9 +579,9 @@ void run_verilator() {
         auto tx = new memory_transaction(ad, txsize, txlen, dram_txlen, false,
                                          inter.ar->getId(), addr);
         // 64b per DRAM transaction
-        tx->dram_txlen = dram_txlen;
+        tx->dram_tx_len = dram_txlen;
         inter.to_enqueue_read = tx;
-        tx->dram_txprogress = 0;
+        tx->dram_tx_progress = 0;
       }
 #endif
     }
@@ -668,9 +677,9 @@ void run_verilator() {
             inter.write_transactions.pop();
 
 #ifdef USE_DRAMSIM
-            trans->dram_txprogress = 0;
-            trans->dram_txlen = trans->len * trans->size >> 3;
-            trans->progress = trans->dram_txlen;
+            trans->dram_tx_progress = 0;
+            trans->dram_tx_len = trans->len * trans->size >> 3;
+            trans->progress = trans->dram_tx_len;
             inter.to_enqueue_write = trans;
 #else
             inter.b->to_enqueue = trans->id;
@@ -688,31 +697,31 @@ void run_verilator() {
       if (inter.to_enqueue_read != nullptr) {
         auto &r = *inter.to_enqueue_read;
         auto dimm_base = get_dimm_address(r.fpga_addr);
-        auto dimm_addr = dimm_base + 8 * r.dram_txprogress;
+        auto dimm_addr = dimm_base + 8 * r.dram_tx_progress;
         if (inter.mem_sys->WillAcceptTransaction(dimm_addr, false)) {
           inter.mem_sys->AddTransaction(dimm_addr, false);
           if (inter.in_flight_reads.find(dimm_addr) == inter.in_flight_reads.end())
             inter.in_flight_reads[dimm_addr] = new std::queue<memory_transaction *>();
           auto &q = *inter.in_flight_reads[dimm_addr];
           q.push(&r);
-          r.dram_txprogress++;
+          r.dram_tx_progress++;
         }
-        if (r.dram_txlen == r.dram_txprogress) {
+        if (r.dram_tx_len == r.dram_tx_progress) {
           inter.to_enqueue_read = nullptr;
         }
       }
 
       if (inter.to_enqueue_write != nullptr) {
         auto &w = *inter.to_enqueue_write;
-        auto dimm_addr = get_dimm_address(w.fpga_addr) + w.dram_txprogress * 8;
+        auto dimm_addr = get_dimm_address(w.fpga_addr) + w.dram_tx_progress * 8;
         if (inter.mem_sys->WillAcceptTransaction(dimm_addr, true)) {
-          w.dram_txprogress++;
+          w.dram_tx_progress++;
           inter.mem_sys->AddTransaction(dimm_addr, true);
           if (inter.in_flight_writes.find(dimm_addr) == inter.in_flight_writes.end())
             inter.in_flight_writes[dimm_addr] = new std::queue<memory_transaction *>;
           inter.in_flight_writes[dimm_addr]->push(&w);
         }
-        if (w.dram_txprogress == w.dram_txlen) {
+        if (w.dram_tx_progress == w.dram_tx_len) {
           inter.to_enqueue_write = nullptr;
         }
       }
@@ -814,20 +823,26 @@ void run_verilator() {
   fflush(stdout);
   tfp->close();
 #endif
-  exit(0);
+  sig_handle(0);
 }
 
+
 int main() {
+  signal(SIGTERM, sig_handle);
   data_server::start();
   cmd_server::start();
 #ifdef VERBOSE
   printf("Entering verilator\n");
 #endif
-  run_verilator();
-  pthread_mutex_lock(&main_lock);
-  pthread_mutex_lock(&main_lock);
+  try {
+    run_verilator();
+    pthread_mutex_lock(&main_lock);
+    pthread_mutex_lock(&main_lock);
 #ifdef VERBOSE
-  printf("Main thread exiting\n");
+    printf("Main thread exiting\n");
 #endif
-  exit(0);
+  } catch (std::exception &e) {
+    sig_handle(1);
+  }
+  sig_handle(0);
 }
