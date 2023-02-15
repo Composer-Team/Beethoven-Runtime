@@ -310,7 +310,7 @@ void *address_translator::translate(uint64_t fp_addr) {
     it++;
   }
   if (it == mappings.end()) {
-    std::cerr << "BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: " << fp_addr << std::endl;
+    printf("BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: %llx\n", fp_addr);
 #if defined(SIM) && defined(TRACE)
     tfp->close();
 #endif
