@@ -49,9 +49,9 @@ elseif ("${TARGET}" STREQUAL "fpga")
     include_directories(${AWS_SDK}/sdk/userspace/include)
     add_executable(ComposerRuntime ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc src/mmio.cc src/mmio.h)
     if ("${BACKEND}" STREQUAL "F1")
-        target_link_libraries(ComposerRuntime PRIVATE rt pthread fpga_mgmt)
+        target_link_libraries(ComposerRuntime PRIVATE pthread fpga_mgmt)
     else ()
-        target_link_libraries(ComposerRuntime PRIVATE rt pthread)
+        target_link_libraries(ComposerRuntime PRIVATE pthread)
     endif ()
     target_compile_definitions(ComposerRuntime PUBLIC FPGA=1 ${BACKEND})
     set(BUILD_FPGA 1)
@@ -59,13 +59,13 @@ elseif ("${TARGET}" STREQUAL "sanity_xsim")
     add_library(ComposerRuntime STATIC ${FILE} ${AWS_SDK}/sdk/userspace/utils/sh_dpi_tasks.c)
     include_directories(${AWS_SDK}/hdk/common/software/include ${AWS_SDK}/sdk/userspace/include ${AWS_SDK}/sdk/userspace/include/utils/)
     target_compile_definitions(ComposerRuntime PUBLIC VSIM)
-    target_link_libraries(ComposerRuntime PRIVATE rt pthread fpga_mgmt)
+    target_link_libraries(ComposerRuntime PRIVATE pthread fpga_mgmt)
     set(BUILD_FPGA 1)
 elseif ("${TARGET}" STREQUAL "sanity_fpga")
     add_executable(ComposerRuntime ${FILE} ${AWS_SDK}/sdk/userspace/utils/sh_dpi_tasks.c)
     include_directories(${AWS_SDK}/hdk/common/software/include ${AWS_SDK}/sdk/userspace/include ${AWS_SDK}/sdk/userspace/include/utils/)
     target_compile_definitions(ComposerRuntime PUBLIC VSIM FPGA)
-    target_link_libraries(ComposerRuntime PRIVATE rt pthread fpga_mgmt)
+    target_link_libraries(ComposerRuntime PRIVATE [pthread fpga_mgmt)
     set(BUILD_FPGA 1)
 else ()
     message(FATAL_ERROR "Must define build target: 'sim', 'fpga', or 'vsim'. Got '${TARGET}'. -DTARGET=<opt>")
@@ -98,10 +98,13 @@ include_directories($ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src)
 if ("${VERBOSE}" STREQUAL "ON")
     target_compile_definitions(ComposerRuntime PUBLIC VERBOSE)
 endif ()
+set(FPN_CACHE "$ENV{COMPOSER_ROOT}/Composer-Hardware/.fpnew_cache")
 if (${BUILD_SIM})
     verilate(ComposerRuntime
-            SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v TOP_MODULE ComposerTop
-            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread"#  --threads 4
+            SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v
+            INCLUDE_DIRS ${FPN_CACHE}
+            TOP_MODULE ComposerTop
+            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" -Wno-context -Wno-lint -Wno-style -Wno-moddup -Wno-unoptflat #  --threads 4
             TRACE
             )
     #    verilate(ComposerDMASimTest
