@@ -5,6 +5,7 @@
 #include <cinttypes>
 #include <queue>
 #include <pthread.h>
+#include <csignal>
 #include "../include/data_server.h"
 #include "../include/cmd_server.h"
 
