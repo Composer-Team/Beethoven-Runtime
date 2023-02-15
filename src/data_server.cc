@@ -310,7 +310,7 @@ void *address_translator::translate(uint64_t fp_addr) {
     it++;
   }
   if (it == mappings.end()) {
-    printf("BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: %llx\n", fp_addr);
+    printf("BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: %llx. You might be running outside of your allocated segment...\n", fp_addr);
 #if defined(SIM) && defined(TRACE)
     tfp->close();
 #endif
