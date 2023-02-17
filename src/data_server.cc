@@ -146,6 +146,9 @@ uint64_t f1_hack_addr(uint64_t addr) {
 #if defined(SIM) && defined(COMPOSER_HAS_DMA)
   pthread_mutex_lock(&dma_wait_lock);
 #endif
+#ifdef VERBOSE
+  std::cerr << "server ready to make allocations" << std::endl;
+#endif
   while (true) {
 //    printf("data server got cmd\n"); fflush(stdout);
     // get file name, descriptor, expand the file, and map it to address space
