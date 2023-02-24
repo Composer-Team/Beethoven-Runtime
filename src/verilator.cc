@@ -13,6 +13,7 @@
 #include "verilated_vcd_c.h"
 #include "../include/verilator.h"
 #include "../include/ddr_macros.h"
+#include "util.h"
 
 #ifdef USE_DRAMSIM
 // dramsim3
@@ -304,7 +305,11 @@ void run_verilator() {
         // send the command over the PCIE bus
       case CMD_BITS_WRITE_DAT:
         top.S00_AXI_wvalid = 1;
+#if AXIL_BUS_WIDTH <= 64
         top.S00_AXI_wdata = ongoing_cmd.cmdbuf[ongoing_cmd.progress];
+#else
+        top.S00_AXI_wdata.at(0) = ongoing_cmd.cmdbuf[ongoing_cmd.progress];
+#endif
         if (top.S00_AXI_wready) {
           ongoing_cmd.state = CMD_BITS_WRITE_B;
 //          printf("wrote %d, going to bits write response. BITS: %08x\n", ongoing_cmd.progress,
@@ -322,6 +327,7 @@ void run_verilator() {
             sig_handle(1);
           }
         }
+        break;
         // We just send the 32-bits, now "simulate" the decoupled interface by toggling to the CMD_VALID bit to 1
         // This bit is visible from the CMD_VALID bit, so we need to perform an AXI transaction
       case CMD_VALID_ADDR:
@@ -337,7 +343,11 @@ void run_verilator() {
         // send the CMD_VALID bit
       case CMD_VALID_DAT:
         top.S00_AXI_wvalid = 1;
+#if AXIL_BUS_WIDTH <= 64
         top.S00_AXI_wdata = 1;
+#else
+        top.S00_AXI_wdata.at(0) = 1;
+#endif
         if (top.S00_AXI_wready) {
 //          printf("to valid b\n");
           ongoing_cmd.state = CMD_VALID_WRITE_B;
@@ -422,7 +432,11 @@ void run_verilator() {
       case RESPT_BITS_READ:
         top.S00_AXI_rready = 1;
         if (top.S00_AXI_rvalid) {
+#if AXIL_BUS_WIDTH <= 64
           ongoing_rsp.resbuf[ongoing_rsp.progress++] = top.S00_AXI_rdata;
+#else
+          ongoing_rsp.resbuf[ongoing_rsp.progress++] = top.S00_AXI_rdata.at(0);
+#endif
           ongoing_rsp.state = RESPT_READY_ADDR;
         }
         break;
@@ -437,7 +451,11 @@ void run_verilator() {
         break;
       case RESPT_READY_WRITE:
         top.S00_AXI_wvalid = 1;
+#if AXIL_BUS_WIDTH <= 64
         top.S00_AXI_wdata = 1;
+#else
+        top.S00_AXI_wdata.at(0) = 1;
+#endif
         if (top.S00_AXI_wready) {
           ongoing_rsp.state = RESPT_READY_WRITE_B;
         }
@@ -508,7 +526,13 @@ void run_verilator() {
         top.S00_AXI_rready = 1;
         if (top.S00_AXI_rvalid) {
           ongoing_rsp.progress = 0;
-          if (top.S00_AXI_rdata == 1) {
+          if (
+#if AXIL_BUS_WIDTH <= 64
+top.S00_AXI_rdata == 1
+#else
+top.S00_AXI_rdata.at(0) == 1
+#endif
+                  ) {
 #ifdef VERBOSE
             printf("Found valid response on cycle %lu!!! %d %d\n", main_time, top.S00_AXI_rvalid, top.S00_AXI_rdata);
 #endif
@@ -830,6 +854,7 @@ void run_verilator() {
 
 int main() {
   signal(SIGTERM, sig_handle);
+  signal(SIGABRT, sig_handle);
   data_server::start();
   cmd_server::start();
 #ifdef VERBOSE

@@ -22,6 +22,8 @@
 
 // for shared memory
 #include <fcntl.h>
+#include <cmath>
+#include "util.h"
 
 #ifdef FPGA
 #include "fpga_utils.h"
@@ -45,6 +47,7 @@ pthread_mutex_t cmdserverlock = PTHREAD_MUTEX_INITIALIZER;
 std::queue<composer::rocc_cmd> cmds;
 std::unordered_map<system_core_pair, std::queue<int>*> in_flight;
 
+constexpr int num_cmd_beats = (int)roundUp((float)(32*5) / AXIL_BUS_WIDTH);
 
 static void* cmd_server_f(void* _) {
   // map in the shared file
@@ -108,8 +111,11 @@ static void* cmd_server_f(void* _) {
     pthread_mutex_lock(&bus_lock);
 #endif
     auto *pack = addr.cmd.pack(pack_cfg);
-    for (int i = 0; i < 5; ++i) { // command is 5 32-bit payloads
-      uint32_t ready = false;
+    if (sizeof(pack[0]) > 64) {
+      printf("FAILURE - cannot use peek-poke give the current ");
+      exit(1);
+    }
+    for (int i = 0; i < num_cmd_beats; ++i) { // command is 5 32-bit payloads
       while(!peek_mmio(CMD_READY)){}
       poke_mmio(CMD_BITS, pack[i]);
       poke_mmio(CMD_VALID, 1);

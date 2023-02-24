@@ -11,9 +11,13 @@ if ("$ENV{COMPOSER_ROOT}" STREQUAL "")
     message(FATAL_ERROR "Environment variable $COMPOSER_ROOT is not defined")
 endif ()
 
-if (NOT EXISTS $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer_allocator_declaration.h)
-    message(FATAL_ERROR "$ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer_allocator_declaration.h does not exist. Try building your project or moving this file into the directory.")
+set(COMPOSER_DIR "$ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src")
+
+if (NOT EXISTS ${COMPOSER_DIR}/composer_allocator_declaration.h)
+    message(FATAL_ERROR "${COMPOSER_DIR}/composer_allocator_declaration.h does not exist. Try building your project or moving this file into the directory.")
 endif ()
+
+
 
 set(AWS_SDK "$ENV{COMPOSER_ROOT}/aws-fpga")
 
@@ -101,7 +105,7 @@ endif ()
 set(FPN_CACHE "$ENV{COMPOSER_ROOT}/Composer-Hardware/.fpnew_cache")
 if (${BUILD_SIM})
     verilate(ComposerRuntime
-            SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v
+            SOURCES ${COMPOSER_DIR}/composer.v
             INCLUDE_DIRS ${FPN_CACHE}
             TOP_MODULE ComposerTop
             VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" -Wno-context -Wno-lint -Wno-style -Wno-moddup -Wno-unoptflat #  --threads 4
