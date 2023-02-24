@@ -26,12 +26,15 @@
 #include "util.h"
 
 #ifdef FPGA
+
 #include "fpga_utils.h"
 #include <composer_allocator_declaration.h>
+
 #endif
 #ifdef SIM
 extern bool kill_sig;
 #endif
+
 #include <ctime>
 
 system_core_pair::system_core_pair(int system, int core) {
@@ -45,11 +48,12 @@ cmd_server_file *csf;
 
 pthread_mutex_t cmdserverlock = PTHREAD_MUTEX_INITIALIZER;
 std::queue<composer::rocc_cmd> cmds;
-std::unordered_map<system_core_pair, std::queue<int>*> in_flight;
+std::unordered_map<system_core_pair, std::queue<int> *> in_flight;
 
-constexpr int num_cmd_beats = (int)roundUp((float)(32*5) / AXIL_BUS_WIDTH);
+constexpr int num_cmd_beats = (int) roundUp((float) (32 * 5) / AXIL_BUS_WIDTH);
 
-static void* cmd_server_f(void* _) {
+static void *cmd_server_f(void *_) {
+  setup_mmio();
   // map in the shared file
   int fd_composer = shm_open(cmd_server_file_name.c_str(), O_CREAT | O_RDWR, file_access_flags);
   if (fd_composer < 0) {
@@ -66,8 +70,8 @@ static void* cmd_server_f(void* _) {
       throw std::exception();
     }
   }
-  auto &addr = *(cmd_server_file*)mmap(nullptr, sizeof(cmd_server_file), file_access_prots,
-                                 MAP_SHARED, fd_composer, 0);
+  auto &addr = *(cmd_server_file *) mmap(nullptr, sizeof(cmd_server_file), file_access_prots,
+                                         MAP_SHARED, fd_composer, 0);
   csf = &addr;
   // we need to initialize it! This used to be a race condition, where the cmd_server thread was racing against the
   // poller thread to get to the file. The poller often won, found old dat anad mucked everything up :(
@@ -76,10 +80,10 @@ static void* cmd_server_f(void* _) {
   response_poller::start_poller();
 #endif
 
-  std::vector<std::pair<int, FILE*>> alloc;
+  std::vector<std::pair<int, FILE *>> alloc;
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
-  while(true) {
+  while (true) {
 //    printf("got cmd\n");
     // allocate space for response
     int id;
@@ -107,7 +111,7 @@ static void* cmd_server_f(void* _) {
       return nullptr;
     }
 #if defined(FPGA) || defined(VSIM)
-#ifdef F1
+#if defined(F1) or defined(Kria)
     pthread_mutex_lock(&bus_lock);
 #endif
     auto *pack = addr.cmd.pack(pack_cfg);
@@ -119,11 +123,11 @@ static void* cmd_server_f(void* _) {
       while(!peek_mmio(CMD_READY)){}
       poke_mmio(CMD_BITS, pack[i]);
       poke_mmio(CMD_VALID, 1);
+#endif
     }
     free(pack);
-#ifdef F1
+#if defined(F1) or defined(Kria)
     pthread_mutex_unlock(&bus_lock);
-#endif
 #else
     // sim only
     cmds.push(addr.cmd);
@@ -163,7 +167,8 @@ void register_reponse(uint32_t *r_buffer) {
   pthread_mutex_lock(&cmdserverlock);
   auto it = in_flight.find(pr);
   if (it == in_flight.end()) {
-    std::cerr << "Error: Got bad response from HW: " << r_buffer[0] << " " << r_buffer[1] << " " << r_buffer[2] << std::endl;
+    std::cerr << "Error: Got bad response from HW: " << r_buffer[0] << " " << r_buffer[1] << " " << r_buffer[2]
+              << std::endl;
     pthread_mutex_unlock(&cmdserverlock);
     pthread_mutex_unlock(&main_lock);
   } else {
