@@ -6,6 +6,9 @@
 #define COMPOSER_VERILATOR_FPGA_UTILS_H
 #include <pthread.h>
 extern pthread_mutex_t main_lock;
+#if defined(F1) || defined(Kria)
+extern pthread_mutex_t bus_lock;
+#endif
 #ifdef F1
 #if defined(VSIM)
 #include "fpga_pci_sv.h"
@@ -19,7 +22,6 @@ extern "C" {
 #endif
 
 
-extern pthread_mutex_t bus_lock;
 extern int pci_bar_handle;
 extern int xdma_write_fd;
 extern int xdma_read_fd;
