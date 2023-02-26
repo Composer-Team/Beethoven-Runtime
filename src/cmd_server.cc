@@ -123,9 +123,10 @@ static void *cmd_server_f(void *_) {
       while(!peek_mmio(CMD_READY)){}
       poke_mmio(CMD_BITS, pack[i]);
       poke_mmio(CMD_VALID, 1);
-#endif
     }
     free(pack);
+#endif
+
 #if defined(F1) or defined(Kria)
     pthread_mutex_unlock(&bus_lock);
 #else
