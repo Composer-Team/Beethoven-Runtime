@@ -32,7 +32,7 @@ void setup_mmio() {
     exit(errno);
   }
   void *dvm = mmap(nullptr, 0x100, PROT_READ | PROT_WRITE, MAP_SYNC, devmem_fd, 0x2000000000L);
-  if (dvm == nullptr) {
+  if (dvm == MAP_FAILED) {
     std::cerr << "Failed to map devmem using mmap. Errno: " << strerror(errno) << std::endl;
     exit(errno);
   }
