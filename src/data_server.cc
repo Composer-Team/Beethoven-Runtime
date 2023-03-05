@@ -10,7 +10,6 @@
 
 #include <composer_allocator_declaration.h>
 #include <composer/verilator_server.h>
-#include "verilated_fst_c.h"
 
 #include "../include/data_server.h"
 
@@ -31,7 +30,7 @@ bool dma_write;
 extern bool kill_sig;
 
 #include "verilator.h"
-#include "verilated_vcd_c.h"
+#include "verilated_fst_c.h"
 
 #endif
 
