@@ -10,7 +10,7 @@
 #include "../include/cmd_server.h"
 
 #include <composer_allocator_declaration.h>
-#include "verilated_vcd_c.h"
+#include "verilated_fst_c.h"
 #include "../include/verilator.h"
 #include "../include/ddr_macros.h"
 #include "util.h"
@@ -38,8 +38,7 @@ Config dramsim3config("../DRAMsim3/configs/DDR4_8Gb_x16_2666.ini", "./");
 void sig_handle(int sig) {
 #ifdef TRACE
   tfp->close();
-  system("vcd2fst -v trace.vcd -f trace.fst");
-  std::cout << "fst written" << std::endl;
+  std::cerr << "FST written" << std::endl;
 #endif
   exit(sig);
 }
@@ -131,7 +130,7 @@ static uint64_t get_dimm_address(uint64_t addr) {
 }
 
 #ifdef TRACE
-VerilatedVcdC *tfp;
+VerilatedFstC *tfp;
 #endif
 
 void tick(Vcomposer *top) {
@@ -157,9 +156,9 @@ void run_verilator() {
 
   Verilated::traceEverOn(true);
 #if defined(TRACE)
-  tfp = new VerilatedVcdC;
-  top.trace(tfp, 100);
-  tfp->open("trace.vcd");
+  tfp = new VerilatedFstC;
+  top.trace(tfp, 30);
+  tfp->open("trace.fst");
 #endif
 
   mem_interface<ComposerMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];

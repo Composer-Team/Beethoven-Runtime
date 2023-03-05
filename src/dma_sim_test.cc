@@ -10,7 +10,7 @@
 int main() {
   Verilated::traceEverOn(true);
   Vcomposer top;
-  VerilatedVcdC tracer;
+  VerilatedFstC tracer;
   unsigned long long time = 0;
 
   top.ocl_0_ar_valid = 0;

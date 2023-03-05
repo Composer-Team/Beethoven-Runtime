@@ -11,7 +11,7 @@
 #endif
 #define TRACE
 #ifdef TRACE
-extern VerilatedVcdC *tfp;
+extern VerilatedFstC *tfp;
 #endif
 
 void run_verilator();

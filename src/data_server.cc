@@ -10,6 +10,7 @@
 
 #include <composer_allocator_declaration.h>
 #include <composer/verilator_server.h>
+#include "verilated_fst_c.h"
 
 #include "../include/data_server.h"
 
@@ -315,6 +316,7 @@ void *address_translator::translate(uint64_t fp_addr) {
   if (it == mappings.end()) {
     std::cerr << "BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: " << std::hex << fp_addr <<". You might be running outside of your allocated segment... "<< std::endl;
 #if defined(SIM) && defined(TRACE)
+
     tfp->close();
 #endif
     throw std::exception();

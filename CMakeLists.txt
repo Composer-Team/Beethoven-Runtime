@@ -108,8 +108,8 @@ if (${BUILD_SIM})
             SOURCES ${COMPOSER_DIR}/composer.v
             INCLUDE_DIRS ${FPN_CACHE}
             TOP_MODULE ComposerTop
+            TRACE_FST
             VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" -Wno-context -Wno-lint -Wno-style -Wno-moddup -Wno-unoptflat #  --threads 4
-            TRACE
             )
     #    verilate(ComposerDMASimTest
     #            SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v TOP_MODULE ComposerTop
