@@ -84,7 +84,9 @@ static void *cmd_server_f(void *_) {
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
   while (true) {
-//    printf("got cmd\n");
+#ifdef VERBOSE
+    std::cerr << "Got Command in Server" << std::endl;
+#endif
     // allocate space for response
     int id;
     if (addr.cmd.getXd()) {
@@ -125,8 +127,11 @@ static void *cmd_server_f(void *_) {
       poke_mmio(CMD_VALID, 1);
     }
     free(pack);
-#endif
 
+#endif
+#ifdef VERBOSE
+    std::cerr << "Successfully delivered command\n" << std::endl;
+#endif
 #if defined(F1) or defined(Kria)
     pthread_mutex_unlock(&bus_lock);
 #else
