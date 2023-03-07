@@ -59,6 +59,10 @@ static void *cmd_server_f(void *_) {
   if (fd_composer < 0) {
     printf("Failed to initialize cmd_file\n%s\n", strerror(errno));
     exit(errno);
+  } else {
+#ifdef VERBOSE
+    printf("Successfully intialized cmd_file at %s\n", cmd_server_file_name.c_str());
+#endif
   }
   // check the file size. It might already exist in which case we don't need to truncate it again
   struct stat shm_stats{};

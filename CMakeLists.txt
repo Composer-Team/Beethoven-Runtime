@@ -99,7 +99,7 @@ endif ()
 
 include_directories($ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src)
 
-if ("${VERBOSE}" STREQUAL "ON")
+if ("${VERBOSE}" STREQUAL "1")
     target_compile_definitions(ComposerRuntime PUBLIC VERBOSE)
 endif ()
 set(FPN_CACHE "$ENV{COMPOSER_ROOT}/Composer-Hardware/.fpnew_cache")
@@ -111,9 +111,4 @@ if (${BUILD_SIM})
             TRACE_FST
             VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" -Wno-context -Wno-lint -Wno-style -Wno-moddup -Wno-unoptflat #  --threads 4
             )
-    #    verilate(ComposerDMASimTest
-    #            SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v TOP_MODULE ComposerTop
-    #            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" #--threads 1
-    #            TRACE
-    #            )
 endif ()

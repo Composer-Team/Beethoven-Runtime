@@ -10,14 +10,6 @@
 #include <fcntl.h>
 #include <cerrno>
 #include <cstring>
-
-volatile uint32_t *ptr_RESP_BITS;
-volatile uint32_t *ptr_RESP_VALID;
-volatile uint32_t *ptr_RESP_READY;
-volatile uint32_t *ptr_CMD_BITS;
-volatile uint32_t *ptr_CMD_VALID;
-volatile uint32_t *ptr_CMD_READY;
-volatile uint32_t *ptr_AXIL_DEBUG;
 int devmem_fd;
 volatile char *devmem_map;
 
