@@ -38,6 +38,7 @@ Config dramsim3config("../DRAMsim3/configs/DDR4_8Gb_x16_2666.ini", "./");
 void sig_handle(int sig) {
 #ifdef TRACE
   tfp->close();
+
   std::cerr << "FST written" << std::endl;
 #endif
   exit(sig);
@@ -146,6 +147,19 @@ void tick(Vcomposer *top) {
 
 //#define TRACE
 
+#ifdef USE_DRAMSIM
+#define RLOCK pthread_mutex_lock(&axi4_mem.read_queue_lock);
+#define WLOCK pthread_mutex_lock(&axi4_mem.write_queue_lock);
+#define RUNLOCK pthread_mutex_unlock(&axi4_mem.read_queue_lock);
+#define WUNLOCK pthread_mutex_unlock(&axi4_mem.write_queue_lock);
+#else
+#define RLOCK
+#define WLOCK
+#define RUNLOCK
+#define WUNLOCK
+#endif
+
+
 void run_verilator() {
   // start servers to communicate with user programs
   const char *v[3] = {"", "+verilator+seed+14934534", "+verilator+rand+reset+2"};
@@ -190,23 +204,38 @@ void run_verilator() {
             dramsim3config,
             "",
             [&axi4_mem](uint64_t addr) {
+              RLOCK
               auto tx = axi4_mem.in_flight_reads[addr]->front();
-              tx->progress--;
-              if (tx->progress == 0) {
-                axi4_mem.read_transactions.push(tx);
+              tx->dram_tx_load_progress++;
+              int hold_idx = int(addr - tx->fpga_addr) / 8;
+              tx->holds[hold_idx] = true;
+              int bytes_loaded = tx->dram_tx_load_progress * 8;
+              int total_tx_size = tx->size * tx->len;
+              bool done = bytes_loaded >= total_tx_size;
+              if (tx->dramsim_hasBeatReady()) {
+                tx->can_be_last = done;
+                auto intermediate_tx = new memory_transaction(tx->addr, tx->size, 1, 0, false, tx->id, 0);
+                tx->addr += tx->size;
+                intermediate_tx->fpga_addr = tx->fpga_addr;
+                intermediate_tx->can_be_last = done;
+                tx->progress += (DATA_BUS_WIDTH / 64);
+                axi4_mem.read_transactions.push(intermediate_tx);
               }
               axi4_mem.in_flight_reads[addr]->pop();
+              if (done)
+                delete tx;
+              RUNLOCK
             },
             [&axi4_mem](uint64_t addr) {
+              WLOCK
               auto tx = axi4_mem.in_flight_writes[addr]->front();
               tx->progress--;
               if (tx->progress == 0) {
-                axi4_mem.b->to_enqueue = tx->id;
+                axi4_mem.b->to_enqueue.push(tx->id);
                 delete tx;
               }
               axi4_mem.in_flight_writes[addr]->pop();
-//              axi4_mem.write_transactions.push(new memory_transaction(ad, size, len, 0, false, id, addr));
-//              printf("write transaction finish\n");
+              WUNLOCK
             });
 
   }
@@ -579,33 +608,33 @@ top.S00_AXI_rdata.at(0) == 1
       }
     }
 #endif
-    for (auto &inter: axi4_mems) {
-      if (inter.r->getValid() && inter.r->getReady()) {
-        auto tx = inter.read_transactions.front();
+    for (auto &axi4_mem: axi4_mems) {
+      if (axi4_mem.r->getValid() && axi4_mem.r->getReady()) {
+        RLOCK
+        auto tx = axi4_mem.read_transactions.front();
         tx->progress++;
         if (not tx->fixed) {
           tx->addr += tx->size;
         }
-        if (inter.r->getLast()) {
-          inter.read_transactions.pop();
+        if (axi4_mem.r->getLast() || !tx->can_be_last) {
+          axi4_mem.read_transactions.pop();
           delete tx;
         }
+        RUNLOCK
       }
 
 #ifdef USE_DRAMSIM
-      if (inter.ar->getReady() && inter.ar->getValid()) {
-        uint64_t addr = inter.ar->getAddr();
+      if (axi4_mem.ar->getReady() && axi4_mem.ar->getValid()) {
+        uint64_t addr = axi4_mem.ar->getAddr();
         char *ad = (char *) at.translate(addr);
-        auto txsize = (int) pow(2, inter.ar->getSize());
-        auto txlen = inter.ar->getLen() + 1;
-        auto dram_txlen = txsize * txlen >> 3;
-        if (dram_txlen == 0) dram_txlen = 1;
-        auto tx = new memory_transaction(ad, txsize, txlen, dram_txlen, false,
-                                         inter.ar->getId(), addr);
+        auto txsize = (int) 1 << axi4_mem.ar->getSize();
+        auto txlen = axi4_mem.ar->getLen() + 1;
+        auto tx = new memory_transaction(ad, txsize, txlen, 0, false,
+                                         axi4_mem.ar->getId(), addr);
         // 64b per DRAM transaction
-        tx->dram_tx_len = dram_txlen;
-        inter.to_enqueue_read = tx;
-        tx->dram_tx_progress = 0;
+        RLOCK
+        axi4_mem.to_enqueue_read = tx;
+        RUNLOCK
       }
 #endif
     }
@@ -618,51 +647,56 @@ top.S00_AXI_rdata.at(0) == 1
 #endif
 
     // ------------ HANDLE MEMORY INTERFACES ----------------
-    for (mem_interface<ComposerMemIDDtype> &inter: axi4_mems) {
-      if (inter.b->getReady() && inter.b->getValid()) {
-        inter.b->send_ids.pop();
+    for (mem_interface<ComposerMemIDDtype> &axi4_mem: axi4_mems) {
+      if (axi4_mem.b->getReady() && axi4_mem.b->getValid()) {
+        axi4_mem.b->send_ids.pop();
       }
-      if (not inter.read_transactions.empty() && not inter.r->getValid()) {
-        auto tx = inter.read_transactions.front();
+
+      RLOCK
+      if (not axi4_mem.read_transactions.empty() && not axi4_mem.r->getValid()) {
+        auto tx = axi4_mem.read_transactions.front();
         int start = (tx->progress * tx->size) % (DATA_BUS_WIDTH / 8);
-        char *dest = (char *) inter.r->getData() + start;
+        char *dest = (char *) axi4_mem.r->getData() + start;
         memcpy(dest, tx->addr, tx->size);
         bool am_done = tx->len == (tx->progress + 1);
-        inter.r->setValid(1);
-        inter.r->setLast(am_done);
-        inter.r->setId(tx->id);
+        axi4_mem.r->setValid(1);
+        axi4_mem.r->setLast(am_done && tx->can_be_last);
+        axi4_mem.r->setId(tx->id);
       } else {
-        inter.r->setValid(0);
+        axi4_mem.r->setValid(0);
       }
+      RUNLOCK
 
       // update all channels with new information now that we've updated states
-      if (not inter.b->send_ids.empty()) {
-        inter.b->setValid(1);
-        inter.b->setId(inter.b->send_ids.front());
+      if (not axi4_mem.b->send_ids.empty()) {
+        axi4_mem.b->setValid(1);
+        axi4_mem.b->setId(axi4_mem.b->send_ids.front());
       } else {
-        inter.b->setValid(0);
+        axi4_mem.b->setValid(0);
       }
 
-      if (inter.b->to_enqueue != -1) {
-        inter.b->send_ids.push(inter.b->to_enqueue);
-        inter.b->to_enqueue = -1;
+      WLOCK
+      if (!axi4_mem.b->to_enqueue.empty()) {
+        axi4_mem.b->send_ids.push(axi4_mem.b->to_enqueue.front());
+        axi4_mem.b->to_enqueue.pop();
       }
-
+      WUNLOCK
       // slave response to valid transaction and write valid
       // write can respond before write address so just ahve to wait for address
       // to be recieved. ready and valid have to be high at the same time for this
       // to work
-      if (not inter.write_transactions.empty() and not inter.w->getReady()) {
+      WLOCK
+      if (not axi4_mem.write_transactions.empty() and not axi4_mem.w->getReady()) {
 #ifdef USE_DRAMSIM
-        inter.w->setReady(inter.to_enqueue_write == nullptr);
+        axi4_mem.w->setReady(axi4_mem.to_enqueue_write == nullptr);
 #else
-        inter.w->setReady(1);
+        axi4_mem.w->setReady(1);
 #endif
-        if (inter.w->getValid() && inter.w->getReady()) {
-          auto trans = inter.write_transactions.front();
+        if (axi4_mem.w->getValid() && axi4_mem.w->getReady()) {
+          auto trans = axi4_mem.write_transactions.front();
           // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
-          char *src = inter.w->getData();
-          ComposerStrobeSimDtype strobe = inter.w->getStrobe();
+          char *src = axi4_mem.w->getData();
+          ComposerStrobeSimDtype strobe = axi4_mem.w->getStrobe();
           uint32_t off = 0;
           // for writes, we need to account for alignment and strobe,so we're re-aligning address here
           // align to 64B - zero out bottom 6b
@@ -697,63 +731,69 @@ top.S00_AXI_rdata.at(0) == 1
             trans->addr += trans->size;
           }
 
-          if (inter.w->getLast()) {
-            inter.write_transactions.pop();
+          if (axi4_mem.w->getLast()) {
+            axi4_mem.write_transactions.pop();
 
 #ifdef USE_DRAMSIM
-            trans->dram_tx_progress = 0;
+            trans->dram_tx_enqueue_progress = 0;
             trans->dram_tx_len = trans->len * trans->size >> 3;
             trans->progress = trans->dram_tx_len;
-            inter.to_enqueue_write = trans;
+            axi4_mem.to_enqueue_write = trans;
 #else
-            inter.b->to_enqueue = trans->id;
+            axi4_mem.b->to_enqueue.push(trans->id);
             delete trans;
 #endif
           }
         }
       } else {
-        inter.w->setReady(0);
+        axi4_mem.w->setReady(0);
       }
-      enqueue_transaction(*inter.aw, inter.write_transactions);
+      enqueue_transaction(*axi4_mem.aw, axi4_mem.write_transactions);
+      WUNLOCK
 
 #ifdef USE_DRAMSIM
-
-      if (inter.to_enqueue_read != nullptr) {
-        auto &r = *inter.to_enqueue_read;
+      RLOCK
+      if (axi4_mem.to_enqueue_read != nullptr) {
+        auto &r = *axi4_mem.to_enqueue_read;
         auto dimm_base = get_dimm_address(r.fpga_addr);
-        auto dimm_addr = dimm_base + 8 * r.dram_tx_progress;
-        if (inter.mem_sys->WillAcceptTransaction(dimm_addr, false)) {
-          inter.mem_sys->AddTransaction(dimm_addr, false);
-          if (inter.in_flight_reads.find(dimm_addr) == inter.in_flight_reads.end())
-            inter.in_flight_reads[dimm_addr] = new std::queue<memory_transaction *>();
-          auto &q = *inter.in_flight_reads[dimm_addr];
+        auto dimm_addr = dimm_base + 8 * r.dram_tx_enqueue_progress;
+        if (axi4_mem.mem_sys->WillAcceptTransaction(dimm_addr, false)) {
+          axi4_mem.mem_sys->AddTransaction(dimm_addr, false);
+          if (axi4_mem.in_flight_reads.find(dimm_addr) == axi4_mem.in_flight_reads.end())
+            axi4_mem.in_flight_reads[dimm_addr] = new std::queue<memory_transaction *>();
+          auto &q = *axi4_mem.in_flight_reads[dimm_addr];
           q.push(&r);
-          r.dram_tx_progress++;
+          r.dram_tx_enqueue_progress++;
         }
-        if (r.dram_tx_len == r.dram_tx_progress) {
-          inter.to_enqueue_read = nullptr;
-        }
-      }
-
-      if (inter.to_enqueue_write != nullptr) {
-        auto &w = *inter.to_enqueue_write;
-        auto dimm_addr = get_dimm_address(w.fpga_addr) + w.dram_tx_progress * 8;
-        if (inter.mem_sys->WillAcceptTransaction(dimm_addr, true)) {
-          w.dram_tx_progress++;
-          inter.mem_sys->AddTransaction(dimm_addr, true);
-          if (inter.in_flight_writes.find(dimm_addr) == inter.in_flight_writes.end())
-            inter.in_flight_writes[dimm_addr] = new std::queue<memory_transaction *>;
-          inter.in_flight_writes[dimm_addr]->push(&w);
-        }
-        if (w.dram_tx_progress == w.dram_tx_len) {
-          inter.to_enqueue_write = nullptr;
+        if (r.dram_tx_len == r.dram_tx_enqueue_progress) {
+          axi4_mem.to_enqueue_read = nullptr;
         }
       }
+      RUNLOCK
 
+      WLOCK
+      if (axi4_mem.to_enqueue_write != nullptr) {
+        auto &w = *axi4_mem.to_enqueue_write;
+        auto dimm_addr = get_dimm_address(w.fpga_addr) + w.dram_tx_enqueue_progress * 8;
+        if (axi4_mem.mem_sys->WillAcceptTransaction(dimm_addr, true)) {
+          w.dram_tx_enqueue_progress++;
+          axi4_mem.mem_sys->AddTransaction(dimm_addr, true);
+          if (axi4_mem.in_flight_writes.find(dimm_addr) == axi4_mem.in_flight_writes.end())
+            axi4_mem.in_flight_writes[dimm_addr] = new std::queue<memory_transaction *>;
+          axi4_mem.in_flight_writes[dimm_addr]->push(&w);
+        }
+        if (w.dram_tx_enqueue_progress == w.dram_tx_len) {
+          axi4_mem.to_enqueue_write = nullptr;
+        }
+      }
+      WUNLOCK
+
+      RLOCK
       // to signify that the AXI4 DDR Controller is busy enqueueing another transaction in the DRAM
-      inter.ar->setReady(inter.to_enqueue_read == nullptr);
+      axi4_mem.ar->setReady(axi4_mem.to_enqueue_read == nullptr);
+      RUNLOCK
 #else
-      enqueue_transaction(*inter.ar, inter.read_transactions);
+      enqueue_transaction(*axi4_mem.ar, axi4_mem.read_transactions);
 #endif
 
     }

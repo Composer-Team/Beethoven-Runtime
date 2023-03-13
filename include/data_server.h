@@ -59,8 +59,12 @@ struct memory_transaction {
   int id;
   bool fixed;
   uint64_t fpga_addr;
-  int dram_tx_len = 0;
-  int dram_tx_progress = 0;
+  int dram_tx_len;
+  int dram_tx_enqueue_progress = 0;
+  int dram_tx_load_progress = 0;
+  bool can_be_last = true;
+
+  std::vector<bool> holds;
 
   memory_transaction(char *addr,
                      int size,
@@ -75,9 +79,26 @@ struct memory_transaction {
           progress(progress),
           fixed(fixed),
           id(id),
-          fpga_addr(fpga_addr){}
+          fpga_addr(fpga_addr){
+    dram_tx_len = (len * size) / 8;
+    if (dram_tx_len == 0) dram_tx_len = 1;
+    for (int i = 0; i < dram_tx_len; ++i) {
+      holds.emplace_back(false);
+    }
+  }
 
   memory_transaction() = delete;
+
+  int dramsim_hasBeatReady() {
+    int dram_beat_bytes = 8; // 64 bits per beat
+    int bus_width_bytes = (DATA_BUS_WIDTH / 8);
+    for (int i = 0; i < bus_width_bytes / dram_beat_bytes; ++i) {
+      // for each cline in beat, make sure there's an associated datum that we've received
+      if (!holds[progress + i])
+        return false;
+    }
+    return holds[0];
+  }
 };
 
 #endif //COMPOSER_VERILATOR_DATA_SERVER_H
