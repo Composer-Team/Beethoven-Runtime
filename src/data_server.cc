@@ -45,6 +45,7 @@ using namespace composer;
 static composer::data_server_file *cf;
 address_translator at;
 
+#ifdef F1
 uint64_t f1_hack_addr(uint64_t addr) {
   // 1 2 0 3
   // 0 1 2 3
@@ -60,6 +61,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
       return addr;
   }
 }
+#endif
 
 [[noreturn]] static void *data_server_f(void *server) {
   auto *ds = (data_server *) server;

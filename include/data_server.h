@@ -21,28 +21,6 @@ extern size_t dma_len;
 extern bool dma_write;
 extern bool dma_in_progress;
 #endif
-struct address_translator {
-  struct addr_pair {
-    uint64_t fpga_addr;
-    uint64_t mapping_length;
-    void* cpu_addr;
-
-    explicit addr_pair(uint64_t fpgaAddr, void *cpuAddr, uint64_t map_length):
-    fpga_addr(fpgaAddr), cpu_addr(cpuAddr), mapping_length(map_length) {}
-
-    bool operator<(const addr_pair &other) const {
-      return fpga_addr < other.fpga_addr;
-    }
-  };
-  std::set<addr_pair> mappings;
-
-  void* translate(uint64_t fp_addr);
-  std::pair<void*, uint64_t> get_mapping(uint64_t fpga_addr);
-  void add_mapping(uint64_t fpga_addr, uint64_t mapping_length, void * cpu_addr);
-  void remove_mapping(uint64_t fpga_addr);
-};
-
-extern address_translator at;
 
 struct memory_transaction {
   char *addr;
@@ -100,6 +78,28 @@ struct data_server {
   static void start();
 };
 
+struct address_translator {
+  struct addr_pair {
+    uint64_t fpga_addr;
+    uint64_t mapping_length;
+    void* cpu_addr;
+
+    explicit addr_pair(uint64_t fpgaAddr, void *cpuAddr, uint64_t map_length):
+            fpga_addr(fpgaAddr), cpu_addr(cpuAddr), mapping_length(map_length) {}
+
+    bool operator<(const addr_pair &other) const {
+      return fpga_addr < other.fpga_addr;
+    }
+  };
+  std::set<addr_pair> mappings;
+
+  void* translate(uint64_t fp_addr);
+  std::pair<void*, uint64_t> get_mapping(uint64_t fpga_addr);
+  void add_mapping(uint64_t fpga_addr, uint64_t mapping_length, void * cpu_addr);
+  void remove_mapping(uint64_t fpga_addr);
+};
+
+extern address_translator at;
 
 
 #endif //COMPOSER_VERILATOR_DATA_SERVER_H
