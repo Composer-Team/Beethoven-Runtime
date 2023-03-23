@@ -225,14 +225,6 @@ public:
     send_ids = sendIds;
   }
 
-  int getToEnqueue() const {
-    return to_enqueue;
-  }
-
-  void setToEnqueue(int toEnqueue) {
-    to_enqueue = toEnqueue;
-  }
-
   bool fire() {
     return *ready && *valid;
   }

@@ -10,7 +10,7 @@
 #include <composer_allocator_declaration.h>
 
 #if defined(SIM)
-#ifdef defined(COMPOSER_HAS_DMA)
+#if defined(COMPOSER_HAS_DMA)
 #include <pthread.h>
 extern pthread_mutex_t dma_lock;
 extern pthread_mutex_t dma_wait_lock;
