@@ -51,7 +51,7 @@ static void *poll_thread(void *in) {
       csf->processes_waiting--;
       pthread_mutex_unlock(&csf->process_waiting_count_lock);
     } else {
-      std::this_thread::sleep_for(10ms);
+      std::this_thread::sleep_for(500us);
     }
   }
   pthread_mutex_unlock(&main_lock);
