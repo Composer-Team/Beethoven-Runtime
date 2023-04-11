@@ -89,9 +89,6 @@ static void* cmd_server_f(void* _) {
       // return response handle to client
       addr.pthread_wait_id = id;
       // end return response handle to client
-
-      // enqueue command for main simulation thread to handle
-      addr.pthread_wait_id = id;
     } else {
       addr.pthread_wait_id = id = 0xffff;
     }

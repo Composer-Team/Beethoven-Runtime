@@ -6,14 +6,18 @@ set(CMAKE_CXX_STANDARD 17)
 find_package(composer 1.0.5 EXACT REQUIRED)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-set(SRC src/data_server.cc src/cmd_server.cc)
+set(SRC src/data_server.cc src/cmd_server.cc src/mmio.cc)
 if ("$ENV{COMPOSER_ROOT}" STREQUAL "")
     message(FATAL_ERROR "Environment variable $COMPOSER_ROOT is not defined")
 endif ()
 
-if (NOT EXISTS $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer_allocator_declaration.h)
-    message(FATAL_ERROR "$ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer_allocator_declaration.h does not exist. Try building your project or moving this file into the directory.")
+set(COMPOSER_DIR "$ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src")
+
+if (NOT EXISTS ${COMPOSER_DIR}/composer_allocator_declaration.h)
+    message(FATAL_ERROR "${COMPOSER_DIR}/composer_allocator_declaration.h does not exist. Try building your project or moving this file into the directory.")
 endif ()
+
+
 
 set(AWS_SDK "$ENV{COMPOSER_ROOT}/aws-fpga")
 
@@ -47,7 +51,7 @@ elseif ("${TARGET}" STREQUAL "fpga")
         message(FATAL_ERROR "Must define backend for FPGA. F1 or Kria")
     endif ()
     include_directories(${AWS_SDK}/sdk/userspace/include)
-    add_executable(ComposerRuntime ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc src/mmio.cc src/mmio.h)
+    add_executable(ComposerRuntime ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc src/mmio.cc include/mmio.h)
     if ("${BACKEND}" STREQUAL "F1")
         target_link_libraries(ComposerRuntime PRIVATE pthread fpga_mgmt)
     else ()
@@ -95,21 +99,17 @@ endif ()
 
 include_directories($ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src)
 
-if ("${VERBOSE}" STREQUAL "ON")
+if ("${VERBOSE}" STREQUAL "1")
     target_compile_definitions(ComposerRuntime PUBLIC VERBOSE)
 endif ()
-set(FPN_CACHE "$ENV{COMPOSER_ROOT}/Composer-Hardware/.fpnew_cache")
 if (${BUILD_SIM})
     verilate(ComposerRuntime
-            SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v
-            INCLUDE_DIRS ${FPN_CACHE}
+            SOURCES ${COMPOSER_DIR}/composer.v
+            INCLUDE_DIRS ${COMPOSER_DIR}
             TOP_MODULE ComposerTop
-            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" -Wno-context -Wno-lint -Wno-style -Wno-moddup -Wno-unoptflat #  --threads 4
-            TRACE
+            TRACE_FST
+            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique
+            -LDFLAGS "${verilator_args}-lpthread" -Wno-context -Wno-lint -Wno-style
+            -Wno-moddup -Wno-unoptflat #  --threads 4
             )
-    #    verilate(ComposerDMASimTest
-    #            SOURCES $ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src/composer.v TOP_MODULE ComposerTop
-    #            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique --x-initial unique -LDFLAGS "${verilator_args}-lpthread" #--threads 1
-    #            TRACE
-    #            )
 endif ()
