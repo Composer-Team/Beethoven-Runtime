@@ -27,7 +27,10 @@ int main(int argc, char **argv)
 #ifdef F1
   fpga_setup(0);
 #endif
+  // Kria does local allocations only
+#ifndef Kria
   data_server::start();
+#endif
   cmd_server::start();
   pthread_mutex_lock(&main_lock);
   pthread_mutex_lock(&main_lock);

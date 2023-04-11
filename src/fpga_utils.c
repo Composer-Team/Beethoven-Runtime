@@ -1,17 +1,19 @@
 //
 // Created by Chris Kjellqvist on 10/29/22.
 //
-
+#if defined(F1) || defined(Kria)
+#include <pthread.h>
+pthread_mutex_t bus_lock;
+#endif
 #ifdef F1
 #include "fpga_utils.h"
 #ifndef VSIM
 #include "fpga_dma.h"
 #endif
-#include <pthread.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 
-pthread_mutex_t bus_lock;
 int pci_bar_handle;
 int xdma_write_fd;
 int xdma_read_fd;

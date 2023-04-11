@@ -8,7 +8,11 @@
 #include <composer_allocator_declaration.h>
 #include <cinttypes>
 
+
+void setup_mmio();
+
 void poke_mmio(uint64_t addr, uint32_t val);
-uint32_t peek_mmio(uint64_t addr);
+
+uint32_t peek_mmio(uint32_t addr);
 
 #endif //COMPOSER_VERILATOR_MMIO_H

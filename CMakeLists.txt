@@ -17,8 +17,6 @@ if (NOT EXISTS ${COMPOSER_DIR}/composer_allocator_declaration.h)
     message(FATAL_ERROR "${COMPOSER_DIR}/composer_allocator_declaration.h does not exist. Try building your project or moving this file into the directory.")
 endif ()
 
-
-
 set(AWS_SDK "$ENV{COMPOSER_ROOT}/aws-fpga")
 
 include_directories(include)

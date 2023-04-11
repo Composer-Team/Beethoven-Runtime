@@ -11,7 +11,7 @@
 #endif
 #define TRACE
 #ifdef TRACE
-extern VerilatedVcdC *tfp;
+extern VerilatedFstC *tfp;
 #endif
 
 void run_verilator();
@@ -185,7 +185,7 @@ class response_channel {
 public:
 
   std::queue<int> send_ids;
-  int to_enqueue = -1;
+  std::queue<int> to_enqueue;
   explicit response_channel(CData &ready,
                             CData &valid,
                             idtype &id) :
@@ -225,14 +225,6 @@ public:
     send_ids = sendIds;
   }
 
-  int getToEnqueue() const {
-    return to_enqueue;
-  }
-
-  void setToEnqueue(int toEnqueue) {
-    to_enqueue = toEnqueue;
-  }
-
   bool fire() {
     return *ready && *valid;
   }
@@ -253,7 +245,8 @@ struct mem_interface {
   std::map<uint64_t, std::queue<memory_transaction *> *> in_flight_reads;
   std::map<uint64_t, std::queue<memory_transaction *> *> in_flight_writes;
   dramsim3::JedecDRAMSystem *mem_sys;
-
+  pthread_mutex_t read_queue_lock = PTHREAD_MUTEX_INITIALIZER;
+  pthread_mutex_t write_queue_lock = PTHREAD_MUTEX_INITIALIZER;
   memory_transaction* to_enqueue_read = nullptr;
   memory_transaction* to_enqueue_write = nullptr;
   int r_progress = 0;
