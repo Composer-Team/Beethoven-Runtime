@@ -8,13 +8,14 @@
 #ifndef SIM
 
 #include <pthread.h>
+#include <semaphore.h>
 #include <composer/verilator_server.h>
 #include <thread>
 
 extern composer::cmd_server_file *csf;
 
 struct response_poller {
-  static void start_poller();
+  static void start_poller(sem_t *t);
 };
 
 #endif

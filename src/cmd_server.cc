@@ -2,40 +2,37 @@
 // Created by Chris Kjellqvist on 9/27/22.
 //
 
-#include <composer/verilator_server.h>
-#include <composer_allocator_declaration.h>
 #include "../include/cmd_server.h"
 #include "../include/data_server.h"
 #include "fpga_utils.h"
 #include "mmio.h"
+#include <composer/verilator_server.h>
+#include <composer_allocator_declaration.h>
 #include <sys/stat.h>
 
-#include <cstdio>
-#include <sys/mman.h>
-#include <unistd.h>
-#include <tuple>
 #include <cassert>
 #include <cerrno>
+#include <cstdio>
 #include <cstring>
+#include <sys/mman.h>
+#include <tuple>
+#include <unistd.h>
 
 #include "response_poller.h"
 
 // for shared memory
-#include <fcntl.h>
-#include <cmath>
 #include "util.h"
+#include <cmath>
+#include <fcntl.h>
 
 #ifdef FPGA
 
-#include "fpga_utils.h"
-#include <composer_allocator_declaration.h>
+#include <semaphore.h>
 
 #endif
 #ifdef SIM
 extern bool kill_sig;
 #endif
-
-#include <ctime>
 
 system_core_pair::system_core_pair(int system, int core) {
   this->system = system;
@@ -52,7 +49,7 @@ std::unordered_map<system_core_pair, std::queue<int> *> in_flight;
 
 constexpr int num_cmd_beats = (int) roundUp((float) (32 * 5) / AXIL_BUS_WIDTH);
 
-static void *cmd_server_f(void *_) {
+static void *cmd_server_f(void *) {
   setup_mmio();
   // map in the shared file
   int fd_composer = shm_open(cmd_server_file_name.c_str(), O_CREAT | O_RDWR, file_access_flags);
@@ -65,7 +62,7 @@ static void *cmd_server_f(void *_) {
 #endif
   }
   // check the file size. It might already exist in which case we don't need to truncate it again
-  struct stat shm_stats{};
+  struct stat shm_stats {};
   fstat(fd_composer, &shm_stats);
   if (shm_stats.st_size < sizeof(cmd_server_file)) {
     int tr_rc = ftruncate(fd_composer, sizeof(cmd_server_file));
@@ -81,7 +78,7 @@ static void *cmd_server_f(void *_) {
   // poller thread to get to the file. The poller often won, found old dat anad mucked everything up :(
   cmd_server_file::init(addr);
 #ifndef SIM
-  response_poller::start_poller();
+  response_poller::start_poller(&addr.processes_waiting);
 #endif
 
   std::vector<std::pair<int, FILE *>> alloc;
@@ -115,15 +112,17 @@ static void *cmd_server_f(void *_) {
     }
 #if defined(FPGA) || defined(VSIM)
 #if defined(F1) or defined(Kria)
+    // wake up response poller if this command expects a response
+    if (addr.cmd.getXd()) sem_post(&addr.processes_waiting);
     pthread_mutex_lock(&bus_lock);
 #endif
     auto *pack = addr.cmd.pack(pack_cfg);
-    if (sizeof(pack[0]) > 64) {
-      printf("FAILURE - cannot use peek-poke give the current ");
-      exit(1);
-    }
-    for (int i = 0; i < num_cmd_beats; ++i) { // command is 5 32-bit payloads
-      while(!peek_mmio(CMD_READY)){}
+//    if (sizeof(pack[0]) > 64) {
+//      printf("FAILURE - cannot use peek-poke give the current ");
+//      exit(1);
+//    }
+    for (int i = 0; i < num_cmd_beats; ++i) {// command is 5 32-bit payloads
+      while (!peek_mmio(CMD_READY)) {}
       poke_mmio(CMD_BITS, pack[i]);
       poke_mmio(CMD_VALID, 1);
     }
@@ -131,7 +130,8 @@ static void *cmd_server_f(void *_) {
 
 #endif
 #ifdef VERBOSE
-    std::cerr << "Successfully delivered command\n" << std::endl;
+    std::cerr << "Successfully delivered command\n"
+              << std::endl;
 #endif
 #if defined(F1) or defined(Kria)
     pthread_mutex_unlock(&bus_lock);
@@ -158,9 +158,9 @@ static void *cmd_server_f(void *_) {
     // re-lock self to stall
     pthread_mutex_lock(&addr.server_mut);
   }
-//  munmap(&addr, sizeof(cmd_server_file));
-//  shm_unlink(cmd_server_file_name.c_str());
-//  return nullptr;
+  //  munmap(&addr, sizeof(cmd_server_file));
+  //  shm_unlink(cmd_server_file_name.c_str());
+  //  return nullptr;
 }
 
 void cmd_server::start() {

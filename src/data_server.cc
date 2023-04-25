@@ -42,30 +42,9 @@ extern bool kill_sig;
 
 using namespace composer;
 
-static composer::data_server_file *cf;
 address_translator at;
 
-#ifdef F1
-uint64_t f1_hack_addr(uint64_t addr) {
-  // 1 2 0 3
-  // 0 1 2 3
-  uint64_t dimm = addr >> 34;
-  switch (dimm) {
-    case 0:
-      return 0x800000000 | (addr & 0x3ffffffff);
-    case 1:
-      return addr & 0x3ffffffff;
-    case 2:
-      return 0x100000000 | (addr & 0x3ffffffff);
-    default:
-      return addr;
-  }
-}
-#endif
-
-[[noreturn]] static void *data_server_f(void *server) {
-  auto *ds = (data_server *) server;
-
+[[noreturn]] static void *data_server_f(void *) {
   int fd_composer = shm_open(data_server_file_name.c_str(), O_CREAT | O_RDWR, file_access_flags);
   if (fd_composer < 0) {
     std::cerr << "Failed to open data_server file" << std::endl;
@@ -88,7 +67,6 @@ uint64_t f1_hack_addr(uint64_t addr) {
 
   auto &addr = *(data_server_file *) mmap(nullptr, sizeof(data_server_file), file_access_prots,
                                           MAP_SHARED, fd_composer, 0);
-  cf = &addr;
 
 #ifdef COMPOSER_USE_CUSTOM_ALLOC
 #ifdef VERBOSE
@@ -142,7 +120,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
 
 #endif
 
-  srand(time(0));
+  srand(time(nullptr)); // NOLINT(cert-msc51-cpp)
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
 #if defined(SIM) && defined(COMPOSER_HAS_DMA)
@@ -156,7 +134,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
     // get file name, descriptor, expand the file, and map it to address space
     switch (addr.operation) {
       case data_server_op::ALLOC: {
-        auto fname = "/composer_file_" + std::to_string(rand());
+        auto fname = "/composer_file_" + std::to_string(rand()); // NOLINT(cert-msc50-cpp)
         int nfd = shm_open(fname.c_str(), O_CREAT | O_RDWR, file_access_flags);
         if (nfd < 0) {
           std::cerr << "Failed to open shared memory segment: " << std::string(strerror(errno)) << std::endl;
@@ -265,7 +243,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
     //          printf("%d ", ((int *) shaddr)[i]);
     //        fflush(stdout);
           if (rc) {
-            fprintf(stderr, "Something failed inside MOVE_FROM_FPGA - %d %p %d %x\n", xdma_read_fd, shaddr,
+            fprintf(stderr, "Something failed inside MOVE_FROM_FPGA - %d %p %ld %lx\n", xdma_read_fd, shaddr,
                     addr.op3_argument, addr.op2_argument);
             exit(1);
           }
@@ -282,7 +260,7 @@ uint64_t f1_hack_addr(uint64_t addr) {
           memcpy(mem, shaddr, addr.op3_argument);
           int rc = wrapper_fpga_dma_burst_write(xdma_write_fd, (uint8_t *) shaddr, addr.op3_argument, addr.op_argument);
           if (rc) {
-            fprintf(stderr, "Something failed inside MOVE_TO_FPGA - %d %p %d %x\n", xdma_write_fd, shaddr,
+            fprintf(stderr, "Something failed inside MOVE_TO_FPGA - %d %p %ld %lx\n", xdma_write_fd, shaddr,
                     addr.op3_argument, addr.op2_argument);
             exit(1);
           }
@@ -306,7 +284,7 @@ void data_server::start() {
   pthread_create(&thread, nullptr, data_server_f, nullptr);
 }
 
-void *address_translator::translate(uint64_t fp_addr) {
+void *address_translator::translate(uint64_t fp_addr) const {
   auto it = mappings.begin();
   while (it != mappings.end()) {
     if (it->fpga_addr <= fp_addr and it->fpga_addr + it->mapping_length > fp_addr) {
@@ -343,7 +321,7 @@ void address_translator::remove_mapping(uint64_t fpga_addr) {
   mappings.erase(it);
 }
 
-std::pair<void *, uint64_t> address_translator::get_mapping(uint64_t fpga_addr) {
+std::pair<void *, uint64_t> address_translator::get_mapping(uint64_t fpga_addr) const {
   auto it = mappings.begin();
   while (it != mappings.end()) {
     if (it->fpga_addr == fpga_addr) {

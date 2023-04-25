@@ -11,54 +11,36 @@
 
 #include "cmd_server.h"
 #include <composer_allocator_declaration.h>
-#include <cinttypes>
 #include <thread>
-
-#include <cerrno>
-#include <cstring>
 
 using namespace std::chrono_literals;
 
-static void *poll_thread(void *in) {
-  int flights;
-  int tries = 0;
+[[noreturn]] static void* poll_thread(void *in) {
+  auto sem = (sem_t *) in;
   while (true) {
-    tries++;
-    pthread_mutex_lock(&csf->process_waiting_count_lock);
-    flights = csf->processes_waiting;
-    pthread_mutex_unlock(&csf->process_waiting_count_lock);
-
-    if (flights) {
-      uint32_t buf[3];
-      for (unsigned int &i: buf) {
-        uint32_t resp_ready = 0;
-        while (!resp_ready) {
-          pthread_mutex_lock(&bus_lock);
-          resp_ready = peek_mmio(RESP_VALID);
-          pthread_mutex_unlock(&bus_lock);
-          if (not resp_ready) {
-            std::this_thread::sleep_for(1us);
-          }
-          tries++;
-        }
+    sem_wait(sem);
+    uint32_t buf[3];
+    for (unsigned int &i: buf) {
+      uint32_t resp_ready = 0;
+      while (!resp_ready) {
         pthread_mutex_lock(&bus_lock);
-        i = peek_mmio(RESP_BITS);
-        poke_mmio(RESP_READY, 1);
+        resp_ready = peek_mmio(RESP_VALID);
         pthread_mutex_unlock(&bus_lock);
+        if (not resp_ready) {
+          std::this_thread::sleep_for(10us);
+        }
       }
-      register_reponse(buf);
-      pthread_mutex_lock(&csf->process_waiting_count_lock);
-      csf->processes_waiting--;
-      pthread_mutex_unlock(&csf->process_waiting_count_lock);
-    } else {
-      std::this_thread::sleep_for(500us);
+      pthread_mutex_lock(&bus_lock);
+      i = peek_mmio(RESP_BITS);
+      poke_mmio(RESP_READY, 1);
+      pthread_mutex_unlock(&bus_lock);
+
     }
+    register_reponse(buf);
   }
-  pthread_mutex_unlock(&main_lock);
-  return nullptr;
 }
 
-void response_poller::start_poller() {
+void response_poller::start_poller(sem_t *t) {
   pthread_t thread;
-  pthread_create(&thread, nullptr, poll_thread, nullptr);
+  pthread_create(&thread, nullptr, poll_thread, (void *) t);
 }

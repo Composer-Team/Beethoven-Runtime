@@ -5,12 +5,7 @@
 #include "../include/data_server.h"
 #include <pthread.h>
 #include "fpga_utils.h"
-#include <response_poller.h>
-#include <unistd.h>
-#include <stdlib.h>
 
-//data_server *d_server;
-cmd_server *c_server;
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 
 
@@ -21,7 +16,7 @@ extern "C" {
 extern "C" void test_main_hook(uint32_t *exit_code)
 #else
 
-int main(int argc, char **argv)
+int main()
 #endif
 {
 #ifdef F1

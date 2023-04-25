@@ -15,6 +15,10 @@ volatile char *devmem_map;
 
 #endif
 
+#ifdef F1
+#include <fpga_utils.h>
+#endif
+
 void setup_mmio() {
   // Kria specific initialization
 #ifdef Kria

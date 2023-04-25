@@ -2,7 +2,6 @@
 
 #include <verilated.h>
 #include "Vcomposer.h"
-#include <cinttypes>
 #include <queue>
 #include <pthread.h>
 #include <csignal>
@@ -13,7 +12,6 @@
 #include "verilated_fst_c.h"
 #include "../include/verilator.h"
 #include "../include/ddr_macros.h"
-#include "util.h"
 
 #ifdef USE_DRAMSIM
 // dramsim3
@@ -36,11 +34,9 @@ Config dramsim3config("../DRAMsim3/configs/DDR4_8Gb_x16_2666.ini", "./");
 #endif
 
 void sig_handle(int sig) {
-#ifdef TRACE
   tfp->close();
-
-  std::cerr << "FST written" << std::endl;
-#endif
+  fprintf(stderr, "FST written!\n");
+  fflush(stderr);
   exit(sig);
 }
 
@@ -173,6 +169,7 @@ void run_verilator() {
   tfp = new VerilatedFstC;
   top.trace(tfp, 30);
   tfp->open("trace.fst");
+  std::cout << "Tracing!" << std::endl;
 #endif
 
   mem_interface<ComposerMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
@@ -808,7 +805,7 @@ top.S00_AXI_rdata.at(0) == 1
     dma.r->setReady(0);
     if (dma_valid && not dma_in_progress) {
       dma_txprogress = 0;
-      dma_txlength = dma_len >> 6;
+      dma_txlength = int(dma_len >> 6);
       if (dma_write) {
         dma.aw->setValid(1);
         dma.aw->setAddr(dma_fpga_addr);
@@ -894,6 +891,7 @@ top.S00_AXI_rdata.at(0) == 1
 int main() {
   signal(SIGTERM, sig_handle);
   signal(SIGABRT, sig_handle);
+  signal(SIGINT, sig_handle);
   data_server::start();
   cmd_server::start();
 #ifdef VERBOSE

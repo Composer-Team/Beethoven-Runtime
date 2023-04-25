@@ -36,6 +36,4 @@ private:
 
 void register_reponse(uint32_t *r_buffer);
 
-extern cmd_server *c_server;
-
 #endif //COMPOSER_VERILATOR_CMD_SERVER_H

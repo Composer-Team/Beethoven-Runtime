@@ -103,7 +103,7 @@ endif ()
 if (${BUILD_SIM})
     verilate(ComposerRuntime
             SOURCES ${COMPOSER_DIR}/composer.v
-            INCLUDE_DIRS ${COMPOSER_DIR}
+            INCLUDE_DIRS ${COMPOSER_DIR} $ENV{COMPOSER_ROOT}/Composer-Runtime/verilog_resources/
             TOP_MODULE ComposerTop
             TRACE_FST
             VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique
