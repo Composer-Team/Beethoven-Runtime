@@ -70,6 +70,10 @@ struct memory_transaction {
     }
     return holds[0];
   }
+
+  [[nodiscard]] int bankId() const {
+    return int(fpga_addr >> 12);
+  }
 };
 
 #endif

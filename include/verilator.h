@@ -4,8 +4,8 @@
 
 #ifndef COMPOSER_VERILATOR_VERILATOR_H
 #define COMPOSER_VERILATOR_VERILATOR_H
-#include <verilated.h>
 #include <composer_allocator_declaration.h>
+#include <verilated.h>
 #ifdef USE_DRAMSIM
 #include "dram_system.h"
 #endif
@@ -14,8 +14,10 @@
 extern VerilatedFstC *tfp;
 #endif
 
+uint64_t get_dimm_address(uint64_t addr);
+
 void run_verilator();
-template <typename idtype>
+template<typename idtype>
 class v_address_channel {
   CData *ready = nullptr;
   CData *valid = nullptr;
@@ -24,22 +26,21 @@ class v_address_channel {
   CData *burst = nullptr;
   ComposerMemAddressSimDtype *addr = nullptr;
   CData *len = nullptr;
-public:
 
+public:
   explicit v_address_channel(CData &ready,
                              CData &valid,
                              idtype &id,
-                             CData &size ,
+                             CData &size,
                              CData &burst,
                              ComposerMemAddressSimDtype &addr,
-                             CData &len) :
-          ready(&ready),
-          valid(&valid),
-          id(&id),
-          size(&size),
-          burst(&burst),
-          addr(&addr),
-          len(&len) {}
+                             CData &len) : ready(&ready),
+                                           valid(&valid),
+                                           id(&id),
+                                           size(&size),
+                                           burst(&burst),
+                                           addr(&addr),
+                                           len(&len) {}
 
   [[nodiscard]] CData getReady() const {
     return *ready;
@@ -102,25 +103,25 @@ public:
   }
 };
 
-template <typename idtype>
+template<typename idtype>
 class data_channel {
-  CData * ready;
-   CData *valid;
-   char *data = nullptr;
-   idtype * id;
-   ComposerStrobeSimDtype *strobe;
-   CData *last;
+  CData *ready;
+  CData *valid;
+  char *data = nullptr;
+  idtype *id;
+  ComposerStrobeSimDtype *strobe;
+  CData *last;
+
 public:
   explicit data_channel(CData &ready,
                         CData &valid,
                         ComposerStrobeSimDtype *strobe,
                         CData &last,
-                        idtype *id) :
-          ready(&ready),
-          valid(&valid),
-          strobe(strobe),
-          last(&last),
-          id(id) {}
+                        idtype *id) : ready(&ready),
+                                      valid(&valid),
+                                      strobe(strobe),
+                                      last(&last),
+                                      id(id) {}
 
   void setData(char *data) {
     data_channel::data = data;
@@ -142,7 +143,7 @@ public:
     *data_channel::valid = valid;
   }
 
-  char* getData() const {
+  char *getData() const {
     return data;
   }
 
@@ -152,7 +153,7 @@ public:
 
   void setId(idtype id) {
     *data_channel::id = id;
-//    std::cerr << "Got " << id << ", set as " << *data_channel::id << std::endl;
+    //    std::cerr << "Got " << id << ", set as " << *data_channel::id << std::endl;
   }
 
   ComposerStrobeSimDtype getStrobe() const {
@@ -174,24 +175,22 @@ public:
   bool fire() {
     return *ready && *valid;
   }
-
 };
 
-template <typename idtype>
+template<typename idtype>
 class response_channel {
   CData *ready;
   CData *valid;
   idtype *id;
-public:
 
+public:
   std::queue<int> send_ids;
   std::queue<int> to_enqueue;
   explicit response_channel(CData &ready,
                             CData &valid,
-                            idtype &id) :
-          ready(&ready),
-          valid(&valid),
-          id(&id) {}
+                            idtype &id) : ready(&ready),
+                                          valid(&valid),
+                                          id(&id) {}
 
   CData getReady() const {
     return *ready;
@@ -238,22 +237,36 @@ struct mem_interface {
   data_channel<IDType> *w = nullptr;
   data_channel<IDType> *r = nullptr;
   response_channel<IDType> *b = nullptr;
-  std::queue<memory_transaction*> write_transactions;
-  std::queue<memory_transaction*> read_transactions;
+  std::queue<std::shared_ptr<memory_transaction>> write_transactions;
+  std::queue<std::shared_ptr<memory_transaction>> read_transactions;
   int id;
 #ifdef USE_DRAMSIM
-  std::map<uint64_t, std::queue<memory_transaction *> *> in_flight_reads;
-  std::map<uint64_t, std::queue<memory_transaction *> *> in_flight_writes;
+  std::map<uint64_t, std::queue<std::shared_ptr<memory_transaction> > *> in_flight_reads;
+  std::map<uint64_t, std::queue<std::shared_ptr<memory_transaction> > *> in_flight_writes;
   dramsim3::JedecDRAMSystem *mem_sys;
   pthread_mutex_t read_queue_lock = PTHREAD_MUTEX_INITIALIZER;
   pthread_mutex_t write_queue_lock = PTHREAD_MUTEX_INITIALIZER;
-  memory_transaction* to_enqueue_read = nullptr;
-  memory_transaction* to_enqueue_write = nullptr;
-  int r_progress = 0;
-  int w_progress = 0;
+
+  const static int max_q_length = 40;
+  std::vector<std::shared_ptr<memory_transaction> > ddr_read_q;
+  std::vector<std::shared_ptr<memory_transaction> > ddr_write_q;
+  std::set<int> bank2tx;
+  bool can_accept_write() {
+    return ddr_write_q.size() < max_q_length;
+  }
+  bool can_accept_read() {
+    return ddr_read_q.size() < max_q_length;
+  }
+
+  static int tx2bank(const std::shared_ptr<memory_transaction> mt) {
+    auto dimm_base = get_dimm_address(mt->fpga_addr);
+    auto dimm_addr = dimm_base + 8 * mt->dram_tx_enqueue_progress;
+
+    return (int) ((dimm_addr & ~(0xFFFL)) >> 12);
+  }
+
 #endif
 
   int current_read_channel_contents = -1;
 };
-
-#endif //COMPOSER_VERILATOR_VERILATOR_H
+#endif//COMPOSER_VERILATOR_VERILATOR_H
