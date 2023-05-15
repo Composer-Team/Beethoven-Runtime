@@ -9,8 +9,12 @@
 #ifdef USE_DRAMSIM
 #include "dram_system.h"
 #endif
-#define TRACE
-#ifdef TRACE
+
+#define USE_VCD
+
+#ifdef USE_VCD
+extern VerilatedVcdC *tfp;
+#else
 extern VerilatedFstC *tfp;
 #endif
 

@@ -10,7 +10,12 @@
 
 #include "../include/ddr_macros.h"
 #include "../include/verilator.h"
+
+#ifdef USE_VCD
+#include "verilated_vcd_c.h"
+#else
 #include "verilated_fst_c.h"
+#endif
 #include <composer_allocator_declaration.h>
 
 #ifdef USE_DRAMSIM
@@ -126,7 +131,9 @@ uint64_t get_dimm_address(uint64_t addr) {
   return acc;
 }
 
-#ifdef TRACE
+#ifdef USE_VCD
+VerilatedVcdC *tfp;
+#else
 VerilatedFstC *tfp;
 #endif
 
@@ -140,8 +147,6 @@ void tick(Vcomposer *top) {
     throw e;
   }
 }
-
-//#define TRACE
 
 #ifdef USE_DRAMSIM
 #define RLOCK pthread_mutex_lock(&axi4_mem.read_queue_lock);
@@ -165,12 +170,20 @@ void run_verilator() {
   Vcomposer top;
 
   Verilated::traceEverOn(true);
-#if defined(TRACE)
+#ifdef USE_VCD
+  tfp = new VerilatedVcdC;
+#else
   tfp = new VerilatedFstC;
-  top.trace(tfp, 30);
-  tfp->open("trace.fst");
-  std::cout << "Tracing!" << std::endl;
 #endif
+  top.trace(tfp, 30);
+  tfp->open("trace."
+#ifdef USE_VCD
+            "vcd"
+#else
+            "fst"
+#endif
+            );
+  std::cout << "Tracing!" << std::endl;
 
   mem_interface<ComposerMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
   for (int i = 0; i < NUM_DDR_CHANNELS; ++i) {
@@ -278,15 +291,11 @@ void run_verilator() {
   for (int i = 0; i < 50; ++i) {
     top.clock = 0;
     tick(&top);
-#ifdef TRACE
     tfp->dump(main_time);
-#endif
     main_time += 4;
     top.clock = 1;
     tick(&top);
-#ifdef TRACE
     tfp->dump(main_time);
-#endif
     main_time += 4;
   }
   top.reset = 0;
@@ -640,9 +649,7 @@ void run_verilator() {
     top.clock = 1;// posedge
     main_time += 4;
     tick(&top);
-#ifdef TRACE
     tfp->dump(main_time);
-#endif
 
     // ------------ HANDLE MEMORY INTERFACES ----------------
     for (mem_interface<ComposerMemIDDtype> &axi4_mem: axi4_mems) {
@@ -911,17 +918,13 @@ void run_verilator() {
     top.clock = 0;// negedge
     tick(&top);
     main_time += 4;
-#ifdef TRACE
     tfp->dump(main_time);
-#endif
   }
-#ifdef TRACE
 #ifdef VERBOSE
   printf("printing traces\n");
 #endif
   fflush(stdout);
   tfp->close();
-#endif
   sig_handle(0);
 }
 

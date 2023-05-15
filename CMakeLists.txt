@@ -3,7 +3,7 @@ project(ComposerRuntime)
 
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(composer 1.0.5 EXACT REQUIRED)
+find_package(composer 1.0.6 EXACT REQUIRED)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(SRC src/data_server.cc src/cmd_server.cc src/mmio.cc)
@@ -105,7 +105,8 @@ if (${BUILD_SIM})
             SOURCES ${COMPOSER_DIR}/composer.v
             INCLUDE_DIRS ${COMPOSER_DIR} $ENV{COMPOSER_ROOT}/Composer-Runtime/verilog_resources/
             TOP_MODULE ComposerTop
-            TRACE_FST
+            TRACE # VCD
+            # TRACE_FST
             VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique
             -LDFLAGS "${verilator_args}-lpthread" -Wno-context -Wno-lint -Wno-style
             -Wno-moddup -Wno-unoptflat #  --threads 4
