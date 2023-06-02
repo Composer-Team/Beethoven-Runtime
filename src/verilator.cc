@@ -38,6 +38,10 @@ bool kill_sig = false;
 Config dramsim3config("../DRAMsim3/configs/DDR4_8Gb_x16_2666.ini", "./");
 #endif
 
+#ifndef FPGA_CLOCK
+#define FPGA_CLOCK 100
+#endif
+
 void sig_handle(int sig) {
   tfp->close();
   fprintf(stderr, "FST written!\n");
@@ -162,6 +166,13 @@ void tick(Vcomposer *top) {
 
 
 void run_verilator() {
+  if (500000 % FPGA_CLOCK != 0) {
+    fprintf(stderr, "Provided FPGA clock rate (%dMHz) does not evenly divide 500. This may result in some inaccuracies in precise simulation measurements.", FPGA_CLOCK);
+  }
+
+  auto fpga_clock_inc = 500000 / FPGA_CLOCK;
+  int ddr_clock_inc = DDR_CLOCK / FPGA_CLOCK;
+
   // start servers to communicate with user programs
   const char *v[3] = {"", "+verilator+seed+14934534", "+verilator+rand+reset+2"};
 
@@ -217,20 +228,21 @@ void run_verilator() {
           RLOCK
           auto tx = axi4_mem.in_flight_reads[addr]->front();
           tx->dram_tx_load_progress++;
-          int hold_idx = int(addr - tx->fpga_addr) / 8;
-          tx->holds[hold_idx] = true;
-          int bytes_loaded = tx->dram_tx_load_progress * 8;
+          for (int i = 0; i < DDR_BURST_LENGTH; ++i) {
+            tx->ddr_bus_beats_retrieved[int(addr - tx->fpga_addr) / memory_transaction::dram_bus_beat_bytes + i] = true;
+          }
+          int bytes_loaded = tx->dram_tx_load_progress * memory_transaction::dram_bus_beat_bytes * DDR_BURST_LENGTH;
           int total_tx_size = tx->size * tx->len;
           bool done = bytes_loaded >= total_tx_size;
           axi4_mem.bank2tx.erase(tx->bankId());
 
-          if (tx->dramsim_hasBeatReady()) {
+          while (tx->dramsim_hasBeatReady()) {
             tx->can_be_last = done;
             auto intermediate_tx = std::make_shared<memory_transaction>(tx->addr, tx->size, 1, 0, false, tx->id, 0);
             tx->addr += tx->size;
             intermediate_tx->fpga_addr = tx->fpga_addr;
             intermediate_tx->can_be_last = done;
-            tx->progress += (DATA_BUS_WIDTH / 64);
+            tx->axi_bus_beats_progress++;
             axi4_mem.read_transactions.push(intermediate_tx);
 //            printf(" R: enqueueing read ID(%04x) ADDR(%16llx)\n", tx->id, tx->fpga_addr);
           }
@@ -240,8 +252,8 @@ void run_verilator() {
         [&axi4_mem](uint64_t addr) {
           WLOCK
           auto tx = axi4_mem.in_flight_writes[addr]->front();
-          tx->progress--;
-          if (tx->progress == 0) {
+          tx->axi_bus_beats_progress--;
+          if (tx->axi_bus_beats_progress == 0) {
             axi4_mem.b->to_enqueue.push(tx->id);
           }
           axi4_mem.in_flight_writes[addr]->pop();
@@ -292,11 +304,11 @@ void run_verilator() {
     top.clock = 0;
     tick(&top);
     tfp->dump(main_time);
-    main_time += 4;
+    main_time += fpga_clock_inc;
     top.clock = 1;
     tick(&top);
     tfp->dump(main_time);
-    main_time += 4;
+    main_time += fpga_clock_inc;
   }
   top.reset = 0;
   top.clock = 0;
@@ -395,6 +407,11 @@ void run_verilator() {
             ongoing_cmd.progress++;
             // send last thing, yield bus
             if (ongoing_cmd.progress == command_transaction::payload_length) {
+#ifdef USE_DRAMSIM
+              for(auto &axi_mem: axi4_mems) {
+                axi_mem.mem_sys->ResetStats();
+              }
+#endif
               ongoing_cmd.state = CMD_INACTIVE;
               bus_occupied = false;
             } else {
@@ -609,9 +626,75 @@ void run_verilator() {
 
 #ifdef USE_DRAMSIM
     // approx clock diff
-    for (int i = 0; i < 13; ++i) {
-      for (auto &mem: axi4_mems) {
-        mem.mem_sys->ClockTick();
+    for (int i = 0; i < ddr_clock_inc; ++i) {
+      for (auto &axi4_mem: axi4_mems) {
+        axi4_mem.mem_sys->ClockTick();
+        RLOCK
+        std::shared_ptr<memory_transaction> to_enqueue_read = nullptr;
+        // find next read we should send to DRAM. Prioritize older txs
+        for (auto it = axi4_mem.ddr_read_q.begin(); it != axi4_mem.ddr_read_q.end(); ++it) {
+          auto &mt = *it;
+          int bank_id = mem_interface<unsigned char>::tx2bank(mt);
+          if ((axi4_mem.bank2tx.find(bank_id) == axi4_mem.bank2tx.end()) &&
+              axi4_mem.mem_sys->WillAcceptTransaction(mt->fpga_addr, false)) {
+            // AXI stipulates that for multiple transactions on the same ID, the returned packets need to be serialized
+            // Since this list is ordered old -> new, we need to search from the beginning of the list to the current iterator
+            //  to see if there is a transaction with the same ID. If so, we need to skip and issue later.
+            bool foundHigherPriorityInID = false;
+            for (auto it2 = axi4_mem.ddr_read_q.begin(); it2 != it; ++it2) {
+              if (mt->id == (*it2)->id) {
+                foundHigherPriorityInID = true;
+              }
+            }
+            if (foundHigherPriorityInID) continue;
+
+            to_enqueue_read = mt;
+            axi4_mem.bank2tx.insert(bank_id);
+            auto dimm_base = get_dimm_address(to_enqueue_read->fpga_addr);
+            auto dimm_addr = dimm_base + memory_transaction::dram_bus_beat_bytes * DDR_BURST_LENGTH * to_enqueue_read->dram_tx_axi_enqueue_progress;
+            axi4_mem.mem_sys->AddTransaction(dimm_addr, false);
+
+            // remember it as being in flight. Make a queue if necessary and store it there
+            if (axi4_mem.in_flight_reads.find(dimm_addr) == axi4_mem.in_flight_reads.end())
+              axi4_mem.in_flight_reads[dimm_addr] = new std::queue<std::shared_ptr<memory_transaction>>();
+
+            auto &q = *axi4_mem.in_flight_reads[dimm_addr];
+            q.push(to_enqueue_read);
+            to_enqueue_read->dram_tx_axi_enqueue_progress++;
+
+            if (to_enqueue_read->dramsim_tx_finished()) {
+              axi4_mem.ddr_read_q.erase(std::find(axi4_mem.ddr_read_q.begin(), axi4_mem.ddr_read_q.end(), to_enqueue_read));
+            }
+
+            break;
+          }
+        }
+        RUNLOCK
+
+        WLOCK
+        std::shared_ptr<memory_transaction> to_enqueue_write = nullptr;
+        for (const auto &mt: axi4_mem.ddr_write_q) {
+          int bank_id = mt->bankId();
+          if (axi4_mem.bank2tx.find(bank_id) == axi4_mem.bank2tx.end() && axi4_mem.mem_sys->WillAcceptTransaction(mt->fpga_addr, true)) {
+            to_enqueue_write = mt;
+            axi4_mem.bank2tx.insert(bank_id);
+            break;
+          }
+        }
+
+        if (to_enqueue_write != nullptr) {
+          auto dimm_addr = get_dimm_address(to_enqueue_write->fpga_addr) +
+                           to_enqueue_write->dram_tx_axi_enqueue_progress * memory_transaction::dram_bus_beat_bytes * memory_transaction::axi_ddr_bus_multiplicity * DDR_BURST_LENGTH;
+          to_enqueue_write->dram_tx_axi_enqueue_progress++;
+          axi4_mem.mem_sys->AddTransaction(dimm_addr, true);
+          if (axi4_mem.in_flight_writes.find(dimm_addr) == axi4_mem.in_flight_writes.end())
+            axi4_mem.in_flight_writes[dimm_addr] = new std::queue<std::shared_ptr<memory_transaction>>;
+          axi4_mem.in_flight_writes[dimm_addr]->push(to_enqueue_write);
+          if (to_enqueue_write->dramsim_tx_finished()) {
+            axi4_mem.ddr_write_q.erase(std::find(axi4_mem.ddr_write_q.begin(), axi4_mem.ddr_write_q.end(), to_enqueue_write));
+          }
+        }
+        WUNLOCK
       }
     }
 #endif
@@ -619,7 +702,7 @@ void run_verilator() {
       if (axi4_mem.r->getValid() && axi4_mem.r->getReady()) {
         RLOCK
         auto tx = axi4_mem.read_transactions.front();
-        tx->progress++;
+        tx->axi_bus_beats_progress++;
         if (not tx->fixed) {
           tx->addr += tx->size;
         }
@@ -647,7 +730,7 @@ void run_verilator() {
     }
 
     top.clock = 1;// posedge
-    main_time += 4;
+    main_time += fpga_clock_inc;
     tick(&top);
     tfp->dump(main_time);
 
@@ -658,12 +741,12 @@ void run_verilator() {
       }
 
       RLOCK
-      if (not axi4_mem.read_transactions.empty() && not axi4_mem.r->getValid()) {
+      if (not axi4_mem.read_transactions.empty()) {
         auto tx = axi4_mem.read_transactions.front();
-        int start = (tx->progress * tx->size) % (DATA_BUS_WIDTH / 8);
+        int start = (tx->axi_bus_beats_progress * tx->size) % (DATA_BUS_WIDTH / 8);
         char *dest = (char *) axi4_mem.r->getData() + start;
         memcpy(dest, tx->addr, tx->size);
-        bool am_done = tx->len == (tx->progress + 1);
+        bool am_done = tx->len == (tx->axi_bus_beats_progress + 1);
         axi4_mem.r->setValid(1);
         axi4_mem.r->setLast(am_done && tx->can_be_last);
         axi4_mem.r->setId(tx->id);
@@ -730,7 +813,7 @@ void run_verilator() {
             off += 1;
             strobe >>= 1;
           }
-          trans->progress++;
+          trans->axi_bus_beats_progress++;
 
           if (not trans->fixed) {
             trans->addr += trans->size;
@@ -740,9 +823,9 @@ void run_verilator() {
             axi4_mem.write_transactions.pop();
 
 #ifdef USE_DRAMSIM
-            trans->dram_tx_enqueue_progress = 0;
-            trans->dram_tx_len = trans->len * trans->size >> 3;
-            trans->progress = trans->dram_tx_len;
+            trans->dram_tx_axi_enqueue_progress = 0;
+            trans->dram_tx_len_bus_beats = trans->len * trans->size >> 3;
+            trans->axi_bus_beats_progress = 1;
             axi4_mem.ddr_write_q.push_back(trans);
 #else
             axi4_mem.b->to_enqueue.push(trans->id);
@@ -756,77 +839,6 @@ void run_verilator() {
       WUNLOCK
 
 #ifdef USE_DRAMSIM
-      RLOCK
-      std::shared_ptr<memory_transaction> to_enqueue_read = nullptr;
-      // find next read we should send to DRAM. Prioritize older txs
-      for (auto it = axi4_mem.ddr_read_q.begin(); it != axi4_mem.ddr_read_q.end(); ++it) {
-        auto &mt = *it;
-        int bank_id = mem_interface<unsigned char>::tx2bank(mt);
-        if ((axi4_mem.bank2tx.find(bank_id) == axi4_mem.bank2tx.end()) &&
-            axi4_mem.mem_sys->WillAcceptTransaction(mt->fpga_addr, false)) {
-          // AXI stipulates that for multiple transactions on the same ID, the returned packets need to be serialized
-          // Since this list is ordered old -> new, we need to search from the beginning of the list to the current iterator
-          //  to see if there is a transaction with the same ID. If so, we need to skip and issue later.
-          bool foundHigherPriorityInID = false;
-          for (auto it2 = axi4_mem.ddr_read_q.begin(); it2 != it; ++it2) {
-            if (mt->id == (*it2)->id) {
-              foundHigherPriorityInID = true;
-            }
-          }
-          if (foundHigherPriorityInID) continue;
-
-          to_enqueue_read = mt;
-          axi4_mem.bank2tx.insert(bank_id);
-          auto dimm_base = get_dimm_address(to_enqueue_read->fpga_addr);
-          auto dimm_addr = dimm_base + 8 * to_enqueue_read->dram_tx_enqueue_progress;
-          axi4_mem.mem_sys->AddTransaction(dimm_addr, false);
-
-          // remember it as being in flight. Make a queue if necessary and store it there
-          if (axi4_mem.in_flight_reads.find(dimm_addr) == axi4_mem.in_flight_reads.end())
-            axi4_mem.in_flight_reads[dimm_addr] = new std::queue<std::shared_ptr<memory_transaction>>();
-
-          auto &q = *axi4_mem.in_flight_reads[dimm_addr];
-          q.push(to_enqueue_read);
-          to_enqueue_read->dram_tx_enqueue_progress++;
-
-          if (to_enqueue_read->dram_tx_enqueue_progress == to_enqueue_read->dram_tx_len) {
-            axi4_mem.ddr_read_q.erase(std::find(axi4_mem.ddr_read_q.begin(), axi4_mem.ddr_read_q.end(), to_enqueue_read));
-          }
-
-          break;
-        }
-      }
-
-      // enqueue read if one is found
-      if (to_enqueue_read != nullptr) {
-
-      }
-      RUNLOCK
-
-      WLOCK
-      std::shared_ptr<memory_transaction> to_enqueue_write = nullptr;
-      for (const auto &mt: axi4_mem.ddr_write_q) {
-        int bank_id = mt->bankId();
-        if (axi4_mem.bank2tx.find(bank_id) == axi4_mem.bank2tx.end() && axi4_mem.mem_sys->WillAcceptTransaction(mt->fpga_addr, true)) {
-          to_enqueue_write = mt;
-          axi4_mem.bank2tx.insert(bank_id);
-          break;
-        }
-      }
-
-      if (to_enqueue_write != nullptr) {
-        auto dimm_addr = get_dimm_address(to_enqueue_write->fpga_addr) + to_enqueue_write->dram_tx_enqueue_progress * 8;
-        to_enqueue_write->dram_tx_enqueue_progress++;
-        axi4_mem.mem_sys->AddTransaction(dimm_addr, true);
-        if (axi4_mem.in_flight_writes.find(dimm_addr) == axi4_mem.in_flight_writes.end())
-          axi4_mem.in_flight_writes[dimm_addr] = new std::queue<std::shared_ptr<memory_transaction>>;
-        axi4_mem.in_flight_writes[dimm_addr]->push(to_enqueue_write);
-        if (to_enqueue_write->dram_tx_enqueue_progress == to_enqueue_write->dram_tx_len) {
-          axi4_mem.ddr_write_q.erase(std::find(axi4_mem.ddr_write_q.begin(), axi4_mem.ddr_write_q.end(), to_enqueue_write));
-        }
-      }
-      WUNLOCK
-
       RLOCK
       // to signify that the AXI4 DDR Controller is busy enqueueing another transaction in the DRAM
       axi4_mem.ar->setReady(axi4_mem.can_accept_read());
@@ -917,7 +929,7 @@ void run_verilator() {
 #endif
     top.clock = 0;// negedge
     tick(&top);
-    main_time += 4;
+    main_time += fpga_clock_inc;
     tfp->dump(main_time);
   }
 #ifdef VERBOSE
@@ -925,6 +937,11 @@ void run_verilator() {
 #endif
   fflush(stdout);
   tfp->close();
+#ifdef USE_DRAMSIM
+  for (auto &axi_mem: axi4_mems) {
+    axi_mem.mem_sys->PrintStats();
+  }
+#endif
   sig_handle(0);
 }
 

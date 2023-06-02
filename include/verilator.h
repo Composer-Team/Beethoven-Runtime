@@ -10,7 +10,7 @@
 #include "dram_system.h"
 #endif
 
-#define USE_VCD
+//#define USE_VCD
 
 #ifdef USE_VCD
 extern VerilatedVcdC *tfp;
@@ -264,7 +264,7 @@ struct mem_interface {
 
   static int tx2bank(const std::shared_ptr<memory_transaction> mt) {
     auto dimm_base = get_dimm_address(mt->fpga_addr);
-    auto dimm_addr = dimm_base + 8 * mt->dram_tx_enqueue_progress;
+    auto dimm_addr = dimm_base + 8 * mt->dram_tx_axi_enqueue_progress;
 
     return (int) ((dimm_addr & ~(0xFFFL)) >> 12);
   }

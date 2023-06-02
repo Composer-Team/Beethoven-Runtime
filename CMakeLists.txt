@@ -100,14 +100,38 @@ include_directories($ENV{COMPOSER_ROOT}/Composer-Hardware/vsim/generated-src)
 if ("${VERBOSE}" STREQUAL "1")
     target_compile_definitions(ComposerRuntime PUBLIC VERBOSE)
 endif ()
+
+
+if ("${FPGA_CLOCK}" STREQUAL "")
+    set(FPGA_CLOCK DEFAULT_PL_CLOCK)
+endif ()
+
+
+if ("${DDR_CLOCK}" STREQUAL "")
+    set(DDR_CLOCK 1333)
+endif ()
+
+if ("${DDR_BURST_LENGTH}" STREQUAL "")
+    set(DDR_BURST_LENGTH 8)
+endif()
+
+if ("${DDR_BUS_WIDTH_BITS}" STREQUAL "")
+    set(DDR_BUS_WIDTH_BITS 64)
+endif()
+
+add_definitions(-DFPGA_CLOCK=${FPGA_CLOCK})
+add_definitions(-DDDR_BURST_LENGTH=${DDR_BURST_LENGTH})
+add_definitions(-DDDR_CLOCK=${DDR_CLOCK})
+add_definitions(-DDDR_BUS_WIDTH_BITS=${DDR_BUS_WIDTH_BITS})
+
 if (${BUILD_SIM})
     verilate(ComposerRuntime
             SOURCES ${COMPOSER_DIR}/composer.v
             INCLUDE_DIRS ${COMPOSER_DIR} $ENV{COMPOSER_ROOT}/Composer-Runtime/verilog_resources/
             TOP_MODULE ComposerTop
-            TRACE # VCD
-            # TRACE_FST
-            VERILATOR_ARGS --timescale 1ns/1ns --x-assign unique
+            #                        TRACE # VCD
+            TRACE_FST
+            VERILATOR_ARGS --timescale 1ps/1ps --x-assign unique
             -LDFLAGS "${verilator_args}-lpthread" -Wno-context -Wno-lint -Wno-style
             -Wno-moddup -Wno-unoptflat #  --threads 4
             )
