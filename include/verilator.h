@@ -254,7 +254,7 @@ struct mem_interface {
   const static int max_q_length = 40;
   std::vector<std::shared_ptr<memory_transaction> > ddr_read_q;
   std::vector<std::shared_ptr<memory_transaction> > ddr_write_q;
-  std::set<int> bank2tx;
+//  std::set<int> bank2tx;
   bool can_accept_write() {
     return ddr_write_q.size() < max_q_length;
   }

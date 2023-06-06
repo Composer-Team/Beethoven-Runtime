@@ -233,11 +233,9 @@ void run_verilator() {
           }
           int bytes_loaded = tx->dram_tx_load_progress * memory_transaction::dram_bus_beat_bytes * DDR_BURST_LENGTH;
           int total_tx_size = tx->size * tx->len;
-          bool done = bytes_loaded >= total_tx_size;
-          axi4_mem.bank2tx.erase(tx->bankId());
 
           while (tx->dramsim_hasBeatReady()) {
-            tx->can_be_last = done;
+            bool done = (tx->axi_bus_beats_progress == tx->axi_bus_beats_length() - 1);
             auto intermediate_tx = std::make_shared<memory_transaction>(tx->addr, tx->size, 1, 0, false, tx->id, 0);
             tx->addr += tx->size;
             intermediate_tx->fpga_addr = tx->fpga_addr;
@@ -257,7 +255,7 @@ void run_verilator() {
             axi4_mem.b->to_enqueue.push(tx->id);
           }
           axi4_mem.in_flight_writes[addr]->pop();
-          axi4_mem.bank2tx.erase(tx->bankId());
+//          axi4_mem.bank2tx.erase(tx->bankId());
           WUNLOCK
         });
   }
@@ -635,7 +633,7 @@ void run_verilator() {
         for (auto it = axi4_mem.ddr_read_q.begin(); it != axi4_mem.ddr_read_q.end(); ++it) {
           auto &mt = *it;
           int bank_id = mem_interface<unsigned char>::tx2bank(mt);
-          if ((axi4_mem.bank2tx.find(bank_id) == axi4_mem.bank2tx.end()) &&
+          if (//(axi4_mem.bank2tx.find(bank_id) == axi4_mem.bank2tx.end()) &&
               axi4_mem.mem_sys->WillAcceptTransaction(mt->fpga_addr, false)) {
             // AXI stipulates that for multiple transactions on the same ID, the returned packets need to be serialized
             // Since this list is ordered old -> new, we need to search from the beginning of the list to the current iterator
@@ -649,7 +647,7 @@ void run_verilator() {
             if (foundHigherPriorityInID) continue;
 
             to_enqueue_read = mt;
-            axi4_mem.bank2tx.insert(bank_id);
+//            axi4_mem.bank2tx.insert(bank_id);
             auto dimm_base = get_dimm_address(to_enqueue_read->fpga_addr);
             auto dimm_addr = dimm_base + memory_transaction::dram_bus_beat_bytes * DDR_BURST_LENGTH * to_enqueue_read->dram_tx_axi_enqueue_progress;
             axi4_mem.mem_sys->AddTransaction(dimm_addr, false);
@@ -675,9 +673,10 @@ void run_verilator() {
         std::shared_ptr<memory_transaction> to_enqueue_write = nullptr;
         for (const auto &mt: axi4_mem.ddr_write_q) {
           int bank_id = mt->bankId();
-          if (axi4_mem.bank2tx.find(bank_id) == axi4_mem.bank2tx.end() && axi4_mem.mem_sys->WillAcceptTransaction(mt->fpga_addr, true)) {
+          if (//axi4_mem.bank2tx.find(bank_id) == axi4_mem.bank2tx.end() &&
+              axi4_mem.mem_sys->WillAcceptTransaction(mt->fpga_addr, true)) {
             to_enqueue_write = mt;
-            axi4_mem.bank2tx.insert(bank_id);
+//            axi4_mem.bank2tx.insert(bank_id);
             break;
           }
         }

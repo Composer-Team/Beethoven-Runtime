@@ -64,6 +64,7 @@ struct memory_transaction {
 
   int dramsim_hasBeatReady() {
     assert(dram_bus_beat_bytes <= (DATA_BUS_WIDTH / 8));
+    if (axi_bus_beats_progress == axi_bus_beats_length()) return false;
     for (int i = 0; i < axi_ddr_bus_multiplicity; ++i) {
       if (!ddr_bus_beats_retrieved[axi_bus_beats_progress * axi_ddr_bus_multiplicity + i]) return false;
     }
@@ -76,6 +77,10 @@ struct memory_transaction {
 
   bool dramsim_tx_finished() const {
     return dram_tx_axi_enqueue_progress * axi_ddr_bus_multiplicity >= dram_tx_len_bus_beats;
+  }
+
+  int axi_bus_beats_length() const {
+    return len * size / (DATA_BUS_WIDTH / 8);
   }
 };
 
