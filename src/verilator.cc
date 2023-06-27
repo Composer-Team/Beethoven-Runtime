@@ -34,10 +34,6 @@ extern std::unordered_map<system_core_pair, std::queue<int> *> in_flight;
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 bool kill_sig = false;
 
-#ifdef USE_DRAMSIM
-Config dramsim3config("../DRAMsim3/configs/DDR4_8Gb_x16_2666.ini", "./");
-#endif
-
 #ifndef FPGA_CLOCK
 #define FPGA_CLOCK 100
 #endif
@@ -164,14 +160,33 @@ void tick(Vcomposer *top) {
 #define WUNLOCK
 #endif
 
+int DDR_BUS_WIDTH_BITS = 64;
+int DDR_BUS_WIDTH_BYTES = 8;
+int axi_ddr_bus_multiplicity;
+int DDR_BUS_BURST_LENGTH;
 
 void run_verilator() {
-  if (500000 % FPGA_CLOCK != 0) {
-    fprintf(stderr, "Provided FPGA clock rate (%dMHz) does not evenly divide 500. This may result in some inaccuracies in precise simulation measurements.", FPGA_CLOCK);
-  }
+#if 500000 % FPGA_CLOCK != 0
+    printf(stderr, "Provided FPGA clock rate (%dMHz) does not evenly divide 500. This may result in some inaccuracies in precise simulation measurements.", FPGA_CLOCK);
+#endif
+
+#ifdef USE_DRAMSIM
+  Config dramsim3config("../DRAMsim3/configs/Kria.ini", "./");
+  const float DDR_CLOCK = 1000.0 / dramsim3config.tCK; // NOLINT
+  int DDR_BURST_LENGTH = dramsim3config.BL;
+  DDR_BUS_WIDTH_BITS = dramsim3config.bus_width;
+  DDR_BUS_WIDTH_BYTES = DDR_BUS_WIDTH_BITS / 8;
+  axi_ddr_bus_multiplicity = (DATA_BUS_WIDTH / 8) / DDR_BUS_WIDTH_BYTES;
+  DDR_BUS_BURST_LENGTH = dramsim3config.BL;
+#else
+  auto DDR_CLOCK = 1333;
+  axi_ddr_bus_multiplicity = (DATA_BUS_WIDTH / 8) / DDR_BUS_WIDTH_BYTES;
+  DDR_BUS_BURST_LENGTH = 8;
+#endif
+
 
   auto fpga_clock_inc = 500000 / FPGA_CLOCK;
-  int ddr_clock_inc = DDR_CLOCK / FPGA_CLOCK;
+  int ddr_clock_inc = DDR_CLOCK / FPGA_CLOCK; // NOLINT
 
   // start servers to communicate with user programs
   const char *v[3] = {"", "+verilator+seed+14934534", "+verilator+rand+reset+2"};
@@ -193,7 +208,7 @@ void run_verilator() {
 #else
             "fst"
 #endif
-            );
+  );
   std::cout << "Tracing!" << std::endl;
 
   mem_interface<ComposerMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
@@ -224,14 +239,14 @@ void run_verilator() {
     axi4_mem.mem_sys = new JedecDRAMSystem(
         dramsim3config,
         "",
-        [&axi4_mem](uint64_t addr) {
+        [&axi4_mem, DDR_BURST_LENGTH](uint64_t addr) {
           RLOCK
           auto tx = axi4_mem.in_flight_reads[addr]->front();
           tx->dram_tx_load_progress++;
           for (int i = 0; i < DDR_BURST_LENGTH; ++i) {
-            tx->ddr_bus_beats_retrieved[int(addr - tx->fpga_addr) / memory_transaction::dram_bus_beat_bytes + i] = true;
+            tx->ddr_bus_beats_retrieved[int(addr - tx->fpga_addr) / DDR_BUS_WIDTH_BYTES + i] = true;
           }
-          int bytes_loaded = tx->dram_tx_load_progress * memory_transaction::dram_bus_beat_bytes * DDR_BURST_LENGTH;
+          int bytes_loaded = tx->dram_tx_load_progress * DDR_BUS_WIDTH_BYTES * DDR_BURST_LENGTH;
           int total_tx_size = tx->size * tx->len;
 
           while (tx->dramsim_hasBeatReady()) {
@@ -242,7 +257,6 @@ void run_verilator() {
             intermediate_tx->can_be_last = done;
             tx->axi_bus_beats_progress++;
             axi4_mem.read_transactions.push(intermediate_tx);
-//            printf(" R: enqueueing read ID(%04x) ADDR(%16llx)\n", tx->id, tx->fpga_addr);
           }
           axi4_mem.in_flight_reads[addr]->pop();
           RUNLOCK
@@ -255,7 +269,7 @@ void run_verilator() {
             axi4_mem.b->to_enqueue.push(tx->id);
           }
           axi4_mem.in_flight_writes[addr]->pop();
-//          axi4_mem.bank2tx.erase(tx->bankId());
+          //          axi4_mem.bank2tx.erase(tx->bankId());
           WUNLOCK
         });
   }
@@ -406,7 +420,7 @@ void run_verilator() {
             // send last thing, yield bus
             if (ongoing_cmd.progress == command_transaction::payload_length) {
 #ifdef USE_DRAMSIM
-              for(auto &axi_mem: axi4_mems) {
+              for (auto &axi_mem: axi4_mems) {
                 axi_mem.mem_sys->ResetStats();
               }
 #endif
@@ -633,8 +647,7 @@ void run_verilator() {
         for (auto it = axi4_mem.ddr_read_q.begin(); it != axi4_mem.ddr_read_q.end(); ++it) {
           auto &mt = *it;
           int bank_id = mem_interface<unsigned char>::tx2bank(mt);
-          if (//(axi4_mem.bank2tx.find(bank_id) == axi4_mem.bank2tx.end()) &&
-              axi4_mem.mem_sys->WillAcceptTransaction(mt->fpga_addr, false)) {
+          if (axi4_mem.mem_sys->WillAcceptTransaction(mt->fpga_addr, false) && axi4_mem.read_transactions.size() < 2) {
             // AXI stipulates that for multiple transactions on the same ID, the returned packets need to be serialized
             // Since this list is ordered old -> new, we need to search from the beginning of the list to the current iterator
             //  to see if there is a transaction with the same ID. If so, we need to skip and issue later.
@@ -647,9 +660,8 @@ void run_verilator() {
             if (foundHigherPriorityInID) continue;
 
             to_enqueue_read = mt;
-//            axi4_mem.bank2tx.insert(bank_id);
             auto dimm_base = get_dimm_address(to_enqueue_read->fpga_addr);
-            auto dimm_addr = dimm_base + memory_transaction::dram_bus_beat_bytes * DDR_BURST_LENGTH * to_enqueue_read->dram_tx_axi_enqueue_progress;
+            auto dimm_addr = dimm_base + DDR_BUS_WIDTH_BYTES * DDR_BURST_LENGTH * to_enqueue_read->dram_tx_axi_enqueue_progress;
             axi4_mem.mem_sys->AddTransaction(dimm_addr, false);
 
             // remember it as being in flight. Make a queue if necessary and store it there
@@ -676,14 +688,14 @@ void run_verilator() {
           if (//axi4_mem.bank2tx.find(bank_id) == axi4_mem.bank2tx.end() &&
               axi4_mem.mem_sys->WillAcceptTransaction(mt->fpga_addr, true)) {
             to_enqueue_write = mt;
-//            axi4_mem.bank2tx.insert(bank_id);
+            //            axi4_mem.bank2tx.insert(bank_id);
             break;
           }
         }
 
         if (to_enqueue_write != nullptr) {
           auto dimm_addr = get_dimm_address(to_enqueue_write->fpga_addr) +
-                           to_enqueue_write->dram_tx_axi_enqueue_progress * memory_transaction::dram_bus_beat_bytes * memory_transaction::axi_ddr_bus_multiplicity * DDR_BURST_LENGTH;
+                           to_enqueue_write->dram_tx_axi_enqueue_progress * DDR_BUS_WIDTH_BYTES * axi_ddr_bus_multiplicity * DDR_BURST_LENGTH;
           to_enqueue_write->dram_tx_axi_enqueue_progress++;
           axi4_mem.mem_sys->AddTransaction(dimm_addr, true);
           if (axi4_mem.in_flight_writes.find(dimm_addr) == axi4_mem.in_flight_writes.end())
@@ -721,7 +733,7 @@ void run_verilator() {
                                                        axi4_mem.ar->getId(), addr);
         // 64b per DRAM transaction
         RLOCK
-//        printf("AR: enqueueing read ID(%04x) ADDR(%16llx) LEN(%04x)\n", tx->id, tx->fpga_addr, tx->len);
+        //        printf("AR: enqueueing read ID(%04x) ADDR(%16llx) LEN(%04x)\n", tx->id, tx->fpga_addr, tx->len);
         axi4_mem.ddr_read_q.push_back(tx);
         RUNLOCK
       }

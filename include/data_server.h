@@ -22,6 +22,11 @@ extern bool dma_write;
 extern bool dma_in_progress;
 #endif
 
+extern int DDR_BUS_WIDTH_BITS;
+extern int DDR_BUS_WIDTH_BYTES;
+extern int axi_ddr_bus_multiplicity;
+extern int DDR_BUS_BURST_LENGTH;
+// = (DATA_BUS_WIDTH / 8) / DDR_BUS_WIDTH_BYTES
 struct memory_transaction {
   char *addr;
   int size;
@@ -34,7 +39,6 @@ struct memory_transaction {
   int dram_tx_axi_enqueue_progress = 0;
   int dram_tx_load_progress = 0;
   bool can_be_last = true;
-  static const int dram_bus_beat_bytes = DDR_BUS_WIDTH_BITS / 8;
 
   std::vector<bool> ddr_bus_beats_retrieved;
 
@@ -51,7 +55,7 @@ struct memory_transaction {
                                            fixed(fixed),
                                            id(id),
                                            fpga_addr(fpga_addr) {
-    dram_tx_len_bus_beats = (len * size) / dram_bus_beat_bytes;
+    dram_tx_len_bus_beats = (len * size) / DDR_BUS_WIDTH_BYTES;
     if (dram_tx_len_bus_beats == 0) dram_tx_len_bus_beats = 1;
     for (int i = 0; i < dram_tx_len_bus_beats; ++i) {
       ddr_bus_beats_retrieved.emplace_back(false);
@@ -60,10 +64,8 @@ struct memory_transaction {
 
   memory_transaction() = delete;
 
-  static const int axi_ddr_bus_multiplicity = (DATA_BUS_WIDTH / 8) / dram_bus_beat_bytes;
-
   int dramsim_hasBeatReady() {
-    assert(dram_bus_beat_bytes <= (DATA_BUS_WIDTH / 8));
+    assert(DDR_BUS_WIDTH_BYTES <= (DATA_BUS_WIDTH / 8));
     if (axi_bus_beats_progress == axi_bus_beats_length()) return false;
     for (int i = 0; i < axi_ddr_bus_multiplicity; ++i) {
       if (!ddr_bus_beats_retrieved[axi_bus_beats_progress * axi_ddr_bus_multiplicity + i]) return false;
@@ -75,11 +77,11 @@ struct memory_transaction {
     return int(fpga_addr >> 12);
   }
 
-  bool dramsim_tx_finished() const {
-    return dram_tx_axi_enqueue_progress * axi_ddr_bus_multiplicity >= dram_tx_len_bus_beats;
+  [[nodiscard]] bool dramsim_tx_finished() const {
+    return dram_tx_axi_enqueue_progress * DDR_BUS_BURST_LENGTH >= dram_tx_len_bus_beats;
   }
 
-  int axi_bus_beats_length() const {
+  [[nodiscard]] int axi_bus_beats_length() const {
     return len * size / (DATA_BUS_WIDTH / 8);
   }
 };
