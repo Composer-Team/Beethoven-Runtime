@@ -641,7 +641,6 @@ void run_verilator() {
     for (int i = 0; i < ddr_clock_inc; ++i) {
       for (auto &axi4_mem: axi4_mems) {
         axi4_mem.mem_sys->ClockTick();
-        if (i == 0) {
           RLOCK
           std::shared_ptr<memory_transaction> to_enqueue_read = nullptr;
           // find next read we should send to DRAM. Prioritize older txs
@@ -708,7 +707,6 @@ void run_verilator() {
           }
           WUNLOCK
         }
-      }
     }
 #endif
     for (auto &axi4_mem: axi4_mems) {
