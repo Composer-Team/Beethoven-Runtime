@@ -29,7 +29,7 @@
 
 #include <semaphore.h>
 
-#ifndef NDEBUG
+#ifdef VERBOSE
 #include <chrono>
 #endif
 
@@ -91,11 +91,9 @@ static void *cmd_server_f(void *) {
   while (true) {
 #ifdef VERBOSE
     std::cerr << "Got Command in Server" << std::endl;
-#endif
-    // allocate space for response
-#ifndef NDEBUG
     auto start= std::chrono::high_resolution_clock::now();
 #endif
+    // allocate space for response
     int id;
     if (addr.cmd.getXd()) {
       pthread_mutex_lock(&addr.free_list_lock);
@@ -161,7 +159,7 @@ static void *cmd_server_f(void *) {
       q->push(id);
     }
 
-#ifndef NDEBUG
+#ifdef VERBOSE
     auto end = std::chrono::high_resolution_clock::now();
     std::cerr << "Command submission took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "µs" << std::endl;
 #endif

@@ -3,7 +3,7 @@ project(ComposerRuntime)
 
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(composer 1.0.6 EXACT REQUIRED)
+find_package(composer REQUIRED)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(SRC src/data_server.cc src/cmd_server.cc src/mmio.cc)
