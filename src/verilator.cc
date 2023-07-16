@@ -171,7 +171,10 @@ void run_verilator() {
 #endif
 
 #ifdef USE_DRAMSIM
-  Config dramsim3config("../DRAMsim3/configs/Kria.ini", "./");
+  // using this to estimate AWS bandwidth
+  Config dramsim3config("../DRAMsim3/configs/DDR4_8Gb_x16_3200.ini", "./");
+  // KRIA has much slower memory!
+  // Config dramsim3config("../DRAMsim3/configs/Kria.ini", "./");
   const float DDR_CLOCK = 1000.0 / dramsim3config.tCK; // NOLINT
   int DDR_BURST_LENGTH = dramsim3config.BL;
   DDR_BUS_WIDTH_BITS = dramsim3config.bus_width;
@@ -269,7 +272,6 @@ void run_verilator() {
             axi4_mem.b->to_enqueue.push(tx->id);
           }
           axi4_mem.in_flight_writes[addr]->pop();
-          //          axi4_mem.bank2tx.erase(tx->bankId());
           WUNLOCK
         });
   }
@@ -342,10 +344,7 @@ void run_verilator() {
       printf("main time: %lld\n", main_time);
 #endif
     }
-
     // ------------ HANDLE COMMAND INTERFACE ----------------
-
-
     // start queueing up a new command if one is available
     top.S00_AXI_awvalid = top.S00_AXI_wvalid = top.S00_AXI_rready = top.S00_AXI_arvalid = top.S00_AXI_bready = 0;
     switch (ongoing_cmd.state) {
@@ -763,6 +762,7 @@ void run_verilator() {
         axi4_mem.r->setId(tx->id);
       } else {
         axi4_mem.r->setValid(0);
+        axi4_mem.r->setLast(false);
       }
       RUNLOCK
 

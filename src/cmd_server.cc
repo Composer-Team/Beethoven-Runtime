@@ -29,6 +29,10 @@
 
 #include <semaphore.h>
 
+#ifndef NDEBUG
+#include <chrono>
+#endif
+
 #endif
 #ifdef SIM
 extern bool kill_sig;
@@ -89,6 +93,9 @@ static void *cmd_server_f(void *) {
     std::cerr << "Got Command in Server" << std::endl;
 #endif
     // allocate space for response
+#ifndef NDEBUG
+    auto start= std::chrono::high_resolution_clock::now();
+#endif
     int id;
     if (addr.cmd.getXd()) {
       pthread_mutex_lock(&addr.free_list_lock);
@@ -153,6 +160,11 @@ static void *cmd_server_f(void *) {
       assert(id != 0xffff);
       q->push(id);
     }
+
+#ifndef NDEBUG
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cerr << "Command submission took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "µs" << std::endl;
+#endif
     pthread_mutex_unlock(&addr.cmd_recieve_server_resp_lock);
     pthread_mutex_unlock(&cmdserverlock);
     // re-lock self to stall
