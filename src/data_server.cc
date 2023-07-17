@@ -153,6 +153,7 @@ address_translator at;
           std::cerr << "Failed to mmap address: " << std::string(strerror(errno)) << std::endl;
           throw std::exception();
         }
+//        printf("Allocated %llu bytes at %p\n", addr.op_argument, naddr);
 
         memset(naddr, 0, addr.op_argument);
         //write response
@@ -176,8 +177,10 @@ address_translator at;
 #ifdef COMPOSER_USE_CUSTOM_ALLOC
         allocator->free(composer::remote_ptr(addr.op_argument, 0));
 #endif
+//        printf("Freeing %llu bytes at %p\n", at.get_mapping(addr.op_argument).second, at.get_mapping(addr.op_argument).first);
+//        fflush(stdout);
+        munmap(at.get_mapping(addr.op_argument).first, at.get_mapping(addr.op_argument).second);
         at.remove_mapping(addr.op_argument);
-        free((void *) addr.op_argument);
         break;
 #if defined(SIM) or defined(Kria)
       case data_server_op::MOVE_TO_FPGA: {
