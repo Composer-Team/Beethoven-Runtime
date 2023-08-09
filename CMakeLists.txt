@@ -23,7 +23,7 @@ include_directories(include)
 # customize make based on simulator (verilator) or fpga (aws) target
 if ("${TARGET}" STREQUAL "sim")
     find_package(verilator REQUIRED)
-    add_executable(ComposerRuntime ${SRC} src/verilator.cc)
+    add_executable(ComposerRuntime ${SRC} src/sim/verilator.cc src/sim/mem_ctrl.cc src/sim/front_bus_ctrl.cc    )
     #
     #    add_executable(ComposerDMASimTest src/dma_sim_test.cc)
     #    target_link_libraries(ComposerDMASimTest PUBLIC APEX::composer)

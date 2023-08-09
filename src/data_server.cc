@@ -29,7 +29,7 @@ bool dma_write;
 #endif
 extern bool kill_sig;
 
-#include "verilator.h"
+#include "sim/verilator.h"
 #include "verilated_fst_c.h"
 
 #endif
