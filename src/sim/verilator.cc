@@ -204,6 +204,7 @@ void run_verilator() {
     for (int i = 0; i < ddr_clock_inc; ++i) {
       for (auto &axi4_mem: axi4_mems) {
         axi4_mem.mem_sys->ClockTick();
+        try_to_enqueue_ddr(axi4_mem);
       }
     }
 #endif
