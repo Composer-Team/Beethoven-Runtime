@@ -12,6 +12,17 @@
 #include <memory>
 #include <queue>
 
+#ifdef USE_VCD
+#include <verilated_vcd_c.h>
+extern VerilatedVcdC *tfp;
+#else
+#include <verilated_fst_c.h>
+extern VerilatedFstC *tfp;
+#endif
+extern uint64_t main_time;
+
+
+
 #ifdef USE_DRAMSIM
 #define RLOCK pthread_mutex_lock(&axi4_mem.read_queue_lock);
 #define WLOCK pthread_mutex_lock(&axi4_mem.write_queue_lock);
@@ -35,7 +46,7 @@ extern dramsim3::Config *dramsim3config;
 namespace mem_ctrl {
   uint64_t get_dimm_address(uint64_t addr);
 
-  void init(std::string &dram_ini_file);
+  void init(const std::string &dram_ini_file);
 
   // = (DATA_BUS_WIDTH / 8) / DDR_BUS_WIDTH_BYTES
   struct memory_transaction {
@@ -309,18 +320,12 @@ namespace mem_ctrl {
     }
   };
 
+  struct with_dramsim3_support {
 
-  template<typename IDType>
-  struct mem_interface {
-    v_address_channel<IDType> *aw = nullptr;
-    v_address_channel<IDType> *ar = nullptr;
-    data_channel<IDType> *w = nullptr;
-    data_channel<IDType> *r = nullptr;
-    response_channel<IDType> *b = nullptr;
-    std::queue<std::shared_ptr<memory_transaction>> write_transactions;
-    std::queue<std::shared_ptr<memory_transaction>> read_transactions;
-    int id;
-#ifdef USE_DRAMSIM
+    virtual void enqueue_read(std::shared_ptr<mem_ctrl::memory_transaction> &tx) = 0;
+
+    virtual void enqueue_response(int id) = 0;
+
     std::map<uint64_t, std::queue<std::shared_ptr<memory_transaction>> *> in_flight_reads;
     std::map<uint64_t, std::queue<std::shared_ptr<memory_transaction>> *> in_flight_writes;
     dramsim3::JedecDRAMSystem *mem_sys;
@@ -346,7 +351,30 @@ namespace mem_ctrl {
     }
 
     void init_dramsim3();
+  };
 
+  template<typename IDType>
+  struct mem_interface
+#ifdef USE_DRAMSIM
+      : with_dramsim3_support
+#endif
+  {
+    v_address_channel<IDType> *aw = nullptr;
+    v_address_channel<IDType> *ar = nullptr;
+    data_channel<IDType> *w = nullptr;
+    data_channel<IDType> *r = nullptr;
+    response_channel<IDType> *b = nullptr;
+    std::queue<std::shared_ptr<memory_transaction>> write_transactions;
+    std::queue<std::shared_ptr<memory_transaction>> read_transactions;
+    int id;
+#ifdef USE_DRAMSIM
+    void enqueue_read(std::shared_ptr<mem_ctrl::memory_transaction> &tx) override {
+      read_transactions.push(tx);
+    }
+
+    void enqueue_response(int id) override {
+      b->to_enqueue.push(static_cast<IDType>(id));
+    }
 #endif
 
     int current_read_channel_contents = -1;

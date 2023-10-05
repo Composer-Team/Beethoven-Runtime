@@ -110,6 +110,6 @@ if (${BUILD_SIM})
             TRACE_FST
             VERILATOR_ARGS --timescale 1ps/1ps --x-assign unique
             -LDFLAGS "${verilator_args}-lpthread" -Wno-context -Wno-lint -Wno-style
-            -Wno-moddup -Wno-unoptflat # --threads 8
+            -Wno-moddup -Wno-unoptflat --threads 8
             )
 endif ()

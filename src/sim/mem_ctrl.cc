@@ -4,14 +4,8 @@
 
 #include "sim/mem_ctrl.h"
 #include "verilated.h"
-#include <verilated_vcd_c.h>
 #include <verilated_fst_c.h>
 
-#ifdef USE_VCD
-extern VerilatedVcdC *tfp;
-#else
-extern VerilatedFstC *tfp;
-#endif
 
 int DDR_BUS_WIDTH_BITS = 64;
 int DDR_BUS_WIDTH_BYTES = 8;
@@ -22,26 +16,7 @@ dramsim3::Config *dramsim3config = nullptr;
 extern uint64_t main_time;
 using namespace mem_ctrl;
 
-void enqueue_transaction(v_address_channel<ComposerMemIDDtype> &chan, std::queue<std::shared_ptr<memory_transaction>> &lst) {
-  if (chan.getValid() && chan.getValid()) {
-    try {
-      char *addr = (char *) at.translate(chan.getAddr());
-      int sz = 1 << chan.getSize();
-      int len = 1 + chan.getLen();// per axi
-      bool is_fixed = chan.getBurst() == 0;
-      int id = chan.getId();
-      uint64_t fpga_addr = chan.getAddr();
-      auto tx = std::make_shared<memory_transaction>(addr, sz, len, 0, is_fixed, id, fpga_addr);
-      lst.push(tx);
-    } catch (std::exception &e) {
-      tfp->dump(main_time);
-      tfp->close();
-      throw e;
-    }
-  }
-}
-
-uint64_t get_dimm_address(uint64_t addr) {
+uint64_t mem_ctrl::get_dimm_address(uint64_t addr) {
   uint64_t acc = 0;
   uint64_t cursor = 1;
   int real = 0;
@@ -58,13 +33,11 @@ uint64_t get_dimm_address(uint64_t addr) {
 }
 
 #ifdef USE_DRAMSIM
-template<typename t>
-void mem_interface<t>::init_dramsim3() {
+void with_dramsim3_support::init_dramsim3() {
   mem_sys = new dramsim3::JedecDRAMSystem(
-      *dramsim3config,
-      "",
+      *dramsim3config, "",
       [this](uint64_t addr) {
-        pthread_mutex_lock(this->read_queue_lock);
+        pthread_mutex_lock(&this->read_queue_lock);
         auto tx = in_flight_reads[addr]->front();
         tx->dram_tx_load_progress++;
         for (int i = 0; i < dramsim3config->BL; ++i) {
@@ -80,17 +53,17 @@ void mem_interface<t>::init_dramsim3() {
           intermediate_tx->fpga_addr = tx->fpga_addr;
           intermediate_tx->can_be_last = done;
           tx->axi_bus_beats_progress++;
-          read_transactions.push(intermediate_tx);
+          enqueue_read(intermediate_tx);
         }
         in_flight_reads[addr]->pop();
-        pthread_mutex_unlock(this->read_queue_lock);
+        pthread_mutex_unlock(&this->read_queue_lock);
       },
       [this](uint64_t addr) {
         pthread_mutex_lock(&write_queue_lock);
         auto tx = in_flight_writes[addr]->front();
         tx->axi_bus_beats_progress--;
         if (tx->axi_bus_beats_progress == 0) {
-          b->to_enqueue.push(tx->id);
+          enqueue_response(tx->id);
         }
         in_flight_writes[addr]->pop();
         pthread_mutex_unlock(&write_queue_lock);
@@ -166,14 +139,32 @@ void try_to_enqueue_ddr(mem_interface<ComposerMemIDDtype> &axi4_mem) {
 
 #endif
 
-void init(std::string &dram_ini_file) {
+void mem_ctrl::init(const std::string &dram_ini_file) {
   dramsim3config = new dramsim3::Config("../DRAMsim3/configs/DDR4_8Gb_x16_3200.ini", "./");
   // KRIA has much slower memory!
   // Config dramsim3config("../DRAMsim3/configs/Kria.ini", "./");
-  int DDR_BURST_LENGTH = dramsim3config->BL;
   DDR_BUS_WIDTH_BITS = dramsim3config->bus_width;
   DDR_BUS_WIDTH_BYTES = DDR_BUS_WIDTH_BITS / 8;
   axi_ddr_bus_multiplicity = (DATA_BUS_WIDTH / 8) / DDR_BUS_WIDTH_BYTES;
   DDR_BUS_BURST_LENGTH = dramsim3config->BL;
+}
+
+void mem_ctrl::enqueue_transaction(v_address_channel<ComposerMemIDDtype> &chan, std::queue<std::shared_ptr<memory_transaction>> &lst) {
+  if (chan.getValid() && chan.getValid()) {
+    try {
+      char *addr = (char *) at.translate(chan.getAddr());
+      int sz = 1 << chan.getSize();
+      int len = 1 + chan.getLen();// per axi
+      bool is_fixed = chan.getBurst() == 0;
+      int id = chan.getId();
+      uint64_t fpga_addr = chan.getAddr();
+      auto tx = std::make_shared<memory_transaction>(addr, sz, len, 0, is_fixed, id, fpga_addr);
+      lst.push(tx);
+    } catch (std::exception &e) {
+      tfp->dump(main_time);
+      tfp->close();
+      throw e;
+    }
+  }
 }
 

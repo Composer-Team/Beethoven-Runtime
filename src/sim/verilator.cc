@@ -66,6 +66,7 @@ void run_verilator() {
 #endif
 
 #ifdef USE_DRAMSIM
+  mem_ctrl::init("../DRAMsim3/configs/DDR4_8Gb_x8_3200.ini");
   // using this to estimate AWS bandwidth
   // KRIA has much slower memory!
   // Config dramsim3config("../DRAMsim3/configs/Kria.ini", "./");
@@ -128,14 +129,14 @@ void run_verilator() {
 
 #if NUM_DDR_CHANNELS >= 1
   init_ddr_interface(0)
-      axi4_mems[0]
-          .w->setData((char *) &top.M00_AXI_wdata.at(0));
   axi4_mems[0].r->setData((char *) &top.M00_AXI_rdata.at(0));
-  axi4_mems[0].w = new mem_ctrl::data_channel<ComposerMemIDDtype>(top.M00_AXI_wready, \
-                                                              top.M00_AXI_wvalid,
-                                                        reinterpret_cast<ComposerStrobeSimDtype *>(&top.M00_AXI_wstrb), \
-                                                              top.M00_AXI_wlast, \
-                                                              nullptr);
+//  axi4_mems[0].w = new mem_ctrl::data_channel<ComposerMemIDDtype>(top.M00_AXI_wready, \
+//                                                              top.M00_AXI_wvalid,
+//                                                        reinterpret_cast<ComposerStrobeSimDtype *>(&top.M00_AXI_wstrb), \
+//                                                              top.M00_AXI_wlast, \
+//                                                              );
+  axi4_mems[0]
+      .w->setData((char *) &top.M00_AXI_wdata.at(0));
 #if NUM_DDR_CHANNELS >= 2
   init_ddr_interface(1)
 #if NUM_DDR_CHANNELS >= 4
