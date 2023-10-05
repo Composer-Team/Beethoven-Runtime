@@ -36,7 +36,13 @@ using namespace std::chrono_literals;
       pthread_mutex_unlock(&bus_lock);
 
     }
+#ifdef VERBOSE
+    std::cerr << "Got response buffer" << std::endl;
+#endif
     register_reponse(buf);
+#ifdef VERBOSE
+    std::cerr << "Successfully enqueued response" << std::endl;
+#endif
   }
 }
 
