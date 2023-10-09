@@ -193,6 +193,13 @@ void run_verilator() {
       fflush(stdout);
       ++ms;
     }
+
+#ifdef KILL_SIM
+    if (ms >= KILL_SIM) {
+      kill_sig = true;
+    }
+#endif
+
     // ------------ HANDLE COMMAND INTERFACE ----------------
     // start queueing up a new command if one is available
     top.S00_AXI_awvalid = top.S00_AXI_wvalid = top.S00_AXI_rready = top.S00_AXI_arvalid = top.S00_AXI_bready = 0;
@@ -233,7 +240,7 @@ void run_verilator() {
                                                        axi4_mem.ar->getId(), addr);
         // 64b per DRAM transaction
         RLOCK
-        //        printf("AR: enqueueing read ID(%04x) ADDR(%16llx) LEN(%04x)\n", tx->id, tx->fpga_addr, tx->len);
+//                printf("AR: enqueueing read ID(%04x) ADDR(%16llx) LEN(%04x)\n", tx->id, tx->fpga_addr, tx->len);
         axi4_mem.ddr_read_q.push_back(tx);
         RUNLOCK
       }

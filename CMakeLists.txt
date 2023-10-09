@@ -28,6 +28,10 @@ if ("${TARGET}" STREQUAL "sim")
     #    add_executable(ComposerDMASimTest src/dma_sim_test.cc)
     #    target_link_libraries(ComposerDMASimTest PUBLIC APEX::composer)
 
+    if (NOT "${KILL_SIM_AFTER}" STREQUAL "")
+        target_compile_definitions(ComposerRuntime PRIVATE KILL_SIM=${KILL_SIM_AFTER})
+    endif ()
+
     if ("${USE_DRAMSIM}" STREQUAL "1")
         add_subdirectory(DRAMsim3)
         target_compile_definitions(ComposerRuntime PRIVATE USE_DRAMSIM=1)
@@ -110,6 +114,6 @@ if (${BUILD_SIM})
             TRACE_FST
             VERILATOR_ARGS --timescale 1ps/1ps --x-assign unique
             -LDFLAGS "${verilator_args}-lpthread" -Wno-context -Wno-lint -Wno-style
-            -Wno-moddup -Wno-unoptflat --threads 8
+            -Wno-moddup -Wno-unoptflat #--threads 8
             )
 endif ()

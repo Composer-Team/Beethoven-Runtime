@@ -40,6 +40,10 @@ extern bool kill_sig;
 
 #endif
 
+#ifdef Kria
+#include <unistd.h>
+#endif
+
 using namespace composer;
 
 address_translator at;
@@ -156,6 +160,14 @@ address_translator at;
 //        printf("Allocated %llu bytes at %p\n", addr.op_argument, naddr);
 
         memset(naddr, 0, addr.op_argument);
+#ifdef Kria
+        unsigned int cacheLineSz = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
+        char *ptr = (char*) naddr;
+        for (uint64_t i = 0; i < addr.op_argument / cacheLineSz; ++i) {
+          asm volatile("DC CIVAC, %0"::"r"(ptr):"memory");
+          ptr += cacheLineSz;
+        }
+#endif
         //write response
         // copy file name to response field
         strcpy(addr.fname, fname.c_str());
