@@ -27,6 +27,7 @@ int main()
   data_server::start();
 #endif
   cmd_server::start();
+  data_server::start();
   pthread_mutex_lock(&main_lock);
   pthread_mutex_lock(&main_lock);
 #ifdef F1

@@ -146,6 +146,12 @@ static std::vector<uint16_t> available_ids;
     // get file name, descriptor, expand the file, and map it to address space
     switch (addr.operation) {
       case data_server_op::ALLOC: {
+#if defined(FPGA) && defined(Kria)
+        fprintf(stderr, "In Embedded FPGA runtime, client is attempting to allocate memory from"
+                        "server. Allocations should only happen locally except for discrete boards.");
+        fflush(stderr);
+        break;
+#endif
         auto fname = "/composer_file_" + std::to_string(rand()); // NOLINT(cert-msc50-cpp)
         int nfd = shm_open(fname.c_str(), O_CREAT | O_RDWR, file_access_flags);
         if (nfd < 0) {
