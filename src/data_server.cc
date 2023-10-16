@@ -322,8 +322,9 @@ static std::vector<uint16_t> available_ids;
         } else {
           id = addr.op_argument;
         }
-        if (id < 0) {
+        if (id < 0 && addr.operation != data_server_op::RELEASE_COHERENCE_MANAGER) {
           addr.resp_id = -1;
+          fprintf(stderr, "Recieved invalid ID on data server during coherence command");
           break;
         }
         pthread_mutex_lock(&bus_lock);
