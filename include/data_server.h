@@ -61,6 +61,7 @@ static constexpr uint8_t log2up(const uint64_t &val) {
 
 const uint32_t superblock_size = 1 << 21;
 const uint32_t min_block_size = 1 << 12;
+#ifdef USE_CUSTOM_ALLOCATOR
 class [[maybe_unused]] device_allocator {
 //  uint64_t _sz = ALLOCATOR_SIZE_BYTES;
 //  uint32_t _sbsz = superblock_size;
@@ -327,7 +328,7 @@ public:
       for (uint32_t i = 1; i < num_superblocks_needed; i++) {
         superblocks[alloc_start + i].flags = 0;// they will not be marked as base allocations
       }
-      return composer::remote_ptr(alloc_start * superblock_size, len);
+      return composer::remote_ptr(alloc_start * superblock_size, len, FPGAONLY);
     }
   }
 
@@ -430,7 +431,7 @@ public:
     for (auto &l: head_locks) l = PTHREAD_MUTEX_INITIALIZER;
   };
 };
-
+#endif
 
 extern address_translator at;
 
