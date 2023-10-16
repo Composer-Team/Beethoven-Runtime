@@ -36,6 +36,7 @@ extern bool kill_sig;
 
 #ifdef FPGA
 
+#include "cmd_server.h"
 #include "fpga_utils.h"
 #include "mmio.h"
 
@@ -311,6 +312,9 @@ static std::vector<uint16_t> available_ids;
       case data_server_op::INVALIDATE_REGION:
       case data_server_op::CLEAN_INVALIDATE_REGION:
       case data_server_op::ADD_TO_COHERENCE_MANAGER: {
+#ifdef VERBOSE
+        std::cerr << "Recieved coherence command" << std::endl;
+#endif
         uint16_t id;
         if (addr.operation == ADD_TO_COHERENCE_MANAGER) {
           id = available_ids.back();
@@ -340,14 +344,26 @@ static std::vector<uint16_t> available_ids;
         switch(addr.operation) {
           case data_server_op::INVALIDATE_REGION:
             command = COHERENCE_OP_INVALIDATE;
+#ifdef VERBOSE
+            std::cerr << "INVALIDATE COMMAND" << std::endl;
+#endif
             break;
           case data_server_op::CLEAN_INVALIDATE_REGION:
             command = COHERENCE_OP_CLEAN_INVALIDATE;
+#ifdef VERBOSE
+            std::cerr << "CLEAN INVALIDATE COMMAND" << std::endl;
+#endif
             break;
           case data_server_op::ADD_TO_COHERENCE_MANAGER:
+#ifdef VERBOSE
+            std::cerr << "REGISTER COHERENT SEGMENT" << std::endl;
+#endif
             command = COHERENCE_OP_ADD;
             break;
           case data_server_op::RELEASE_COHERENCE_BARRIER:
+#ifdef VERBOSE
+            std::cerr << "RELEASE COHERENCE BARRIER" << std::endl;
+#endif
             command = COHERENCE_OP_BARRIER_RELEASE;
             break;
         }
