@@ -37,6 +37,7 @@ extern bool kill_sig;
 #ifdef FPGA
 
 #include "fpga_utils.h"
+#include "mmio.h"
 
 #endif
 
@@ -44,9 +45,15 @@ extern bool kill_sig;
 #include <unistd.h>
 #endif
 
+#include <composer_allocator_declaration.h>
+
 using namespace composer;
 
 address_translator at;
+
+#if defined(Kria)
+static std::vector<uint16_t> available_ids;
+#endif
 
 [[noreturn]] static void *data_server_f(void *) {
   int fd_composer = shm_open(data_server_file_name.c_str(), O_CREAT | O_RDWR, file_access_flags);
@@ -76,7 +83,7 @@ address_translator at;
 #ifdef VERBOSE
   std::cerr << "Constructing allocator" << std::endl;
 #endif
-  auto allocator = new composer_allocator();
+  auto allocator = new device_allocator();
 #ifdef VERBOSE
   std::cerr << "Allocator constructed - data server ready" << std::endl;
 #endif
@@ -121,7 +128,11 @@ address_translator at;
   } else {
     std::cerr << "Success 3/3" << std::endl;
   }
+#endif
 
+#ifdef Kria
+  for (int i = 0; i < HAS_COHERENCE; ++i)
+    available_ids.push_back(i);
 #endif
 
   srand(time(nullptr)); // NOLINT(cert-msc51-cpp)
@@ -129,9 +140,6 @@ address_translator at;
   pthread_mutex_lock(&addr.server_mut);
 #if defined(SIM) && defined(COMPOSER_HAS_DMA)
   pthread_mutex_lock(&dma_wait_lock);
-#endif
-#ifdef VERBOSE
-  std::cerr << "server ready to make allocations" << std::endl;
 #endif
   while (true) {
 //    printf("data server got cmd\n"); fflush(stdout);
@@ -157,7 +165,9 @@ address_translator at;
           std::cerr << "Failed to mmap address: " << std::string(strerror(errno)) << std::endl;
           throw std::exception();
         }
-//        printf("Allocated %llu bytes at %p\n", addr.op_argument, naddr);
+#ifdef VERBOSE
+        printf("Allocated %llu bytes at %p\n", addr.op_argument, naddr);
+#endif
 
         memset(naddr, 0, addr.op_argument);
 #ifdef Kria
@@ -189,12 +199,14 @@ address_translator at;
 #ifdef COMPOSER_USE_CUSTOM_ALLOC
         allocator->free(composer::remote_ptr(addr.op_argument, 0));
 #endif
-//        printf("Freeing %llu bytes at %p\n", at.get_mapping(addr.op_argument).second, at.get_mapping(addr.op_argument).first);
-//        fflush(stdout);
+#ifdef VERBOSE
+        printf("Freeing %llu bytes at %p\n", at.get_mapping(addr.op_argument).second, at.get_mapping(addr.op_argument).first);
+        fflush(stdout);
+#endif
         munmap(at.get_mapping(addr.op_argument).first, at.get_mapping(addr.op_argument).second);
         at.remove_mapping(addr.op_argument);
         break;
-#if defined(SIM) or defined(Kria)
+#if defined(SIM)
       case data_server_op::MOVE_TO_FPGA: {
         std::cerr << at.get_mapping(addr.op_argument).first << std::endl;
 #if defined(COMPOSER_HAS_DMA) and defined(SIM)
@@ -246,7 +258,7 @@ address_translator at;
 #endif
         break;
       }
-#elif defined (FPGA)
+#elif defined (FPGA) && !defined(Kria)
         case data_server_op::MOVE_FROM_FPGA: {
           auto shaddr = at.translate(addr.op2_argument);
     //        std::cout << "from fpga addr: " << addr.op2_argument << std::endl;
@@ -282,6 +294,63 @@ address_translator at;
     //        printf("finished transfering\n"); fflush(stdout);
           break;
         }
+#elif defined(Kria)
+      case data_server_op::MOVE_TO_FPGA:
+      case data_server_op::MOVE_FROM_FPGA:
+        fprintf(stderr, "Kria backend attempting to do unsupported op in data server\n");
+        break;
+      case data_server_op::INVALIDATE_REGION:
+      case data_server_op::CLEAN_INVALIDATE_REGION:
+      case data_server_op::ADD_TO_COHERENCE_MANAGER: {
+        uint16_t id;
+        if (addr.operation == ADD_TO_COHERENCE_MANAGER) {
+          id = available_ids.back();
+          available_ids.pop_back();
+        } else {
+          id = addr.op_argument;
+        }
+        if (id < 0) {
+          addr.resp_id = -1;
+          break;
+        }
+        pthread_mutex_lock(&bus_lock);
+        // this arguments are ignored by `add` operation so doesn't matter
+        uint64_t &a = addr.op_argument;
+        uint64_t &l = addr.op2_argument;
+        for (int i = 0; i < 2; ++i) {// command is 5 32-bit payloads
+          while (!peek_mmio(COHERENCE_READY)) {}
+          poke_mmio(COHERENCE_BITS, ((uint32_t*)(&a))[i]);
+          poke_mmio(COHERENCE_VALID, 1);
+        }
+        for (int i = 0; i < 2; ++i) {// command is 5 32-bit payloads
+          while (!peek_mmio(COHERENCE_READY)) {}
+          poke_mmio(COHERENCE_BITS, ((uint32_t*)(&l))[i]);
+          poke_mmio(COHERENCE_VALID, 1);
+        }
+        uint32_t command;
+        switch(addr.operation) {
+          case data_server_op::INVALIDATE_REGION:
+            command = COHERENCE_OP_INVALIDATE;
+            break;
+          case data_server_op::CLEAN_INVALIDATE_REGION:
+            command = COHERENCE_OP_CLEAN_INVALIDATE;
+            break;
+          case data_server_op::ADD_TO_COHERENCE_MANAGER:
+            command = COHERENCE_OP_ADD;
+            break;
+          case data_server_op::RELEASE_COHERENCE_BARRIER:
+            command = COHERENCE_OP_BARRIER_RELEASE;
+            break;
+        }
+        command |= (id & 0xFFFF) << 2;
+
+        while (!peek_mmio(COHERENCE_READY)) {}
+        poke_mmio(COHERENCE_BITS, command);
+        poke_mmio(COHERENCE_VALID, 1);
+        pthread_mutex_unlock(&bus_lock);
+        addr.resp_id = id;
+        break;
+      }
 #else
 #error("Doesn't appear that we're covering all cases inside data server")
 #endif

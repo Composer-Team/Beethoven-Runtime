@@ -27,7 +27,7 @@ void setup_mmio() {
     std::cerr << "Error opening /dev/mem. Errno: " << strerror(errno) << std::endl;
     exit(errno);
   }
-  void *dvm = mmap(nullptr, 0x1000, PROT_READ | PROT_WRITE, MAP_SYNC | MAP_SHARED, devmem_fd, 0x2000000000L);
+  void *dvm = mmap(nullptr, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED, devmem_fd, 0x2000000000L);
   if (dvm == MAP_FAILED) {
     std::cerr << "Failed to map devmem using mmap. Errno: " << strerror(errno) << std::endl;
     exit(errno);
