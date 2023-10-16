@@ -89,6 +89,9 @@ static std::vector<uint16_t> available_ids;
 #endif
 #endif
   data_server_file::init(addr);
+#ifdef VERBOSE
+  std::cerr << "Data server file constructed" << std::endl;
+#endif
 
 #if defined(FPGA) && defined(F1)
   std::cerr << "Running FPGA MemCpy Sanity Checks..." << std::endl;
