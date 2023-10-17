@@ -311,6 +311,7 @@ static std::vector<uint16_t> available_ids;
         break;
       case data_server_op::INVALIDATE_REGION:
       case data_server_op::CLEAN_INVALIDATE_REGION:
+      case data_server_op::RELEASE_COHERENCE_BARRIER:
       case data_server_op::ADD_TO_COHERENCE_MANAGER: {
 #ifdef VERBOSE
         std::cerr << "Recieved coherence command" << std::endl;
