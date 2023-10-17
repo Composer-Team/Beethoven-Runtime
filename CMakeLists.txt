@@ -54,8 +54,7 @@ elseif ("${TARGET}" STREQUAL "fpga")
     else ()
         add_library(CMSIS INTERFACE)
         target_include_directories(CMSIS INTERFACE
-                CMSIS_5/CMSIS/Core_A/Include
-                CMSIS_5/CMSIS/Core/Include)
+                CMSIS_5/CMSIS/Core_A/Include)
         target_link_libraries(ComposerRuntime PUBLIC pthread CMSIS)
     endif ()
     target_compile_definitions(ComposerRuntime PUBLIC FPGA=1 ${BACKEND})
