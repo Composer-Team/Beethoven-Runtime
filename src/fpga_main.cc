@@ -34,7 +34,7 @@ int main()
   fpga_setup(0);
 #endif
 #ifdef Kria
-
+  kria_setup();
 #endif
   // Kria does local allocations only
   cmd_server::start();
