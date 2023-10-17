@@ -18,16 +18,11 @@ if (NOT EXISTS ${COMPOSER_DIR}/composer_allocator_declaration.h)
 endif ()
 
 set(AWS_SDK "$ENV{COMPOSER_ROOT}/aws-fpga")
-
 include_directories(include)
 # customize make based on simulator (verilator) or fpga (aws) target
 if ("${TARGET}" STREQUAL "sim")
     find_package(verilator REQUIRED)
     add_executable(ComposerRuntime ${SRC} src/sim/verilator.cc src/sim/mem_ctrl.cc src/sim/front_bus_ctrl.cc    )
-    #
-    #    add_executable(ComposerDMASimTest src/dma_sim_test.cc)
-    #    target_link_libraries(ComposerDMASimTest PUBLIC APEX::composer)
-
     if (NOT "${KILL_SIM_AFTER}" STREQUAL "")
         target_compile_definitions(ComposerRuntime PRIVATE KILL_SIM=${KILL_SIM_AFTER})
     endif ()
@@ -55,9 +50,13 @@ elseif ("${TARGET}" STREQUAL "fpga")
     include_directories(${AWS_SDK}/sdk/userspace/include)
     add_executable(ComposerRuntime ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc src/mmio.cc include/mmio.h)
     if ("${BACKEND}" STREQUAL "F1")
-        target_link_libraries(ComposerRuntime PRIVATE pthread fpga_mgmt)
+        target_link_libraries(ComposerRuntime PUBLIC pthread fpga_mgmt)
     else ()
-        target_link_libraries(ComposerRuntime PRIVATE pthread)
+        add_library(CMSIS STATIC CMSIS_5/CMSIS/Core_A/Source/irq_ctrl_gic.c)
+        target_include_directories(CMSIS PUBLIC
+                CMSIS_5/CMSIS/Core_A/Include
+                CMSIS_5/CMSIS/Core/Include)
+        target_link_libraries(ComposerRuntime PUBLIC pthread CMSIS)
     endif ()
     target_compile_definitions(ComposerRuntime PUBLIC FPGA=1 ${BACKEND})
     set(BUILD_FPGA 1)
