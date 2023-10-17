@@ -17,6 +17,7 @@ extern "C" void test_main_hook(uint32_t *exit_code)
 #else
 
 #ifdef Kria
+#include <cmsis_gcc.h>
 #include <cmsis_cp15.h>
 void kria_setup() {
   uint32_t cbar = __get_CBAR();
