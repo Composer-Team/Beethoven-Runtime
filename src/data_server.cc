@@ -357,7 +357,8 @@ static std::vector<uint16_t> available_ids;
             break;
           case data_server_op::ADD_TO_COHERENCE_MANAGER:
 #ifdef VERBOSE
-            std::cerr << "REGISTER COHERENT SEGMENT" << std::endl;
+            fprintf(stderr, "REGISTER COHERENT SEGMENT: %16lx\n", addr.op_argument);
+            fflush(stderr);
 #endif
             command = COHERENCE_OP_ADD;
             break;
