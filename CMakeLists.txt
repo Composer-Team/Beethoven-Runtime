@@ -52,8 +52,8 @@ elseif ("${TARGET}" STREQUAL "fpga")
     if ("${BACKEND}" STREQUAL "F1")
         target_link_libraries(ComposerRuntime PUBLIC pthread fpga_mgmt)
     else ()
-        add_library(CMSIS STATIC CMSIS_5/CMSIS/Core_A/Source/irq_ctrl_gic.c)
-        target_include_directories(CMSIS PUBLIC
+        add_library(CMSIS INTERFACE)
+        target_include_directories(CMSIS INTERFACE
                 CMSIS_5/CMSIS/Core_A/Include
                 CMSIS_5/CMSIS/Core/Include)
         target_link_libraries(ComposerRuntime PUBLIC pthread CMSIS)
