@@ -378,10 +378,10 @@ static std::vector<uint16_t> available_ids;
         poke_mmio(COHERENCE_VALID, 1);
         pthread_mutex_unlock(&bus_lock);
         addr.resp_id = id;
-#endif
 
         break;
       }
+#endif
 #else
 #error("Doesn't appear that we're covering all cases inside data server")
 #endif
