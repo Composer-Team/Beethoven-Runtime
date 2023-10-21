@@ -134,7 +134,7 @@ static std::vector<uint16_t> available_ids;
   }
 #endif
 
-#ifdef Kria
+#ifdef HAS_COHERENCE
   for (int i = 0; i < HAS_COHERENCE; ++i)
     available_ids.push_back(i);
 #endif
@@ -369,7 +369,6 @@ static std::vector<uint16_t> available_ids;
             std::cerr << "RELEASE COHERENCE BARRIER" << std::endl;
 #endif
             command = COHERENCE_OP_BARRIER_RELEASE;
-#endif
             break;
         }
         command |= (id & 0xFFFF) << 2;
@@ -379,6 +378,8 @@ static std::vector<uint16_t> available_ids;
         poke_mmio(COHERENCE_VALID, 1);
         pthread_mutex_unlock(&bus_lock);
         addr.resp_id = id;
+#endif
+
         break;
       }
 #else
