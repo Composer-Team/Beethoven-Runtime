@@ -207,7 +207,7 @@ static std::vector<uint16_t> available_ids;
       }
       case data_server_op::FREE:
 #ifdef COMPOSER_USE_CUSTOM_ALLOC
-        allocator->free(composer::remote_ptr(addr.op_argument, 0));
+        allocator->free(composer::remote_ptr(addr.op_argument, 0, FPGAONLY));
 #endif
 #ifdef VERBOSE
         printf("Freeing %llu bytes at %p\n", at.get_mapping(addr.op_argument).second, at.get_mapping(addr.op_argument).first);
@@ -309,6 +309,7 @@ static std::vector<uint16_t> available_ids;
       case data_server_op::MOVE_FROM_FPGA:
         fprintf(stderr, "Kria backend attempting to do unsupported op in data server\n");
         break;
+#ifdef HAS_COHERENCE
       case data_server_op::INVALIDATE_REGION:
       case data_server_op::CLEAN_INVALIDATE_REGION:
       case data_server_op::RELEASE_COHERENCE_BARRIER:
@@ -368,6 +369,7 @@ static std::vector<uint16_t> available_ids;
             std::cerr << "RELEASE COHERENCE BARRIER" << std::endl;
 #endif
             command = COHERENCE_OP_BARRIER_RELEASE;
+#endif
             break;
         }
         command |= (id & 0xFFFF) << 2;

@@ -61,7 +61,10 @@ static constexpr uint8_t log2up(const uint64_t &val) {
 
 const uint32_t superblock_size = 1 << 21;
 const uint32_t min_block_size = 1 << 12;
-#ifdef USE_CUSTOM_ALLOCATOR
+#ifdef COMPOSER_USE_CUSTOM_ALLOC
+
+#include <composer/alloc.h>
+
 class [[maybe_unused]] device_allocator {
 //  uint64_t _sz = ALLOCATOR_SIZE_BYTES;
 //  uint32_t _sbsz = superblock_size;
@@ -244,7 +247,7 @@ public:
         pthread_mutex_unlock(&my_head_lock);
       }
       //        printf("sbid: %lu, bid: %lu, flags: %d\n", superblock_id, block_id, superblocks[superblock_id].flags); fflush(stdout);
-      return composer::remote_ptr(superblock_id * superblock_size + block_id * block_size, len);
+      return composer::remote_ptr(superblock_id * superblock_size + block_id * block_size, len, composer::FPGAONLY);
     } else {
       // we're just going to use a huge allocation (not within a superblock)
       uint32_t num_superblocks_needed = 1 << (log_block_size - log_superblock_size);
@@ -328,7 +331,7 @@ public:
       for (uint32_t i = 1; i < num_superblocks_needed; i++) {
         superblocks[alloc_start + i].flags = 0;// they will not be marked as base allocations
       }
-      return composer::remote_ptr(alloc_start * superblock_size, len, FPGAONLY);
+      return composer::remote_ptr(alloc_start * superblock_size, len, composer::FPGAONLY);
     }
   }
 
