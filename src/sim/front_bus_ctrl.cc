@@ -36,7 +36,7 @@ static void sig_handle(int sig) {
 void update_command_state(command_transaction &ongoing_cmd,
                           response_transaction &ongoing_rsp,
                           update_state &ongoing_update,
-                          Vcomposer &top){
+                          VComposerTop &top){
   switch (ongoing_cmd.state) {
     // tell the composer that we're going to send 32-bits of a command over the PCIE bus
     case CMD_BITS_WRITE_ADDR:
@@ -57,6 +57,9 @@ void update_command_state(command_transaction &ongoing_cmd,
       top.S00_AXI_wdata = ongoing_cmd.cmdbuf[ongoing_cmd.progress];
 #else
       top.S00_AXI_wdata.at(0) = ongoing_cmd.cmdbuf[ongoing_cmd.progress];
+#endif
+#ifdef VERBOSE
+      printf("Writing %x to %x\n", top.S00_AXI_wdata, CMD_BITS);
 #endif
       if (top.S00_AXI_wready) {
         ongoing_cmd.state = CMD_BITS_WRITE_B;
@@ -177,7 +180,7 @@ void update_command_state(command_transaction &ongoing_cmd,
 void update_resp_state(command_transaction &ongoing_cmd,
                        response_transaction &ongoing_rsp,
                        update_state &ongoing_update,
-                       Vcomposer &top) {
+                       VComposerTop &top) {
   switch (ongoing_rsp.state) {
     case RESPT_INACTIVE:
       break;
@@ -228,7 +231,7 @@ void update_resp_state(command_transaction &ongoing_cmd,
             auto id = std::tuple<int, int>(r.system_id, r.core_id);
             auto start = start_times[id];
 #ifdef VERBOSE
-            printf("Command took %f us\n", float((main_time - start)) / 1000);
+            printf("Command took %f ms\n", float((main_time - start)) / 1000 / 1000 / 1000);
 #endif
             register_reponse(ongoing_rsp.resbuf);
             cmds_inflight--;
@@ -271,7 +274,7 @@ void update_resp_state(command_transaction &ongoing_cmd,
 void update_update_state(command_transaction &ongoing_cmd,
                          response_transaction &ongoing_rsp,
                          update_state &ongoing_update,
-                         Vcomposer &top) {
+                         VComposerTop &top) {
   switch (ongoing_update) {
     case UPDATE_IDLE_RESP:
       if (!bus_occupied && (main_time % check_freq == 0)) {

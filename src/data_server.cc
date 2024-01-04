@@ -175,11 +175,8 @@ static std::vector<uint16_t> available_ids;
           std::cerr << "Failed to mmap address: " << std::string(strerror(errno)) << std::endl;
           throw std::exception();
         }
-#ifdef VERBOSE
-        printf("Allocated %llu bytes at %p\n", addr.op_argument, naddr);
-#endif
-
         memset(naddr, 0, addr.op_argument);
+        auto nBytes = addr.op_argument;
 #ifdef Kria
         unsigned int cacheLineSz = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
         char *ptr = (char*) naddr;
@@ -197,6 +194,9 @@ static std::vector<uint16_t> available_ids;
         at.add_mapping(fpga_addr.getFpgaAddr(), addr.op_argument, naddr);
         // return fpga address
         addr.op_argument = fpga_addr.getFpgaAddr();
+#ifdef VERBOSE
+        printf("Allocated %llu bytes at %p. FPGA addr %llx\n", nBytes, naddr, fpga_addr.getFpgaAddr());
+#endif
 #else
         auto fpga_addr = (uint64_t) naddr;
         at.add_mapping(fpga_addr, addr.op_argument, naddr);

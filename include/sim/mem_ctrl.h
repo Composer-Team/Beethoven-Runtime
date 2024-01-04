@@ -7,8 +7,10 @@
 #include "composer_allocator_declaration.h"
 #include "data_server.h"
 #include "ddr_macros.h"
+#ifdef USE_DRAMSIM
 #include "dram_system.h"
 #include <dramsim3.h>
+#endif
 #include <memory>
 #include <queue>
 
@@ -41,7 +43,9 @@ extern int DDR_BUS_WIDTH_BYTES;
 extern int axi_ddr_bus_multiplicity;
 extern int DDR_BUS_BURST_LENGTH;
 extern address_translator at;
+#ifdef USE_DRAMSIM
 extern dramsim3::Config *dramsim3config;
+#endif
 
 namespace mem_ctrl {
   uint64_t get_dimm_address(uint64_t addr);
@@ -328,7 +332,9 @@ namespace mem_ctrl {
 
     std::map<uint64_t, std::queue<std::shared_ptr<memory_transaction>> *> in_flight_reads;
     std::map<uint64_t, std::queue<std::shared_ptr<memory_transaction>> *> in_flight_writes;
+#ifdef USE_DRAMSIM
     dramsim3::JedecDRAMSystem *mem_sys;
+#endif
     pthread_mutex_t read_queue_lock = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_t write_queue_lock = PTHREAD_MUTEX_INITIALIZER;
 

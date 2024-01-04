@@ -165,7 +165,7 @@ class [[maybe_unused]] device_allocator {
   };
   block_info get_block_info(const composer::remote_ptr &ptr, bool verbose = false) {
     if (verbose) {
-      printf("addr: %16x\n", ptr.getFpgaAddr());
+      printf("addr: %16llx\n", ptr.getFpgaAddr());
     }
     uint32_t superblock_id = (ptr.getFpgaAddr() >> log_superblock_size) & superblock_id_mask();
     auto &sb = superblocks[superblock_id];

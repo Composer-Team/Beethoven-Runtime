@@ -105,13 +105,15 @@ endif ()
 
 if (${BUILD_SIM})
     verilate(ComposerRuntime
-            SOURCES ${COMPOSER_DIR}/composer.v
-            INCLUDE_DIRS ${COMPOSER_DIR} $ENV{COMPOSER_ROOT}/Composer-Runtime/verilog_resources/
+            SOURCES ${COMPOSER_DIR}/composer.build/ComposerTop.v
+            INCLUDE_DIRS ${COMPOSER_DIR} $ENV{COMPOSER_ROOT}/Composer-Runtime/verilog_resources/ ${COMPOSER_DIR}/composer.build/
             TOP_MODULE ComposerTop
             #                        TRACE # VCD
             TRACE_FST
             VERILATOR_ARGS --timescale 1ps/1ps --x-assign unique
-            -LDFLAGS "${verilator_args}-lpthread" -Wno-context -Wno-lint -Wno-style
+            # -O0 --no-decoration
+            # -LDFLAGS "${verilator_args}-lpthread"
+            -Wno-context -Wno-lint -Wno-style
             -Wno-moddup -Wno-unoptflat #--threads 8
             )
 endif ()

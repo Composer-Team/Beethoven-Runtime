@@ -11,7 +11,9 @@ int DDR_BUS_WIDTH_BITS = 64;
 int DDR_BUS_WIDTH_BYTES = 8;
 int axi_ddr_bus_multiplicity;
 int DDR_BUS_BURST_LENGTH;
+#ifdef USE_DRAMSIM
 dramsim3::Config *dramsim3config = nullptr;
+#endif
 
 extern uint64_t main_time;
 using namespace mem_ctrl;
@@ -64,6 +66,9 @@ void with_dramsim3_support::init_dramsim3() {
         tx->axi_bus_beats_progress--;
         if (tx->axi_bus_beats_progress == 0) {
           enqueue_response(tx->id);
+//#ifdef VERBOSE
+//          fprintf(stderr, "Enqueing id %d\n", tx->id); fflush(stderr);
+//#endif
         }
         in_flight_writes[addr]->pop();
         pthread_mutex_unlock(&write_queue_lock);
@@ -133,6 +138,7 @@ void try_to_enqueue_ddr(mem_interface<ComposerMemIDDtype> &axi4_mem) {
     if (to_enqueue_write->dramsim_tx_finished()) {
       axi4_mem.ddr_write_q.erase(std::find(axi4_mem.ddr_write_q.begin(), axi4_mem.ddr_write_q.end(), to_enqueue_write));
     }
+//    fprintf(stderr, "Starting write tx %d\n", to_enqueue_write->id);
   }
   WUNLOCK
 }
@@ -140,6 +146,7 @@ void try_to_enqueue_ddr(mem_interface<ComposerMemIDDtype> &axi4_mem) {
 #endif
 
 void mem_ctrl::init(const std::string &dram_ini_file) {
+#ifdef USE_DRAMSIM
   dramsim3config = new dramsim3::Config("../DRAMsim3/configs/DDR4_8Gb_x16_3200.ini", "./");
   // KRIA has much slower memory!
   // Config dramsim3config("../DRAMsim3/configs/Kria.ini", "./");
@@ -147,16 +154,18 @@ void mem_ctrl::init(const std::string &dram_ini_file) {
   DDR_BUS_WIDTH_BYTES = DDR_BUS_WIDTH_BITS / 8;
   axi_ddr_bus_multiplicity = (DATA_BUS_WIDTH / 8) / DDR_BUS_WIDTH_BYTES;
   DDR_BUS_BURST_LENGTH = dramsim3config->BL;
+#endif
 }
 
 void mem_ctrl::enqueue_transaction(v_address_channel<ComposerMemIDDtype> &chan, std::queue<std::shared_ptr<memory_transaction>> &lst) {
-  if (chan.getValid() && chan.getValid()) {
+  if (chan.getValid() && chan.getReady()) {
     try {
       char *addr = (char *) at.translate(chan.getAddr());
       int sz = 1 << chan.getSize();
       int len = 1 + chan.getLen();// per axi
       bool is_fixed = chan.getBurst() == 0;
       int id = chan.getId();
+//      fprintf(stderr, "Enqueueing on awid channel %d\n", id);
       uint64_t fpga_addr = chan.getAddr();
       auto tx = std::make_shared<memory_transaction>(addr, sz, len, 0, is_fixed, id, fpga_addr);
       lst.push(tx);
