@@ -7,10 +7,8 @@
 #include "composer_allocator_declaration.h"
 #include "data_server.h"
 #include "ddr_macros.h"
-#ifdef USE_DRAMSIM
 #include "dram_system.h"
 #include <dramsim3.h>
-#endif
 #include <memory>
 #include <queue>
 
@@ -25,27 +23,17 @@ extern uint64_t main_time;
 
 
 
-#ifdef USE_DRAMSIM
 #define RLOCK pthread_mutex_lock(&axi4_mem.read_queue_lock);
 #define WLOCK pthread_mutex_lock(&axi4_mem.write_queue_lock);
 #define RUNLOCK pthread_mutex_unlock(&axi4_mem.read_queue_lock);
 #define WUNLOCK pthread_mutex_unlock(&axi4_mem.write_queue_lock);
-#else
-#define RLOCK
-#define WLOCK
-#define RUNLOCK
-#define WUNLOCK
-#endif
-
 
 extern int DDR_BUS_WIDTH_BITS;
 extern int DDR_BUS_WIDTH_BYTES;
 extern int axi_ddr_bus_multiplicity;
 extern int DDR_BUS_BURST_LENGTH;
 extern address_translator at;
-#ifdef USE_DRAMSIM
 extern dramsim3::Config *dramsim3config;
-#endif
 
 namespace mem_ctrl {
   uint64_t get_dimm_address(uint64_t addr);
@@ -332,9 +320,7 @@ namespace mem_ctrl {
 
     std::map<uint64_t, std::queue<std::shared_ptr<memory_transaction>> *> in_flight_reads;
     std::map<uint64_t, std::queue<std::shared_ptr<memory_transaction>> *> in_flight_writes;
-#ifdef USE_DRAMSIM
     dramsim3::JedecDRAMSystem *mem_sys;
-#endif
     pthread_mutex_t read_queue_lock = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_t write_queue_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -360,10 +346,7 @@ namespace mem_ctrl {
   };
 
   template<typename IDType>
-  struct mem_interface
-#ifdef USE_DRAMSIM
-      : with_dramsim3_support
-#endif
+  struct mem_interface: with_dramsim3_support
   {
     v_address_channel<IDType> *aw = nullptr;
     v_address_channel<IDType> *ar = nullptr;
@@ -373,7 +356,6 @@ namespace mem_ctrl {
     std::queue<std::shared_ptr<memory_transaction>> write_transactions;
     std::queue<std::shared_ptr<memory_transaction>> read_transactions;
     int id;
-#ifdef USE_DRAMSIM
     void enqueue_read(std::shared_ptr<mem_ctrl::memory_transaction> &tx) override {
       read_transactions.push(tx);
     }
@@ -381,7 +363,6 @@ namespace mem_ctrl {
     void enqueue_response(int id) override {
       b->to_enqueue.push(static_cast<IDType>(id));
     }
-#endif
 
     int current_read_channel_contents = -1;
   };
@@ -389,8 +370,6 @@ namespace mem_ctrl {
   void enqueue_transaction(v_address_channel<ComposerMemIDDtype> &chan, std::queue<std::shared_ptr<memory_transaction>> &lst);
 }
 
-#ifdef USE_DRAMSIM
 void try_to_enqueue_ddr(mem_ctrl::mem_interface<ComposerMemIDDtype> &axi4_mem);
-#endif
 
 #endif//COMPOSERRUNTIME_MEM_CTRL_H

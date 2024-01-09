@@ -11,9 +11,7 @@ int DDR_BUS_WIDTH_BITS = 64;
 int DDR_BUS_WIDTH_BYTES = 8;
 int axi_ddr_bus_multiplicity;
 int DDR_BUS_BURST_LENGTH;
-#ifdef USE_DRAMSIM
 dramsim3::Config *dramsim3config = nullptr;
-#endif
 
 extern uint64_t main_time;
 using namespace mem_ctrl;
@@ -34,7 +32,6 @@ uint64_t mem_ctrl::get_dimm_address(uint64_t addr) {
   return acc;
 }
 
-#ifdef USE_DRAMSIM
 void with_dramsim3_support::init_dramsim3() {
   mem_sys = new dramsim3::JedecDRAMSystem(
       *dramsim3config, "",
@@ -75,6 +72,7 @@ void with_dramsim3_support::init_dramsim3() {
       });
 
 }
+
 void try_to_enqueue_ddr(mem_interface<ComposerMemIDDtype> &axi4_mem) {
   RLOCK
   std::shared_ptr<mem_ctrl::memory_transaction> to_enqueue_read = nullptr;
@@ -143,10 +141,7 @@ void try_to_enqueue_ddr(mem_interface<ComposerMemIDDtype> &axi4_mem) {
   WUNLOCK
 }
 
-#endif
-
 void mem_ctrl::init(const std::string &dram_ini_file) {
-#ifdef USE_DRAMSIM
   dramsim3config = new dramsim3::Config("../DRAMsim3/configs/DDR4_8Gb_x16_3200.ini", "./");
   // KRIA has much slower memory!
   // Config dramsim3config("../DRAMsim3/configs/Kria.ini", "./");
@@ -154,7 +149,6 @@ void mem_ctrl::init(const std::string &dram_ini_file) {
   DDR_BUS_WIDTH_BYTES = DDR_BUS_WIDTH_BITS / 8;
   axi_ddr_bus_multiplicity = (DATA_BUS_WIDTH / 8) / DDR_BUS_WIDTH_BYTES;
   DDR_BUS_BURST_LENGTH = dramsim3config->BL;
-#endif
 }
 
 void mem_ctrl::enqueue_transaction(v_address_channel<ComposerMemIDDtype> &chan, std::queue<std::shared_ptr<memory_transaction>> &lst) {

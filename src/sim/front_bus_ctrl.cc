@@ -111,11 +111,9 @@ void update_command_state(command_transaction &ongoing_cmd,
           ongoing_cmd.progress++;
           // send last thing, yield bus
           if (ongoing_cmd.progress == command_transaction::payload_length) {
-#ifdef USE_DRAMSIM
             for (auto &axi_mem: axi4_mems) {
               axi_mem.mem_sys->ResetStats();
             }
-#endif
             ongoing_cmd.state = CMD_INACTIVE;
             bus_occupied = false;
           } else {

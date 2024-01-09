@@ -6,11 +6,7 @@
 #define COMPOSER_VERILATOR_VERILATOR_H
 #include <composer_allocator_declaration.h>
 #include <verilated.h>
-#ifdef USE_DRAMSIM
 #include "dram_system.h"
-#endif
-
-//#define USE_VCD
 
 #ifdef USE_VCD
 extern VerilatedVcdC *tfp;
