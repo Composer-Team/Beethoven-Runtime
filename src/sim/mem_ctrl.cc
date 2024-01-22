@@ -142,7 +142,7 @@ void try_to_enqueue_ddr(mem_interface<ComposerMemIDDtype> &axi4_mem) {
 }
 
 void mem_ctrl::init(const std::string &dram_ini_file) {
-  dramsim3config = new dramsim3::Config("../DRAMsim3/configs/DDR4_8Gb_x16_3200.ini", "./");
+  dramsim3config = new dramsim3::Config("../custom_dram_configs/hyperram.ini", "./");
   // KRIA has much slower memory!
   // Config dramsim3config("../DRAMsim3/configs/Kria.ini", "./");
   DDR_BUS_WIDTH_BITS = dramsim3config->bus_width;

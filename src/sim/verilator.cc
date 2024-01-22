@@ -74,7 +74,8 @@ void run_verilator() {
 
   auto fpga_clock_inc = 500000 / FPGA_CLOCK;
   std::cout << "FPGA CLOCK RATE (MHz): " << FPGA_CLOCK << std::endl;
-  int ddr_clock_inc = DDR_CLOCK / FPGA_CLOCK;// NOLINT
+  float ddr_clock_inc = DDR_CLOCK / FPGA_CLOCK;// NOLINT
+  float ddr_acc = 0;
 
   // start servers to communicate with user programs
   const char *v[3] = {"", "+verilator+seed+14934534", "+verilator+rand+reset+2"};
@@ -195,12 +196,15 @@ void run_verilator() {
       update_update_state(ongoing_cmd, ongoing_rsp, ongoing_update, top);
 
       // approx clock diff
-      for (int i = 0; i < ddr_clock_inc; ++i) {
+      ddr_acc += ddr_clock_inc;
+      while (ddr_acc >= 1) {
         for (auto &axi4_mem: axi4_mems) {
           axi4_mem.mem_sys->ClockTick();
           try_to_enqueue_ddr(axi4_mem);
         }
+        ddr_acc -= 1;
       }
+
       for (auto &axi4_mem: axi4_mems) {
         if (axi4_mem.r->getValid() && axi4_mem.r->getReady()) {
           RLOCK
