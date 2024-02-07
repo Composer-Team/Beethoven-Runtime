@@ -9,6 +9,7 @@
 #include <composer_allocator_declaration.h>
 #include <queue>
 #include <set>
+#include "util.h"
 
 #if defined(SIM)
 #if defined(COMPOSER_HAS_DMA)
@@ -344,9 +345,7 @@ public:
     if ((flags & BLOCK_ALLOC) && (flags & BASE_ALLOCATION)) {
       fprintf(stderr, "WARNING - incoherent flags in superblocks in composer allocator\n");
     }
-#ifdef VERBOSE
-    printf("free info: %d %d %d\n", bi.superblock_id, bi.block_id, flags);
-#endif
+    LOG(printf("free info: %d %d %d\n", bi.superblock_id, bi.block_id, flags));
     if (flags & BLOCK_ALLOC) {
       // small allocation
       pthread_mutex_lock(&sb.lock);

@@ -63,9 +63,6 @@ void with_dramsim3_support::init_dramsim3() {
         tx->axi_bus_beats_progress--;
         if (tx->axi_bus_beats_progress == 0) {
           enqueue_response(tx->id);
-//#ifdef VERBOSE
-//          fprintf(stderr, "Enqueing id %d\n", tx->id); fflush(stderr);
-//#endif
         }
         in_flight_writes[addr]->pop();
         pthread_mutex_unlock(&write_queue_lock);
@@ -75,7 +72,7 @@ void with_dramsim3_support::init_dramsim3() {
 
 void try_to_enqueue_ddr(mem_interface<ComposerMemIDDtype> &axi4_mem) {
   RLOCK
-  std::shared_ptr<mem_ctrl::memory_transaction> to_enqueue_read = nullptr;
+  std::shared_ptr<mem_ctrl::memory_transaction> to_enqueue_read = {};
   // find next read we should send to DRAM. Prioritize older txs
   for (auto it = axi4_mem.ddr_read_q.begin(); it != axi4_mem.ddr_read_q.end(); ++it) {
     auto &mt = *it;
@@ -142,7 +139,7 @@ void try_to_enqueue_ddr(mem_interface<ComposerMemIDDtype> &axi4_mem) {
 }
 
 void mem_ctrl::init(const std::string &dram_ini_file) {
-  dramsim3config = new dramsim3::Config("../custom_dram_configs/hyperram.ini", "./");
+  dramsim3config = new dramsim3::Config(dram_ini_file, "./");
   // KRIA has much slower memory!
   // Config dramsim3config("../DRAMsim3/configs/Kria.ini", "./");
   DDR_BUS_WIDTH_BITS = dramsim3config->bus_width;

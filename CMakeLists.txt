@@ -22,7 +22,8 @@ include_directories(include)
 # customize make based on simulator (verilator) or fpga (aws) target
 if ("${TARGET}" STREQUAL "sim")
     find_package(verilator REQUIRED)
-    add_executable(ComposerRuntime ${SRC} src/sim/verilator.cc src/sim/mem_ctrl.cc src/sim/front_bus_ctrl.cc    )
+    add_executable(ComposerRuntime
+            ${SRC} src/sim/verilator.cc src/sim/mem_ctrl.cc src/sim/front_bus_ctrl.cc src/trace/trace_read.cc)
     if (NOT "${KILL_SIM_AFTER}" STREQUAL "")
         target_compile_definitions(ComposerRuntime PRIVATE KILL_SIM=${KILL_SIM_AFTER})
     endif ()
@@ -34,8 +35,19 @@ if ("${TARGET}" STREQUAL "sim")
     endif ()
     target_compile_definitions(ComposerRuntime PUBLIC SIM)
     set(BUILD_SIM 1)
+elseif ("${TARGET}" STREQUAL "trace_sim")
+    find_package(verilator REQUIRED)
+    add_executable(ComposerRuntime ${SRC} src/sim/verilator.cc src/sim/mem_ctrl.cc src/sim/front_bus_ctrl.cc)
+    add_subdirectory(DRAMsim3)
+    target_link_libraries(ComposerRuntime PRIVATE dramsim3 args)
+    if ("${USE_WAVES}" STREQUAL "")
+        set(vargs "${vargs} --trace")
+    endif ()
+    target_compile_definitions(ComposerRuntime PUBLIC SIM)
+    set(BUILD_SIM 1)
 elseif ("${TARGET}" STREQUAL "vsim")
-    add_library(ComposerRuntime STATIC ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc ${AWS_SDK}/sdk/userspace/utils/sh_dpi_tasks.c)
+    add_library(ComposerRuntime STATIC
+            ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc ${AWS_SDK}/sdk/userspace/utils/sh_dpi_tasks.c)
     include_directories(${AWS_SDK}/hdk/common/software/include ${AWS_SDK}/sdk/userspace/include ${AWS_SDK}/sdk/userspace/include/utils/)
     target_compile_definitions(ComposerRuntime PUBLIC VSIM FPGA)
     target_link_libraries(ComposerRuntime PRIVATE rt pthread fpga_mgmt)
@@ -48,11 +60,6 @@ elseif ("${TARGET}" STREQUAL "fpga")
     add_executable(ComposerRuntime ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc src/mmio.cc include/mmio.h)
     if ("${BACKEND}" STREQUAL "F1")
         target_link_libraries(ComposerRuntime PUBLIC pthread fpga_mgmt)
-    else ()
-        add_library(CMSIS INTERFACE)
-        target_include_directories(CMSIS INTERFACE
-                CMSIS_5/CMSIS/Core_A/Include)
-        target_link_libraries(ComposerRuntime PUBLIC pthread CMSIS)
     endif ()
     target_compile_definitions(ComposerRuntime PUBLIC FPGA=1 ${BACKEND})
     set(BUILD_FPGA 1)
@@ -77,7 +84,7 @@ set_target_properties(ComposerRuntime PROPERTIES
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED YES
         CXX_EXTENSIONS NO
-        )
+)
 target_link_libraries(ComposerRuntime PUBLIC APEX::composer)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 
@@ -100,17 +107,32 @@ if ("${VERBOSE}" STREQUAL "1")
     target_compile_definitions(ComposerRuntime PUBLIC VERBOSE)
 endif ()
 
+if ("${VTOP}" STREQUAL "")
+    set(VTOP ${COMPOSER_DIR}/composer.build/ComposerTop.v)
+endif ()
+
+if ("${TOP}" STREQUAL "")
+    set(TOP ComposerTop)
+endif ()
+
+if ("${CONTROL_LITE}" STREQUAL "1")
+    target_compile_definitions(ComposerRuntime PUBLIC CONTROL_LITE)
+endif ()
+
+if ("${NO_SANITY}" STREQUAL "1")
+    target_compile_definitions(ComposerRuntime PUBLIC SANITY=0)
+else ()
+    target_compile_definitions(ComposerRuntime PUBLIC SANITY=1)
+endif ()
+
 if (${BUILD_SIM})
     verilate(ComposerRuntime
-            SOURCES ${COMPOSER_DIR}/composer.build/ComposerTop.v
-            INCLUDE_DIRS ${COMPOSER_DIR} $ENV{COMPOSER_ROOT}/Composer-Runtime/verilog_resources/ ${COMPOSER_DIR}/composer.build/
-            TOP_MODULE ComposerTop
-            #                        TRACE # VCD
+            SOURCES ${VTOP}
+            INCLUDE_DIRS ${COMPOSER_DIR} $ENV{COMPOSER_ROOT}/Composer-Runtime/verilog_resources/ ${COMPOSER_DIR}/composer.build/ ${ADDITIONAL_SEARCH}
+            TOP_MODULE ${TOP}
             TRACE_FST
-            VERILATOR_ARGS --timescale 1ps/1ps --x-assign unique
-            # -O0 --no-decoration
-            # -LDFLAGS "${verilator_args}-lpthread"
-            -Wno-context -Wno-lint -Wno-style
+            VERILATOR_ARGS --timescale 1ps/1ps --x-assign fast
+            --timing -Wno-context -Wno-lint -Wno-style -Wno-symrsvdword -Wno-multidriven -Wno-combdly -Wno-zerodly
             -Wno-moddup -Wno-unoptflat #--threads 8
-            )
+    )
 endif ()

@@ -9,6 +9,7 @@
 #include <cmd_server.h>
 #include <verilated_vcd_c.h>
 #include <verilated_fst_c.h>
+#include "util.h"
 
 static bool bus_occupied = false;
 extern pthread_mutex_t cmdserverlock;
@@ -27,23 +28,30 @@ extern VerilatedFstC *tfp;
 #endif
 
 static void sig_handle(int sig) {
+  for (auto q: axi4_mems) {
+    q.mem_sys->PrintEpochStats();
+  }
   tfp->close();
   fprintf(stderr, "FST written!\n");
   fflush(stderr);
   exit(sig);
 }
 
-void update_command_state(command_transaction &ongoing_cmd,
-                          response_transaction &ongoing_rsp,
-                          update_state &ongoing_update,
-                          VComposerTop &top){
+command_transaction ongoing_cmd;
+response_transaction ongoing_rsp;
+update_state ongoing_update = UPDATE_IDLE_CMD;
+
+
+void update_command_state(VComposerTop &top){
   switch (ongoing_cmd.state) {
     // tell the composer that we're going to send 32-bits of a command over the PCIE bus
     case CMD_BITS_WRITE_ADDR:
       ongoing_cmd.ready_for_command = false;
       top.S00_AXI_awvalid = 1;
+#ifndef CONTROL_LITE
       top.S00_AXI_awlen = 0;
       top.S00_AXI_awid = 0;
+#endif
       top.S00_AXI_awaddr = CMD_BITS;
       if (top.S00_AXI_awready) {
         ongoing_cmd.state = CMD_BITS_WRITE_DAT;
@@ -58,13 +66,9 @@ void update_command_state(command_transaction &ongoing_cmd,
 #else
       top.S00_AXI_wdata.at(0) = ongoing_cmd.cmdbuf[ongoing_cmd.progress];
 #endif
-#ifdef VERBOSE
-      printf("Writing %x to %x\n", top.S00_AXI_wdata, CMD_BITS);
-#endif
+      LOG(printf("Writing %x to %x\n", top.S00_AXI_wdata, CMD_BITS));
       if (top.S00_AXI_wready) {
         ongoing_cmd.state = CMD_BITS_WRITE_B;
-        //          printf("wrote %d, going to bits write response. BITS: %08x\n", ongoing_cmd.progress,
-        //                 ongoing_cmd.cmdbuf[ongoing_cmd.progress]);
       }
       break;
     case CMD_BITS_WRITE_B:
@@ -72,7 +76,6 @@ void update_command_state(command_transaction &ongoing_cmd,
       if (top.S00_AXI_bvalid) {
         if (top.S00_AXI_bresp == 0) {
           ongoing_cmd.state = CMD_VALID_ADDR;
-          //            printf("to valid addr\n");
         } else {
           fprintf(stderr, "Recieved error from write response!");
           sig_handle(1);
@@ -84,8 +87,10 @@ void update_command_state(command_transaction &ongoing_cmd,
     case CMD_VALID_ADDR:
       top.S00_AXI_awvalid = 1;
       top.S00_AXI_awaddr = CMD_VALID;
+#ifndef CONTROL_LITE
       top.S00_AXI_awlen = 0;// length is actually one - see AXI spec
       top.S00_AXI_awid = 0;
+#endif
       if (top.S00_AXI_awready) {
         //          printf("to valid dat\n");
         ongoing_cmd.state = CMD_VALID_DAT;
@@ -100,7 +105,6 @@ void update_command_state(command_transaction &ongoing_cmd,
       top.S00_AXI_wdata.at(0) = 1;
 #endif
       if (top.S00_AXI_wready) {
-        //          printf("to valid b\n");
         ongoing_cmd.state = CMD_VALID_WRITE_B;
       }
       break;
@@ -131,8 +135,10 @@ void update_command_state(command_transaction &ongoing_cmd,
     case CMD_RECHECK_READY_ADDR:
       top.S00_AXI_arvalid = 1;
       top.S00_AXI_araddr = CMD_READY;
+#ifndef CONTROL_LITE
       top.S00_AXI_arlen = 0;
       top.S00_AXI_arid = 0;
+#endif
       if (top.S00_AXI_arready) {
         ongoing_cmd.state = CMD_RECHECK_READY_DAT;
       }
@@ -175,18 +181,17 @@ void update_command_state(command_transaction &ongoing_cmd,
 
 }
 
-void update_resp_state(command_transaction &ongoing_cmd,
-                       response_transaction &ongoing_rsp,
-                       update_state &ongoing_update,
-                       VComposerTop &top) {
+void update_resp_state(VComposerTop &top) {
   switch (ongoing_rsp.state) {
     case RESPT_INACTIVE:
       break;
     case RESPT_BITS_ADDR:
       top.S00_AXI_araddr = RESP_BITS;
-      top.S00_AXI_arlen = 0;
       top.S00_AXI_arvalid = 1;
+#ifndef CONTROL_LITE
+      top.S00_AXI_arlen = 0;
       top.S00_AXI_arid = 0;
+#endif
       if (top.S00_AXI_arready) {
         ongoing_rsp.state = RESPT_BITS_READ;
       }
@@ -203,9 +208,11 @@ void update_resp_state(command_transaction &ongoing_cmd,
       break;
     case RESPT_READY_ADDR:
       top.S00_AXI_awvalid = 1;
-      top.S00_AXI_awlen = 0;
       top.S00_AXI_awaddr = RESP_READY;
+#ifndef CONTROL_LITE
+      top.S00_AXI_awlen = 0;
       top.S00_AXI_awid = 0;
+#endif
       if (top.S00_AXI_awready) {
         ongoing_rsp.state = RESPT_READY_WRITE;
       }
@@ -228,9 +235,7 @@ void update_resp_state(command_transaction &ongoing_cmd,
             composer::rocc_response r(ongoing_rsp.resbuf, pack_cfg);
             auto id = std::tuple<int, int>(r.system_id, r.core_id);
             auto start = start_times[id];
-#ifdef VERBOSE
-            printf("Command took %f ms\n", float((main_time - start)) / 1000 / 1000 / 1000);
-#endif
+            LOG(printf("Command took %f ms\n", float((main_time - start)) / 1000 / 1000 / 1000));
             register_reponse(ongoing_rsp.resbuf);
             cmds_inflight--;
             bus_occupied = false;
@@ -250,8 +255,10 @@ void update_resp_state(command_transaction &ongoing_cmd,
     case RESPT_RECHECK_VALID_ADDR:
       top.S00_AXI_arvalid = 1;
       top.S00_AXI_araddr = RESP_VALID;
+#ifndef CONTROL_LITE
       top.S00_AXI_arlen = 0;
       top.S00_AXI_arid = 0;
+#endif
       if (top.S00_AXI_arready) {
         ongoing_rsp.state = RESPT_RECHECK_VALID_READ;
       }
@@ -269,10 +276,7 @@ void update_resp_state(command_transaction &ongoing_cmd,
   }
 }
 
-void update_update_state(command_transaction &ongoing_cmd,
-                         response_transaction &ongoing_rsp,
-                         update_state &ongoing_update,
-                         VComposerTop &top) {
+void update_update_state(VComposerTop &top) {
   switch (ongoing_update) {
     case UPDATE_IDLE_RESP:
       if (!bus_occupied && (main_time % check_freq == 0)) {
@@ -282,8 +286,10 @@ void update_update_state(command_transaction &ongoing_cmd,
       break;
     case UPDATE_RESP_ADDR:
       top.S00_AXI_arvalid = 1;
+#ifndef CONTROL_LITE
       top.S00_AXI_arlen = 0;
       top.S00_AXI_arid = 0;
+#endif
       top.S00_AXI_araddr = RESP_VALID;
       if (top.S00_AXI_arready) {
         ongoing_update = UPDATE_RESP_WAIT;
@@ -300,9 +306,7 @@ void update_update_state(command_transaction &ongoing_cmd,
             top.S00_AXI_rdata.at(0) == 1
 #endif
         ) {
-#ifdef VERBOSE
-          printf("Found valid response on cycle %lu!!! %d %d\n", main_time, top.S00_AXI_rvalid, top.S00_AXI_rdata);
-#endif
+          LOG(printf("Found valid response on cycle %lu!!! %d %d\n", main_time, top.S00_AXI_rvalid, top.S00_AXI_rdata));
           ongoing_rsp.state = RESPT_BITS_ADDR;
         } else {
           bus_occupied = false;
@@ -318,9 +322,11 @@ void update_update_state(command_transaction &ongoing_cmd,
       break;
     case UPDATE_CMD_ADDR:
       top.S00_AXI_arvalid = 1;
-      top.S00_AXI_arid = 0;
       top.S00_AXI_araddr = CMD_READY;
+#ifndef CONTROL_LITE
+      top.S00_AXI_arid = 0;
       top.S00_AXI_arlen = 0;
+#endif
       if (top.S00_AXI_arready) {
         ongoing_update = UPDATE_CMD_WAIT;
       }

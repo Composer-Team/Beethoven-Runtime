@@ -14,4 +14,12 @@ constexpr int roundUp(float q) {
   }
 }
 
+
+// if we're not running in verbose mode, just turn the print into a string and forget about it...
+#ifndef VERBOSE
+#define LOG(x) (#x)
+#else
+#define LOG(x) x
+#endif
+
 #endif //COMPOSERRUNTIME_UTIL_H

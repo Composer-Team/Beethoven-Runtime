@@ -12,6 +12,7 @@
 #include "cmd_server.h"
 #include <composer_allocator_declaration.h>
 #include <thread>
+#include "util.h"
 
 using namespace std::chrono_literals;
 
@@ -36,13 +37,9 @@ using namespace std::chrono_literals;
       pthread_mutex_unlock(&bus_lock);
 
     }
-#ifdef VERBOSE
-    std::cerr << "Got response buffer" << std::endl;
-#endif
+    LOG(std::cerr << "Got response buffer" << std::endl);
     register_reponse(buf);
-#ifdef VERBOSE
-    std::cerr << "Successfully enqueued response" << std::endl;
-#endif
+    LOG(std::cerr << "Successfully enqueued response" << std::endl);
   }
 }
 

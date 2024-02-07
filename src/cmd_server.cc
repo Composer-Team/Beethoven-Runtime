@@ -29,9 +29,7 @@
 
 #include <semaphore.h>
 
-#ifdef VERBOSE
 #include <chrono>
-#endif
 
 #endif
 #ifdef SIM
@@ -61,9 +59,7 @@ static void *cmd_server_f(void *) {
     printf("Failed to initialize cmd_file\n%s\n", strerror(errno));
     exit(errno);
   } else {
-#ifdef VERBOSE
-    printf("Successfully intialized cmd_file at %s\n", cmd_server_file_name.c_str());
-#endif
+    LOG(printf("Successfully intialized cmd_file at %s\n", cmd_server_file_name.c_str()));
   }
   // check the file size. It might already exist in which case we don't need to truncate it again
   struct stat shm_stats {};
@@ -89,89 +85,77 @@ static void *cmd_server_f(void *) {
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
   while (true) {
-#ifdef VERBOSE
-    std::cerr << "Got Command in Server" << std::endl;
-    auto start= std::chrono::high_resolution_clock::now();
-#endif
+    LOG(std::cerr << "Got Command in Server" << std::endl;
+        auto start = std::chrono::high_resolution_clock::now());
     // allocate space for response
     int id;
     // dont' process FLUSH commands on FPGA, they're only used
     // for simulation right now. Use in future maybe. But they
     // may be illegal if we consider the process isolation
-    if (true
-#ifdef FPGA
-        && addr.cmd.getOpcode() != ROCC_OP_FLUSH
-#endif
-        ) {
-      if (addr.cmd.getXd()) {
-        pthread_mutex_lock(&addr.free_list_lock);
-        id = addr.free_list[addr.free_list_idx];
-        addr.free_list_idx--;
-        pthread_mutex_unlock(&addr.free_list_lock);
+    if (addr.cmd.getXd()) {
+      pthread_mutex_lock(&addr.free_list_lock);
+      id = addr.free_list[addr.free_list_idx];
+      addr.free_list_idx--;
+      pthread_mutex_unlock(&addr.free_list_lock);
 
-        // return response handle to client
-        addr.pthread_wait_id = id;
-        // end return response handle to client
-      } else {
-        addr.pthread_wait_id = id = 0xffff;
-      }
-      pthread_mutex_lock(&cmdserverlock);
-      if (addr.quit) {
-        pthread_mutex_unlock(&main_lock);
+      // return response handle to client
+      addr.pthread_wait_id = id;
+      // end return response handle to client
+    } else {
+      addr.pthread_wait_id = id = 0xffff;
+    }
+    pthread_mutex_lock(&cmdserverlock);
+    if (addr.quit) {
+      pthread_mutex_unlock(&main_lock);
 #ifdef SIM
-        kill_sig = true;
+      kill_sig = true;
 #endif
-        return nullptr;
-      }
+      return nullptr;
+    }
 #if defined(FPGA) || defined(VSIM)
 #if defined(F1) or defined(Kria)
-      // wake up response poller if this command expects a response
-      if (addr.cmd.getXd()) sem_post(&addr.processes_waiting);
-      pthread_mutex_lock(&bus_lock);
+    // wake up response poller if this command expects a response
+    if (addr.cmd.getXd()) sem_post(&addr.processes_waiting);
+    pthread_mutex_lock(&bus_lock);
 #endif
-      auto *pack = addr.cmd.pack(pack_cfg);
-      //    if (sizeof(pack[0]) > 64) {
-      //      printf("FAILURE - cannot use peek-poke give the current ");
-      //      exit(1);
-      //    }
-      for (int i = 0; i < num_cmd_beats; ++i) {// command is 5 32-bit payloads
-        while (!peek_mmio(CMD_READY)) {}
-        poke_mmio(CMD_BITS, pack[i]);
-        poke_mmio(CMD_VALID, 1);
-      }
-      free(pack);
-
-#endif
-#ifdef VERBOSE
-      std::cerr << "Successfully delivered command\n"
-                << std::endl;
-#endif
-#if defined(F1) or defined(Kria)
-      pthread_mutex_unlock(&bus_lock);
-#else
-      // sim only
-      cmds.push(addr.cmd);
-#endif
-      // let main thread know how to return result
-      if (addr.cmd.getXd()) {
-        const auto key = system_core_pair(addr.cmd.getSystemId(), addr.cmd.getCoreId());
-        auto &m = in_flight;
-        std::queue<int> *q;
-        auto iterator = m.find(key);
-        if (iterator == m.end()) {
-          q = new std::queue<int>;
-          m[key] = q;
-        } else
-          q = iterator->second;
-        assert(id != 0xffff);
-        q->push(id);
-      }
-
-#ifdef VERBOSE
-      auto end = std::chrono::high_resolution_clock::now();
-      std::cerr << "Command submission took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "µs" << std::endl;
-#endif
+    auto *pack = addr.cmd.pack(pack_cfg);
+    //    if (sizeof(pack[0]) > 64) {
+    //      printf("FAILURE - cannot use peek-poke give the current ");
+    //      exit(1);
+    //    }
+    for (int i = 0; i < num_cmd_beats; ++i) {// command is 5 32-bit payloads
+      while (!peek_mmio(CMD_READY)) {}
+      poke_mmio(CMD_BITS, pack[i]);
+      poke_mmio(CMD_VALID, 1);
     }
+    free(pack);
+
+#endif
+    LOG(std::cerr << "Successfully delivered command\n"
+                  << std::endl);
+#if defined(F1) or defined(Kria)
+    pthread_mutex_unlock(&bus_lock);
+#else
+    // sim only
+    cmds.push(addr.cmd);
+#endif
+    // let main thread know how to return result
+    if (addr.cmd.getXd()) {
+      const auto key = system_core_pair(addr.cmd.getSystemId(), addr.cmd.getCoreId());
+      auto &m = in_flight;
+      std::queue<int> *q;
+      auto iterator = m.find(key);
+      if (iterator == m.end()) {
+        q = new std::queue<int>;
+        m[key] = q;
+      } else
+        q = iterator->second;
+      assert(id != 0xffff);
+      q->push(id);
+    }
+
+    LOG(auto end = std::chrono::high_resolution_clock::now();
+        std::cerr << "Command submission took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "µs" << std::endl);
     pthread_mutex_unlock(&addr.cmd_recieve_server_resp_lock);
     pthread_mutex_unlock(&cmdserverlock);
     // re-lock self to stall

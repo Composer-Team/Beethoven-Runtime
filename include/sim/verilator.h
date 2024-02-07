@@ -4,17 +4,27 @@
 
 #ifndef COMPOSER_VERILATOR_VERILATOR_H
 #define COMPOSER_VERILATOR_VERILATOR_H
+#include "dram_system.h"
 #include <composer_allocator_declaration.h>
 #include <verilated.h>
-#include "dram_system.h"
+#include <optional>
 
 #ifdef USE_VCD
-extern VerilatedVcdC *tfp;
+#include "verilated_vcd_c.h"
+using waveTrace = VerilatedVcdC;
+#define TRACE_FILE_ENDING ".vcd"
 #else
-extern VerilatedFstC *tfp;
+#include "verilated_fst_c.h"
+using waveTrace = VerilatedFstC;
+#define TRACE_FILE_ENDING ".fst"
 #endif
 
-void run_verilator();
+extern waveTrace *tfp;
 
+void run_verilator(std::optional<std::string> trace_file, const std::string &dram_config_file);
+
+void sig_handle(int sig);
+
+extern bool active_reset;
 
 #endif//COMPOSER_VERILATOR_VERILATOR_H

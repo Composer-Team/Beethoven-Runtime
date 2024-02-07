@@ -12,15 +12,22 @@
 #include "sim/front_bus_ctrl.h"
 #include "sim/mem_ctrl.h"
 #include "sim/verilator.h"
+#include "trace/trace_read.h"
 
-#ifdef USE_VCD
-#include "verilated_vcd_c.h"
-#else
-#include "verilated_fst_c.h"
-#endif
 #include <composer_allocator_declaration.h>
+#include "util.h"
+
+
+
+#ifndef DEFAULT_PL_CLOCK
+#define FPGA_CLOCK 100
+#else
+#define FPGA_CLOCK DEFAULT_PL_CLOCK
+#endif
 
 uint64_t main_time = 0;
+
+bool active_reset = true;
 
 extern std::queue<composer::rocc_cmd> cmds;
 extern std::unordered_map<system_core_pair, std::queue<int> *> in_flight;
@@ -29,19 +36,9 @@ mem_ctrl::mem_interface<ComposerMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 bool kill_sig = false;
 
-#ifndef DEFAULT_PL_CLOCK
-#define FPGA_CLOCK 100
-#else
-#define FPGA_CLOCK DEFAULT_PL_CLOCK
-#endif
+waveTrace *tfp;
 
-#ifdef USE_VCD
-VerilatedVcdC *tfp;
-#else
-VerilatedFstC *tfp;
-#endif
-
-static void sig_handle(int sig) {
+void sig_handle(int sig) {
   tfp->close();
   fprintf(stderr, "FST written!\n");
   fflush(stderr);
@@ -60,12 +57,17 @@ void tick(VComposerTop *top) {
 }
 
 
-void run_verilator() {
+void run_verilator(std::optional<std::string> trace_file, const std::string &dram_config_file) {
 #if 500000 % FPGA_CLOCK != 0
   fprintf(stderr, "Provided FPGA clock rate (%d MHz) does not evenly divide 500. This may result in some inaccuracies in precise simulation measurements.", FPGA_CLOCK);
 #endif
 
-  mem_ctrl::init("../DRAMsim3/configs/DDR4_8Gb_x8_3200.ini");
+  mem_ctrl::init(dram_config_file);
+  bool use_trace = false;
+  if (trace_file.has_value()) {
+    init_trace(*trace_file);
+    use_trace = true;
+  }
   // using this to estimate AWS bandwidth
   // KRIA has much slower memory!
   // Config dramsim3config("../DRAMsim3/configs/Kria.ini", "./");
@@ -75,6 +77,7 @@ void run_verilator() {
   auto fpga_clock_inc = 500000 / FPGA_CLOCK;
   std::cout << "FPGA CLOCK RATE (MHz): " << FPGA_CLOCK << std::endl;
   float ddr_clock_inc = DDR_CLOCK / FPGA_CLOCK;// NOLINT
+  printf("%f\n", ddr_clock_inc);
   float ddr_acc = 0;
 
   // start servers to communicate with user programs
@@ -82,15 +85,11 @@ void run_verilator() {
   Verilated::commandArgs(3, v);
   VComposerTop top;
   Verilated::traceEverOn(true);
-#ifdef USE_VCD
-  tfp = new VerilatedVcdC;
+  tfp = new waveTrace;
   top.trace(tfp, 30);
-  tfp->open("trace.vcd");
-#else
-  tfp = new VerilatedFstC;
-  top.trace(tfp, 30);
-  tfp->open("trace.fst");
-#endif
+  tfp->open("trace" TRACE_FILE_ENDING );
+
+  LOG(printf("TESTING THIS"));
 
   std::cout << "Tracing!" << std::endl;
 
@@ -135,7 +134,7 @@ void run_verilator() {
 #endif
 #endif
       // reset circuit
-      top.reset = 1;
+      top.reset = active_reset;
   for (auto &mem: axi4_mems) {
     mem.r->setValid(0);
     mem.b->setValid(0);
@@ -149,6 +148,7 @@ void run_verilator() {
   dma.r->setReady(0);
 #endif
 
+  top.S00_AXI_awvalid = top.S00_AXI_wvalid = top.S00_AXI_rready = top.S00_AXI_arvalid = top.S00_AXI_bready = 0;
 
   for (int i = 0; i < 50; ++i) {
     top.clock = 0;
@@ -160,15 +160,10 @@ void run_verilator() {
     tfp->dump(main_time);
     main_time += fpga_clock_inc;
   }
-  top.reset = 0;
+  top.reset = !active_reset;
   top.clock = 0;
 
-  command_transaction ongoing_cmd;
-  response_transaction ongoing_rsp;
-  update_state ongoing_update = UPDATE_IDLE_CMD;
-#ifdef VERBOSE
-  printf("main time %lld\n", main_time);
-#endif
+  LOG(printf("main time %lld\n", main_time));
   unsigned long ms = 1;
   while (not kill_sig) {
     // clock is high after posedge - changes now are taking place after posedge,
@@ -182,6 +177,7 @@ void run_verilator() {
 #ifdef KILL_SIM
     if (ms >= KILL_SIM) {
       kill_sig = true;
+      printf("killing\n"); fflush(stdout);
     }
 #endif
     top.clock = 1;// posedge
@@ -190,10 +186,13 @@ void run_verilator() {
 
       // ------------ HANDLE COMMAND INTERFACE ----------------
       // start queueing up a new command if one is available
-      top.S00_AXI_awvalid = top.S00_AXI_wvalid = top.S00_AXI_rready = top.S00_AXI_arvalid = top.S00_AXI_bready = 0;
-      update_command_state(ongoing_cmd, ongoing_rsp, ongoing_update, top);
-      update_resp_state(ongoing_cmd, ongoing_rsp, ongoing_update, top);
-      update_update_state(ongoing_cmd, ongoing_rsp, ongoing_update, top);
+
+      if (!use_trace) {
+        top.S00_AXI_awvalid = top.S00_AXI_wvalid = top.S00_AXI_rready = top.S00_AXI_arvalid = top.S00_AXI_bready = 0;
+        update_command_state(top);
+        update_resp_state(top);
+        update_update_state(top);
+      }
 
       // approx clock diff
       ddr_acc += ddr_clock_inc;
@@ -237,9 +236,6 @@ void run_verilator() {
       // ------------ HANDLE MEMORY INTERFACES ----------------
       for (mem_ctrl::mem_interface<ComposerMemIDDtype> &axi4_mem: axi4_mems) {
         if (axi4_mem.b->getReady() && axi4_mem.b->getValid()) {
-          //#ifdef VERBOSE
-          //        fprintf(stderr, "Write response %d\n", axi4_mem.b->send_ids.front());
-          //#endif
           axi4_mem.b->send_ids.pop();
         }
 
@@ -248,7 +244,9 @@ void run_verilator() {
           auto tx = axi4_mem.read_transactions.front();
           int start = (tx->axi_bus_beats_progress * tx->size) % (DATA_BUS_WIDTH / 8);
           char *dest = (char *) axi4_mem.r->getData() + start;
-          memcpy(dest, tx->addr, tx->size);
+          if (SANITY) {
+            memcpy(dest, tx->addr, tx->size);
+          }
           bool am_done = tx->len == (tx->axi_bus_beats_progress + 1);
           axi4_mem.r->setValid(1);
           axi4_mem.r->setLast(am_done && tx->can_be_last);
@@ -286,7 +284,7 @@ void run_verilator() {
             // align to 64B - zero out bottom 6b
             auto addr = trans->addr;
             while (strobe != 0) {
-              if (strobe & 1) {
+              if (strobe & 1 && SANITY) {
 #ifdef COMPOSER_HAS_DMA
                 auto curr_ptr = uintptr_t(addr + off);
                 auto base_ptr = uintptr_t(dma_ptr);
@@ -416,16 +414,22 @@ void run_verilator() {
       pthread_mutex_unlock(&dma_lock);
 #endif
     }
+    if (use_trace) {
+      if (main_time > fpga_clock_inc * 200)
+        trace_rising_edge_pre(top);
+    }
     tick(&top);
+    if (use_trace) {
+      if (main_time > fpga_clock_inc * 200)
+        trace_rising_edge_post(top);
+    }
     tfp->dump(main_time);
     top.clock = 0;// negedge
     tick(&top);
     main_time += fpga_clock_inc;
     tfp->dump(main_time);
   }
-#ifdef VERBOSE
-  printf("printing traces\n");
-#endif
+  LOG(printf("printing traces\n"));
   fflush(stdout);
   tfp->close();
   for (auto &axi_mem: axi4_mems) {
@@ -435,26 +439,39 @@ void run_verilator() {
 }
 
 
-int main() {
+int main(int argc, char **argv) {
   signal(SIGTERM, sig_handle);
   signal(SIGABRT, sig_handle);
   signal(SIGINT, sig_handle);
   signal(SIGKILL, sig_handle);
 
+  std::optional<std::string> dram_file = {};
+  std::optional<std::string> trace_file = {};
+  for (int i = 1; i < argc; ++i) {
+    assert(argv[i][0] == '-');
+    if (strcmp(argv[i]+1, "dramconfig") == 0){
+      dram_file = std::string(argv[i+1]);
+    } else if (strcmp(argv[i]+1, "tracefile") == 0) {
+      trace_file = std::string(argv[i+1]);
+    }
+    ++i;
+  }
+
+  if (!dram_file.has_value()) {
+    dram_file = std::string("../custom_dram_configs/DDR4_8Gb_x16_3200.ini");
+  }
+
   data_server::start();
   cmd_server::start();
-#ifdef VERBOSE
-  printf("Entering verilator\n");
-#endif
+  LOG(printf("Entering verilator\n"));
   try {
-    run_verilator();
+    run_verilator(trace_file, *dram_file);
     pthread_mutex_lock(&main_lock);
     pthread_mutex_lock(&main_lock);
-#ifdef VERBOSE
-    printf("Main thread exiting\n");
-#endif
+    LOG(printf("Main thread exiting\n"));
   } catch (std::exception &e) {
-    sig_handle(1);
+    tfp->close();
+    throw(e);
   }
   sig_handle(0);
 }

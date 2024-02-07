@@ -60,20 +60,11 @@ struct response_transaction {
   resp_transfer_state state = RESPT_INACTIVE;
 };
 
-void update_command_state(command_transaction &ongoing_cmd,
-                          response_transaction &ongoing_rsp,
-                          update_state &ongoing_update,
-                          VComposerTop &top);
+void update_command_state(VComposerTop &top);
 
-void update_resp_state(command_transaction &ongoing_cmd,
-                       response_transaction &ongoing_rsp,
-                       update_state &ongoing_update,
-                       VComposerTop &top);
+void update_resp_state(VComposerTop &top);
 
-void update_update_state(command_transaction &ongoing_cmd,
-                         response_transaction &ongoing_rsp,
-                         update_state &ongoing_update,
-                         VComposerTop &top);
+void update_update_state(VComposerTop &top);
 
 
 #endif//COMPOSERRUNTIME_FRONT_BUS_CTRL_H

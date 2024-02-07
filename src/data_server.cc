@@ -3,13 +3,14 @@
 //
 
 #include <cstring>
+#include <string>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <vector>
-#include <string>
 
-#include <composer_allocator_declaration.h>
+#include "util.h"
 #include <composer/verilator_server.h>
+#include <composer_allocator_declaration.h>
 
 #include "../include/data_server.h"
 
@@ -63,12 +64,10 @@ static std::vector<uint16_t> available_ids;
     throw std::exception();
   }
 
-  struct stat shm_stats{};
+  struct stat shm_stats {};
   fstat(fd_composer, &shm_stats);
-#ifdef VERBOSE
-  std::cerr << shm_stats.st_size << std::endl;
-  std::cerr << sizeof(data_server_file) << std::endl;
-#endif
+  LOG(std::cerr << shm_stats.st_size << std::endl;
+      std::cerr << sizeof(data_server_file) << std::endl);
   if (shm_stats.st_size < sizeof(data_server_file)) {
     int tr_rc = ftruncate(fd_composer, sizeof(data_server_file));
     if (tr_rc) {
@@ -81,23 +80,17 @@ static std::vector<uint16_t> available_ids;
                                           MAP_SHARED, fd_composer, 0);
 
 #ifdef COMPOSER_USE_CUSTOM_ALLOC
-#ifdef VERBOSE
-  std::cerr << "Constructing allocator" << std::endl;
-#endif
+  LOG(std::cerr << "Constructing allocator" << std::endl);
   auto allocator = new device_allocator();
-#ifdef VERBOSE
-  std::cerr << "Allocator constructed - data server ready" << std::endl;
-#endif
+  LOG(std::cerr << "Allocator constructed - data server ready" << std::endl);
 #endif
   data_server_file::init(addr);
-#ifdef VERBOSE
-  std::cerr << "Data server file constructed" << std::endl;
-#endif
+  LOG(std::cerr << "Data server file constructed" << std::endl);
 
 #if defined(FPGA) && defined(F1)
   std::cerr << "Running FPGA MemCpy Sanity Checks..." << std::endl;
-  auto sanity_alloc = (uint8_t*)malloc(1024);
-  auto sanity_int = (uint32_t*)sanity_alloc;
+  auto sanity_alloc = (uint8_t *) malloc(1024);
+  auto sanity_int = (uint32_t *) sanity_alloc;
   unsigned long sanity_address = 0xDEAD0000L;
   for (int i = 0; i < 1024 / 4; ++i) {
     sanity_int[i] = 0xCAFEBEEF;
@@ -139,14 +132,14 @@ static std::vector<uint16_t> available_ids;
     available_ids.push_back(i);
 #endif
 
-  srand(time(nullptr)); // NOLINT(cert-msc51-cpp)
+  srand(time(nullptr));// NOLINT(cert-msc51-cpp)
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
 #if defined(SIM) && defined(COMPOSER_HAS_DMA)
   pthread_mutex_lock(&dma_wait_lock);
 #endif
   while (true) {
-//    printf("data server got cmd\n"); fflush(stdout);
+    //    printf("data server got cmd\n"); fflush(stdout);
     // get file name, descriptor, expand the file, and map it to address space
     switch (addr.operation) {
       case data_server_op::ALLOC: {
@@ -156,7 +149,7 @@ static std::vector<uint16_t> available_ids;
         fflush(stderr);
         break;
 #endif
-        auto fname = "/composer_file_" + std::to_string(rand()); // NOLINT(cert-msc50-cpp)
+        auto fname = "/composer_file_" + std::to_string(rand());// NOLINT(cert-msc50-cpp)
         int nfd = shm_open(fname.c_str(), O_CREAT | O_RDWR, file_access_flags);
         if (nfd < 0) {
           std::cerr << "Failed to open shared memory segment: " << std::string(strerror(errno)) << std::endl;
@@ -165,7 +158,7 @@ static std::vector<uint16_t> available_ids;
         int rc = ftruncate(nfd, (off_t) addr.op_argument);
         if (rc) {
           std::cerr << "Failed to truncate!" << std::endl;
-//          printf("Failed to truncate! - %d, %d, %llu\t %s\n", rc, nfd, (off_t) addr.op_argument, strerror(errno));
+          //          printf("Failed to truncate! - %d, %d, %llu\t %s\n", rc, nfd, (off_t) addr.op_argument, strerror(errno));
           throw std::exception();
         }
         void *naddr = mmap(nullptr, addr.op_argument, file_access_prots, MAP_SHARED, nfd, 0);
@@ -179,9 +172,10 @@ static std::vector<uint16_t> available_ids;
         auto nBytes = addr.op_argument;
 #ifdef Kria
         unsigned int cacheLineSz = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
-        char *ptr = (char*) naddr;
+        char *ptr = (char *) naddr;
         for (uint64_t i = 0; i < addr.op_argument / cacheLineSz; ++i) {
-          asm volatile("DC CIVAC, %0"::"r"(ptr):"memory");
+          asm volatile("DC CIVAC, %0" ::"r"(ptr)
+                       : "memory");
           ptr += cacheLineSz;
         }
 #endif
@@ -194,9 +188,7 @@ static std::vector<uint16_t> available_ids;
         at.add_mapping(fpga_addr.getFpgaAddr(), addr.op_argument, naddr);
         // return fpga address
         addr.op_argument = fpga_addr.getFpgaAddr();
-#ifdef VERBOSE
-        printf("Allocated %llu bytes at %p. FPGA addr %llx\n", nBytes, naddr, fpga_addr.getFpgaAddr());
-#endif
+        LOG(printf("Allocated %llu bytes at %p. FPGA addr %llx\n", nBytes, naddr, fpga_addr.getFpgaAddr()));
 #else
         auto fpga_addr = (uint64_t) naddr;
         at.add_mapping(fpga_addr, addr.op_argument, naddr);
@@ -209,10 +201,8 @@ static std::vector<uint16_t> available_ids;
 #ifdef COMPOSER_USE_CUSTOM_ALLOC
         allocator->free(composer::remote_ptr(addr.op_argument, 0, FPGAONLY));
 #endif
-#ifdef VERBOSE
-        printf("Freeing %llu bytes at %p\n", at.get_mapping(addr.op_argument).second, at.get_mapping(addr.op_argument).first);
-        fflush(stdout);
-#endif
+        LOG(printf("Freeing %llu bytes at %p\n", at.get_mapping(addr.op_argument).second, at.get_mapping(addr.op_argument).first);
+            fflush(stdout));
         munmap(at.get_mapping(addr.op_argument).first, at.get_mapping(addr.op_argument).second);
         at.remove_mapping(addr.op_argument);
         break;
@@ -237,7 +227,7 @@ static std::vector<uint16_t> available_ids;
         //          pthread_mutex_lock(&dma_wait_lock);
         //        }
 #endif
-//        std::cerr << "finish DMA " << std::endl;
+        //        std::cerr << "finish DMA " << std::endl;
         break;
       }
       case data_server_op::MOVE_FROM_FPGA: {
@@ -268,42 +258,42 @@ static std::vector<uint16_t> available_ids;
 #endif
         break;
       }
-#elif defined (FPGA) && !defined(Kria)
-        case data_server_op::MOVE_FROM_FPGA: {
-          auto shaddr = at.translate(addr.op2_argument);
-    //        std::cout << "from fpga addr: " << addr.op2_argument << std::endl;
-          auto *mem = (uint8_t*)malloc(addr.op3_argument);
-          int rc = wrapper_fpga_dma_burst_read(xdma_read_fd, (uint8_t *) mem, addr.op3_argument, addr.op2_argument);\
-          memcpy(shaddr, mem, addr.op3_argument);
-          free(mem);
-    //        for (int i = 0; i < addr.op3_argument / sizeof(int); ++i)
-    //          printf("%d ", ((int *) shaddr)[i]);
-    //        fflush(stdout);
-          if (rc) {
-            fprintf(stderr, "Something failed inside MOVE_FROM_FPGA - %d %p %ld %lx\n", xdma_read_fd, shaddr,
-                    addr.op3_argument, addr.op2_argument);
-            exit(1);
-          }
-          break;
+#elif defined(FPGA) && !defined(Kria)
+      case data_server_op::MOVE_FROM_FPGA: {
+        auto shaddr = at.translate(addr.op2_argument);
+        //        std::cout << "from fpga addr: " << addr.op2_argument << std::endl;
+        auto *mem = (uint8_t *) malloc(addr.op3_argument);
+        int rc = wrapper_fpga_dma_burst_read(xdma_read_fd, (uint8_t *) mem, addr.op3_argument, addr.op2_argument);
+        memcpy(shaddr, mem, addr.op3_argument);
+        free(mem);
+        //        for (int i = 0; i < addr.op3_argument / sizeof(int); ++i)
+        //          printf("%d ", ((int *) shaddr)[i]);
+        //        fflush(stdout);
+        if (rc) {
+          fprintf(stderr, "Something failed inside MOVE_FROM_FPGA - %d %p %ld %lx\n", xdma_read_fd, shaddr,
+                  addr.op3_argument, addr.op2_argument);
+          exit(1);
         }
-        case data_server_op::MOVE_TO_FPGA: {
-          auto shaddr = at.translate(addr.op_argument);
-    //        printf("trying to transfer\n"); fflush(stdout);
-    //        std::cout << "to fpga addr: " << addr.op_argument << std::endl;
-    //        for (int i = 0; i < addr.op3_argument / sizeof(int); ++i)
-    //          printf("%d ", ((int *) shaddr)[i]);
-    //        fflush(stdout);
-          auto *mem = (uint8_t*)malloc(addr.op3_argument);
-          memcpy(mem, shaddr, addr.op3_argument);
-          int rc = wrapper_fpga_dma_burst_write(xdma_write_fd, (uint8_t *) shaddr, addr.op3_argument, addr.op_argument);
-          if (rc) {
-            fprintf(stderr, "Something failed inside MOVE_TO_FPGA - %d %p %ld %lx\n", xdma_write_fd, shaddr,
-                    addr.op3_argument, addr.op2_argument);
-            exit(1);
-          }
-    //        printf("finished transfering\n"); fflush(stdout);
-          break;
+        break;
+      }
+      case data_server_op::MOVE_TO_FPGA: {
+        auto shaddr = at.translate(addr.op_argument);
+        //        printf("trying to transfer\n"); fflush(stdout);
+        //        std::cout << "to fpga addr: " << addr.op_argument << std::endl;
+        //        for (int i = 0; i < addr.op3_argument / sizeof(int); ++i)
+        //          printf("%d ", ((int *) shaddr)[i]);
+        //        fflush(stdout);
+        auto *mem = (uint8_t *) malloc(addr.op3_argument);
+        memcpy(mem, shaddr, addr.op3_argument);
+        int rc = wrapper_fpga_dma_burst_write(xdma_write_fd, (uint8_t *) shaddr, addr.op3_argument, addr.op_argument);
+        if (rc) {
+          fprintf(stderr, "Something failed inside MOVE_TO_FPGA - %d %p %ld %lx\n", xdma_write_fd, shaddr,
+                  addr.op3_argument, addr.op2_argument);
+          exit(1);
         }
+        //        printf("finished transfering\n"); fflush(stdout);
+        break;
+      }
 #elif defined(Kria)
       case data_server_op::MOVE_TO_FPGA:
       case data_server_op::MOVE_FROM_FPGA:
@@ -314,9 +304,7 @@ static std::vector<uint16_t> available_ids;
       case data_server_op::CLEAN_INVALIDATE_REGION:
       case data_server_op::RELEASE_COHERENCE_BARRIER:
       case data_server_op::ADD_TO_COHERENCE_MANAGER: {
-#ifdef VERBOSE
-        std::cerr << "Recieved coherence command" << std::endl;
-#endif
+        LOG(std::cerr << "Recieved coherence command" << std::endl);
         uint16_t id;
         if (addr.operation == ADD_TO_COHERENCE_MANAGER) {
           id = available_ids.back();
@@ -335,39 +323,31 @@ static std::vector<uint16_t> available_ids;
         uint64_t &l = addr.op2_argument;
         for (int i = 0; i < 2; ++i) {// command is 5 32-bit payloads
           while (!peek_mmio(COHERENCE_READY)) {}
-          poke_mmio(COHERENCE_BITS, ((uint32_t*)(&a))[i]);
+          poke_mmio(COHERENCE_BITS, ((uint32_t *) (&a))[i]);
           poke_mmio(COHERENCE_VALID, 1);
         }
         for (int i = 0; i < 2; ++i) {// command is 5 32-bit payloads
           while (!peek_mmio(COHERENCE_READY)) {}
-          poke_mmio(COHERENCE_BITS, ((uint32_t*)(&l))[i]);
+          poke_mmio(COHERENCE_BITS, ((uint32_t *) (&l))[i]);
           poke_mmio(COHERENCE_VALID, 1);
         }
         uint32_t command;
-        switch(addr.operation) {
+        switch (addr.operation) {
           case data_server_op::INVALIDATE_REGION:
             command = COHERENCE_OP_INVALIDATE;
-#ifdef VERBOSE
-            std::cerr << "INVALIDATE COMMAND" << std::endl;
-#endif
+            LOG(std::cerr << "INVALIDATE COMMAND" << std::endl);
             break;
           case data_server_op::CLEAN_INVALIDATE_REGION:
             command = COHERENCE_OP_CLEAN_INVALIDATE;
-#ifdef VERBOSE
-            std::cerr << "CLEAN INVALIDATE COMMAND" << std::endl;
-#endif
+            LOG(std::cerr << "CLEAN INVALIDATE COMMAND" << std::endl);
             break;
           case data_server_op::ADD_TO_COHERENCE_MANAGER:
-#ifdef VERBOSE
-            fprintf(stderr, "REGISTER COHERENT SEGMENT: %16lx\n", addr.op_argument);
-            fflush(stderr);
-#endif
+            LOG(fprintf(stderr, "REGISTER COHERENT SEGMENT: %16lx\n", addr.op_argument);
+                fflush(stderr));
             command = COHERENCE_OP_ADD;
             break;
           case data_server_op::RELEASE_COHERENCE_BARRIER:
-#ifdef VERBOSE
-            std::cerr << "RELEASE COHERENCE BARRIER" << std::endl;
-#endif
+            LOG(std::cerr << "RELEASE COHERENCE BARRIER" << std::endl);
             command = COHERENCE_OP_BARRIER_RELEASE;
             break;
         }
@@ -391,7 +371,6 @@ static std::vector<uint16_t> available_ids;
     // re-lock self to stall
     pthread_mutex_lock(&addr.server_mut);
   }
-
 }
 
 void data_server::start() {
@@ -407,16 +386,17 @@ void *address_translator::translate(uint64_t fp_addr) const {
     }
     it++;
   }
-  if (it == mappings.end()) {
-    std::cerr << "BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: " << std::hex << fp_addr <<". You might be running outside of your allocated segment... "<< std::endl;
+  if (it == mappings.end() && SANITY) {
+    std::cerr << "BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: " << std::hex << fp_addr << ". You might be running outside of your allocated segment... " << std::endl;
 #if defined(SIM) && defined(TRACE)
 
     tfp->close();
 #endif
     throw std::exception();
   }
-  if (it->fpga_addr + it->mapping_length <= fp_addr) {
-    std::cerr << "ADDRESS IS OUT OF BOUNDS FROM FPGA -> CPU\n" << std::endl;
+  if (it->fpga_addr + it->mapping_length <= fp_addr && SANITY) {
+    std::cerr << "ADDRESS IS OUT OF BOUNDS FROM FPGA -> CPU\n"
+              << std::endl;
     throw std::exception();
   }
   return (char *) it->cpu_addr + (fp_addr - it->fpga_addr);
@@ -430,7 +410,8 @@ void address_translator::remove_mapping(uint64_t fpga_addr) {
   addr_pair a(fpga_addr, nullptr, 0);
   auto it = mappings.find(a);
   if (it == mappings.end()) {
-    std::cerr << "ERROR - could not remove mapping in data server because could not find address...\n" << std::endl;
+    std::cerr << "ERROR - could not remove mapping in data server because could not find address...\n"
+              << std::endl;
     throw std::exception();
   }
   mappings.erase(it);
