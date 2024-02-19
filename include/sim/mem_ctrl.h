@@ -100,7 +100,7 @@ namespace mem_ctrl {
     }
   };
 
-  template<typename idtype>
+  template<typename idtype >
   class v_address_channel {
     CData *ready = nullptr;
     CData *valid = nullptr;

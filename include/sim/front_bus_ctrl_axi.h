@@ -2,8 +2,8 @@
 // Created by Chris Kjellqvist on 8/9/23.
 //
 
-#ifndef COMPOSERRUNTIME_FRONT_BUS_CTRL_H
-#define COMPOSERRUNTIME_FRONT_BUS_CTRL_H
+#ifndef COMPOSERRUNTIME_FRONT_BUS_CTRL_AXI_H
+#define COMPOSERRUNTIME_FRONT_BUS_CTRL_AXI_H
 
 #include <cinttypes>
 #include <VComposerTop.h>
@@ -67,4 +67,4 @@ void update_resp_state(VComposerTop &top);
 void update_update_state(VComposerTop &top);
 
 
-#endif//COMPOSERRUNTIME_FRONT_BUS_CTRL_H
+#endif//COMPOSERRUNTIME_FRONT_BUS_CTRL_AXI_H

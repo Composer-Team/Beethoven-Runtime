@@ -5,7 +5,7 @@
 #ifndef COMPOSERRUNTIME_TRACE_READ_H
 #define COMPOSERRUNTIME_TRACE_READ_H
 
-#include "sim/front_bus_ctrl.h"
+#include "sim/front_bus_ctrl_axi.h"
 #include <cinttypes>
 #include <functional>
 #include <queue>

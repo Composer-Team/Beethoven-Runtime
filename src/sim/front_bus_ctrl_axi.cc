@@ -2,14 +2,14 @@
 // Created by Chris Kjellqvist on 8/9/23.
 //
 
-#include "sim/front_bus_ctrl.h"
-#include "sim/mem_ctrl.h"
+#include "sim/front_bus_ctrl_axi.h"
 #include "composer_allocator_declaration.h"
-#include <csignal>
-#include <cmd_server.h>
-#include <verilated_vcd_c.h>
-#include <verilated_fst_c.h>
+#include "sim/mem_ctrl.h"
 #include "util.h"
+#include <cmd_server.h>
+#include <csignal>
+#include <verilated_fst_c.h>
+#include <verilated_vcd_c.h>
 
 static bool bus_occupied = false;
 extern pthread_mutex_t cmdserverlock;

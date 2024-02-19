@@ -22,8 +22,11 @@ include_directories(include)
 # customize make based on simulator (verilator) or fpga (aws) target
 if ("${TARGET}" STREQUAL "sim")
     find_package(verilator REQUIRED)
+    if (NOT DEFINED FRONTEND)
+        set(FRONTEND "axi")
+    endif ()
     add_executable(ComposerRuntime
-            ${SRC} src/sim/verilator.cc src/sim/mem_ctrl.cc src/sim/front_bus_ctrl.cc src/trace/trace_read.cc)
+            ${SRC} src/sim/verilator_${FRONTEND}_frontend.cc src/sim/mem_ctrl.cc src/sim/front_bus_ctrl_${FRONTEND}.cc)
     if (NOT "${KILL_SIM_AFTER}" STREQUAL "")
         target_compile_definitions(ComposerRuntime PRIVATE KILL_SIM=${KILL_SIM_AFTER})
     endif ()
@@ -37,7 +40,7 @@ if ("${TARGET}" STREQUAL "sim")
     set(BUILD_SIM 1)
 elseif ("${TARGET}" STREQUAL "trace_sim")
     find_package(verilator REQUIRED)
-    add_executable(ComposerRuntime ${SRC} src/sim/verilator.cc src/sim/mem_ctrl.cc src/sim/front_bus_ctrl.cc)
+    add_executable(ComposerRuntime ${SRC} src/sim/verilator_axi_frontend.cc src/sim/mem_ctrl.cc src/sim/front_bus_ctrl_axi.cc)
     add_subdirectory(DRAMsim3)
     target_link_libraries(ComposerRuntime PRIVATE dramsim3 args)
     if ("${USE_WAVES}" STREQUAL "")
@@ -133,6 +136,6 @@ if (${BUILD_SIM})
             TRACE_FST
             VERILATOR_ARGS --timescale 1ps/1ps --x-assign fast
             --timing -Wno-context -Wno-lint -Wno-style -Wno-symrsvdword -Wno-multidriven -Wno-combdly -Wno-zerodly
-            -Wno-moddup -Wno-unoptflat #--threads 8
+            -Wno-moddup -Wno-unoptflat --threads 4
     )
 endif ()
