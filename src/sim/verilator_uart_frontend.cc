@@ -58,27 +58,30 @@ void read_program(std::queue<unsigned char> &vec, const std::string &fname) {
   char buf[256];
   char c;
   int addr = 0;
+
   while ((c = getc(f)) != EOF) {
+    if (isspace(c)) while (isspace(c=getc(f)));
+    if (c != '@') ungetc(c, f);
     switch (c) {
       case '@': {
         fscanf(f, "%s", buf);
-        auto naddr = atoi(buf);
+        auto naddr = strtol(buf, nullptr, 16);
         while (addr < naddr) {
           vec.push('\0');
           addr++;
         }
         break;
       }
-      case ' ':
-      case '\n':
-      case '\r':
-      case '\t':
+      default:
+      {
+        auto q = getc(f);
+        ungetc(q, f);
+        if (q == '@') continue;
         fscanf(f, "%s", buf);
         vec.push(strtol(buf, nullptr, 16));
         addr++;
         break;
-      default:
-        throw std::runtime_error("unexpected");
+      }
     }
   }
 }
@@ -198,8 +201,14 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
   unsigned long ms = 1;
 
   int loops = 0;
+  int last = program.size();
   while (program.size() > 0) {
-    printf("\r%d %zu %llu", loops++, program.size(), main_time); fflush(stdout);
+    loops ++;
+    if (last != program.size() && (program.size() % 100 == 0)) {
+      printf("\r%d %zu %llu", loops, program.size(), main_time);
+      fflush(stdout);
+      last = program.size();
+    }
     top.clock = 1;
     main_time += fpga_clock_inc;
     tick(&top);
@@ -213,22 +222,25 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 
   }
 
-  printf("--program written--"); fflush(stdout);
+  printf("--program written--\n\n"); fflush(stdout);
 
   top.reset = active_reset;
   for (int i =0; i < 6; ++i) {
     top.clock = 1;
     main_time += fpga_clock_inc;
     tick(&top);
+    tfp->dump(main_time);
     top.clock = 0;
     main_time += fpga_clock_inc;
     tick(&top);
+    tfp->dump(main_time);
   }
+  top.reset = !active_reset;
 
 
   int last_size = stdout_strm.size();
 
-  int count = 100000;
+  int count = 10000;
   while (not kill_sig && (--count > 0)) {
     // clock is high after posedge - changes now are taking place after posedge,
     // and will take effect on negedge
@@ -253,11 +265,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
       queue_uart(program, stdout_strm, top.STDUART_program_uart_rxd, top.STDUART_uart_txd, 1);
       if (last_size != stdout_strm.size()) {
         printf("%c", stdout_strm.back());
-      }
-      if (stdout_strm.size() > 0) {
-        if (stdout_strm.back() == 0) {
-          break;
-        }
+        last_size = stdout_strm.size();
       }
       // approx clock diff
       ddr_acc += ddr_clock_inc;
@@ -410,6 +418,8 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
     main_time += fpga_clock_inc;
     tfp->dump(main_time);
   }
+  printf("Final stdout print:\n");
+  fflush(stdout);
   LOG(printf("printing traces\n"));
   fflush(stdout);
   tfp->close();

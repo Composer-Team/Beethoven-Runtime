@@ -42,8 +42,8 @@ static bool test(unsigned char q, int idx) {
   return q & (1 << idx);
 }
 
-static void set(unsigned char &target, unsigned char src, int idx) {
-  target = (src & (1 << idx)) >> idx;
+static void set(unsigned char &target, int target_idx, unsigned char src, int src_idx) {
+  target = (target & ~(1 << target_idx)) | (((src & (1 << src_idx)) >> src_idx) << target_idx);
 }
 
 void queue_uart(std::queue<unsigned char> &in_stream,
@@ -67,16 +67,16 @@ void queue_uart(std::queue<unsigned char> &in_stream,
       break;
     case START:
       if ((++baud_count_in) == baud_div) {
-        set(rxd, in_stream.front(), in_byte_progress);
+        set(rxd, 0, in_stream.front(), in_byte_progress);
         in_byte_progress++;
-        baud_count_in = 1;
+        baud_count_in = 0;
         in_state = BITS_BAUD;
       }
       break;
     case BITS:
-      set(rxd, in_stream.front(), in_byte_progress);
+      set(rxd, 0, in_stream.front(), in_byte_progress);
       in_byte_progress++;
-      baud_count_in = 1;
+      baud_count_in = 0;
       if (baud_div > 1)
         in_state = BITS_BAUD;
       else {
@@ -90,20 +90,18 @@ void queue_uart(std::queue<unsigned char> &in_stream,
       }
       break;
     case BITS_BAUD:
-      if (baud_count_in == baud_div-1) {
+      if (++baud_count_in == baud_div) {
         baud_count_in = 0;
         in_state = BITS;
         if (in_byte_progress == 8) {
           in_state = STOP;
           in_stream.pop();
-          in_byte_progress = 0;
-          rxd = 1;
+          baud_count_in = 0;
         }
-      } else {
-        baud_count_in++;
       }
       break;
     case STOP:
+      rxd = 1;
       if(++baud_count_in == 2 * baud_div) {
         in_state = IDLE;
         baud_count_in = 0;
@@ -113,8 +111,14 @@ void queue_uart(std::queue<unsigned char> &in_stream,
   switch (out_state) {
     case IDLE:
       if (txd == 0 && out_enable) {
-        baud_count_out = 1;
-        out_state = START_BAUD;
+        out_byte = 0;
+        if (baud_div == 1) {
+          out_state = BITS;
+          out_byte_progress = 0;
+        } else {
+          baud_count_out = 1;
+          out_state = START_BAUD;
+        }
       }
       break;
     case START_BAUD:
@@ -125,14 +129,22 @@ void queue_uart(std::queue<unsigned char> &in_stream,
       }
       break;
     case BITS:
-      out_byte = (out_byte << 1) | txd;
+      set(out_byte, out_byte_progress, txd, 0);
       out_byte_progress++;
-      baud_count_out = 1;
-      out_state = BITS_BAUD;
+      if (baud_div == 1) {
+        if (out_byte_progress == 8) {
+          baud_count_out = 0;
+          out_state = STOP;
+        }
+      } else {
+        baud_count_out = 1;
+        out_state = BITS_BAUD;
+      }
       break;
     case BITS_BAUD:
       if (++baud_count_out == baud_div) {
         if (out_byte_progress == 8) {
+          baud_count_out = 0;
           out_state = STOP;
         } else {
           out_state = BITS;
