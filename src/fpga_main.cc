@@ -16,26 +16,11 @@ extern "C" {
 extern "C" void test_main_hook(uint32_t *exit_code)
 #else
 
-#ifdef Kria
-#include <cmsis_gcc.h>
-#include <cmsis_cp15.h>
-void kria_setup() {
-  uint32_t cbar = __get_CBAR();
-  uint64_t cbar_long = (uint64_t)cbar;
-  void *ptr = reinterpret_cast<void *>(cbar_long);
-  printf("CBAR is %p\n", ptr); fflush(stdout);
-}
-#endif
-
-
 int main()
 #endif
 {
 #ifdef F1
   fpga_setup(0);
-#endif
-#ifdef Kria
-  kria_setup();
 #endif
   // Kria does local allocations only
   cmd_server::start();

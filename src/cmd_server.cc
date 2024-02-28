@@ -118,7 +118,8 @@ static void *cmd_server_f(void *) {
     if (addr.cmd.getXd()) sem_post(&addr.processes_waiting);
     pthread_mutex_lock(&bus_lock);
 #endif
-    auto *pack = addr.cmd.pack(pack_cfg);
+    uint32_t pack[5];
+    addr.cmd.pack(pack_cfg, pack);
     //    if (sizeof(pack[0]) > 64) {
     //      printf("FAILURE - cannot use peek-poke give the current ");
     //      exit(1);
@@ -128,8 +129,6 @@ static void *cmd_server_f(void *) {
       poke_mmio(CMD_BITS, pack[i]);
       poke_mmio(CMD_VALID, 1);
     }
-    free(pack);
-
 #endif
     LOG(std::cerr << "Successfully delivered command\n"
                   << std::endl);
