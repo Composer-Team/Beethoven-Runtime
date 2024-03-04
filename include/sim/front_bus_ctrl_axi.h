@@ -43,7 +43,7 @@ enum update_state {
 
 
 struct command_transaction {
-  uint32_t *cmdbuf = nullptr;
+  uint32_t cmdbuf[5];
   int8_t progress = 0;
   int id = 0;
   cmd_transfer_state state = CMD_INACTIVE;

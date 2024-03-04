@@ -199,7 +199,7 @@ static std::vector<uint16_t> available_ids;
       }
       case data_server_op::FREE:
 #ifdef COMPOSER_USE_CUSTOM_ALLOC
-        allocator->free(composer::remote_ptr(addr.op_argument, 0, FPGAONLY));
+        allocator->free(addr.op_argument);
 #endif
         LOG(printf("Freeing %llu bytes at %p\n", at.get_mapping(addr.op_argument).second, at.get_mapping(addr.op_argument).first);
             fflush(stdout));

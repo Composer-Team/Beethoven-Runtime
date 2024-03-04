@@ -167,7 +167,7 @@ void update_command_state(VComposerTop &top){
             auto id = std::tuple<int, int>(cmds.front().getSystemId(), cmds.front().getCoreId());
             start_times[id] = main_time;
           }
-          ongoing_cmd.cmdbuf = cmds.front().pack(pack_cfg);
+          cmds.front().pack(pack_cfg, ongoing_cmd.cmdbuf);
           kill_sig = cmds.front().getOpcode() == ROCC_OP_FLUSH;
           ongoing_cmd.progress = 0;
           if (cmds.front().getXd() == 1)

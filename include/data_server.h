@@ -178,6 +178,21 @@ class [[maybe_unused]] device_allocator {
       return block_info(superblock_id, 0);
   }
 
+  block_info get_block_info(uint64_t fpga_addr, bool verbose = false) {
+    if (verbose) {
+      printf("addr: %16llx\n", fpga_addr);
+    }
+    uint32_t superblock_id = (fpga_addr >> log_superblock_size) & superblock_id_mask();
+    auto &sb = superblocks[superblock_id];
+    if (sb.flags & BLOCK_ALLOC) {
+      auto log_block_size = sb.log_block_size;
+      uint32_t block_id = (fpga_addr >> log_block_size) & block_id_mask(log_superblock_size);
+      return block_info(superblock_id, block_id);
+    } else
+      return block_info(superblock_id, 0);
+  }
+
+
 public:
   composer::remote_ptr malloc(uint64_t len) {
     const auto log_block_size = std::max(log2up(len), log_min_block);
@@ -248,7 +263,7 @@ public:
         pthread_mutex_unlock(&my_head_lock);
       }
       //        printf("sbid: %lu, bid: %lu, flags: %d\n", superblock_id, block_id, superblocks[superblock_id].flags); fflush(stdout);
-      return composer::remote_ptr(superblock_id * superblock_size + block_id * block_size, len, composer::FPGAONLY);
+      return composer::remote_ptr(superblock_id * superblock_size + block_id * block_size, nullptr, len);
     } else {
       // we're just going to use a huge allocation (not within a superblock)
       uint32_t num_superblocks_needed = 1 << (log_block_size - log_superblock_size);
@@ -332,13 +347,13 @@ public:
       for (uint32_t i = 1; i < num_superblocks_needed; i++) {
         superblocks[alloc_start + i].flags = 0;// they will not be marked as base allocations
       }
-      return composer::remote_ptr(alloc_start * superblock_size, len, composer::FPGAONLY);
+      return composer::remote_ptr(alloc_start * superblock_size, nullptr, len);
     }
   }
 
-  void free(composer::remote_ptr p) {
+  void free(uint64_t fpga_addr) {
     // TODO security - make sure this pointer belongs to the user who's freeing it
-    auto bi = get_block_info(p);
+    auto bi = get_block_info(fpga_addr);
     auto &sb = superblocks[bi.superblock_id];
     // sanity check flags
     auto flags = sb.flags;
