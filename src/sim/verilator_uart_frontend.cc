@@ -164,12 +164,12 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 #endif
       // reset circuit
       top.reset = active_reset;
-  top.CHIP_FESEL = 0;
-  top.CHIP_SCEN = 0;
-  top.CHIP_SCLK1 = top.CHIP_SCLK2 = top.CHIP_SHIFTIN = top.CHIP_SHIFTOUT = 0;
-  top.CHIP_UART_M_BAUD_SEL = 0x7;
-  top.CHIP_UART_M_RXD = 1;
-  top.CHIP_UART_M_CTS = 1;
+//  top.CHIP_FESEL = 0;
+//  top.CHIP_SCEN = 0;
+//  top.CHIP_SCLK1 = top.CHIP_SCLK2 = top.CHIP_SHIFTIN = top.CHIP_SHIFTOUT = 0;
+//  top.CHIP_UART_M_BAUD_SEL = 0x7;
+//  top.CHIP_UART_M_RXD = 1;
+//  top.CHIP_UART_M_CTS = 1;
   for (auto &mem: axi4_mems) {
     mem.r->setValid(0);
     mem.b->setValid(0);
@@ -240,8 +240,10 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 
   int last_size = stdout_strm.size();
 
-  int count = 10000;
-  while (not kill_sig && (--count > 0)) {
+  int count = 1000000;
+  while (not kill_sig
+  && (--count > 0)
+  ) {
     // clock is high after posedge - changes now are taking place after posedge,
     // and will take effect on negedge
     if (main_time > ms * 1000 * 1000 * 1000) {
@@ -266,6 +268,11 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
       if (last_size != stdout_strm.size()) {
         printf("%c", stdout_strm.back());
         last_size = stdout_strm.size();
+        if (stdout_strm.back() == 0x4) {
+          // this is the kill signal defined by the arm source (see uart_stdout.h)
+          kill_sig = true;
+
+        }
       }
       // approx clock diff
       ddr_acc += ddr_clock_inc;
@@ -451,6 +458,7 @@ int main(int argc, char **argv) {
   if (!dram_file.has_value()) {
     dram_file = std::string("../custom_dram_configs/DDR4_8Gb_x16_3200.ini");
   }
+  assert(trace_file.has_value());
 
   LOG(printf("Entering verilator\n"));
   try {

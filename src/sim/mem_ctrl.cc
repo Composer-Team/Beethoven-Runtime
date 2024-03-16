@@ -146,6 +146,19 @@ void mem_ctrl::init(const std::string &dram_ini_file) {
   DDR_BUS_WIDTH_BYTES = DDR_BUS_WIDTH_BITS / 8;
   axi_ddr_bus_multiplicity = (DATA_BUS_WIDTH / 8) / DDR_BUS_WIDTH_BYTES;
   DDR_BUS_BURST_LENGTH = dramsim3config->BL;
+
+  if (DDR_BUS_WIDTH_BYTES > (DATA_BUS_WIDTH / 8)) {
+    std::cerr << DDR_BUS_WIDTH_BYTES << "</= " << (DATA_BUS_WIDTH / 8) << std::endl;
+    std::cerr << "This is an unsupported configuration of DDR and AXI bus.\n"
+                 "It's also quite rare to happen as well. The AXI bus is \n"
+                 "much more likely to be greater than or equal to the DDR\n"
+                 "bus width. This is a limitation of the current impl.\n"
+                 "To fix this, select a memory configuration that has a\n"
+                 "smaller device bus width or, if you genuinely have a \n"
+                 "system with such a configuration, please contact the\n"
+                 "maintainer of this project." << std::endl;
+    assert(DDR_BUS_WIDTH_BYTES <= (DATA_BUS_WIDTH / 8));
+  }
 }
 
 void mem_ctrl::enqueue_transaction(v_address_channel<ComposerMemIDDtype> &chan, std::queue<std::shared_ptr<memory_transaction>> &lst) {

@@ -79,7 +79,6 @@ namespace mem_ctrl {
     memory_transaction() = delete;
 
     int dramsim_hasBeatReady() {
-      assert(DDR_BUS_WIDTH_BYTES <= (DATA_BUS_WIDTH / 8));
       if (axi_bus_beats_progress == axi_bus_beats_length()) return false;
       for (int i = 0; i < axi_ddr_bus_multiplicity; ++i) {
         if (!ddr_bus_beats_retrieved[axi_bus_beats_progress * axi_ddr_bus_multiplicity + i]) return false;

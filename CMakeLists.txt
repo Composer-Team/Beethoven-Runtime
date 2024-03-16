@@ -122,7 +122,7 @@ if ("${CONTROL_LITE}" STREQUAL "1")
     target_compile_definitions(ComposerRuntime PUBLIC CONTROL_LITE)
 endif ()
 
-if ("${NO_SANITY}" STREQUAL "1")
+if ("${NO_SANITY}" STREQUAL "1" OR "${FRONTEND}" STREQUAL "uart")
     target_compile_definitions(ComposerRuntime PUBLIC SANITY=0)
 else ()
     target_compile_definitions(ComposerRuntime PUBLIC SANITY=1)
