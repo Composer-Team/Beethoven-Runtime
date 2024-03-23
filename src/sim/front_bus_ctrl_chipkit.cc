@@ -46,27 +46,51 @@ static void set(unsigned char &target, int target_idx, unsigned char src, int sr
   target = (target & ~(1 << target_idx)) | (((src & (1 << src_idx)) >> src_idx) << target_idx);
 }
 
+// Set Baud Rates
+//|  SEL | DIV |  10  |  20  |  25  |  30  |  40  |  50  |  60  |  70  |  75  |  80  |  90  | 100  |
+//| 4'd0 | 1302|      |      |      |      |      |  9.6K|      |      |      |      |      | 19.2K|
+//| 4'd1 |  217|      |      |      |      |      | 57.6K|      |      |      |      |      |115.2K|
+//| 4'd2 |  108|      |      | 57.6K|      |      |115.2K|      |      |      |      |      |230.4K|
+//| 4'd3 |   54|      |      |115.2K|      |      |230.4K|      |      |      |      |      |460.8K|
+//| 4'd4 |   27|      |      |230.4K|      |      |460.8K|      |      |      |      |      |921.6K|
+//| 4'd5 |   22|115.2K|230.4K|      |      |460.8K|      |      |      |      |921.6K|      |      |
+//| 4'd6 |   20|      |      |      |      |      |      |      |      |921.6K|1.000M|      |      |
+//| 4'd7 |   19|      |      |      |      |      |      |      |921.6K|1.000M|      |      |      |
+//| 4'd8 |   16|      |      |      |460.8K|      |      |921.6K|      |      |1.250M|      |1.500M|
+//| 4'd9 |   15|      |      |      |      |      |      |1.000M|      |1.250M|      |1.500M|      |
+//| 4'd10|   10|      |      |      |      |1.000M|1.250M|1.500M|      |      |2.000M|      |      |
+//| 4'd11|    8|      |      |      |      |1.250M|1.500M|      |      |      |      |      |3.000M|
+//| 4'd12|    6|      |      |1.000M|1.250M|      |2.000M|      |3.000M|3.000M|      |      |      |
+//| 4'd13|    5|      |      |1.250M|1.500M|2.000M|      |3.000M|      |      |      |      |      |
+//| 4'd14|    4|      |1.250M|1.500M|      |      |3.000M|      |      |      |      |      |      |
+//| 4'd15|    2|1.250M|      |3.000M|      |      |      |      |      |      |      |      |      |
+
+const int baud_table[] = {1302, 217, 108, 54, 27, 22, 20, 19, 16, 15, 10, 8, 6, 5, 4, 2};
+int baud_flag = 14;
+int baud_div = baud_table[baud_flag]*4;
+
 void queue_uart(std::queue<unsigned char> &in_stream,
                 std::queue<unsigned char> &out_stream,
                 unsigned char &rxd,
                 unsigned char &txd,
-                int baud_div,
                 char in_enable = true,
                 char out_enable = true) {
+  assert(baud_div > 1);
+  assert(baud_flag != 15);
   switch (in_state) {
     case IDLE:
       if (in_stream.size() && in_enable) {
         rxd = 0; // START
         in_byte_progress = 0;
-        if (baud_div > 1)
-          in_state = START;
-        else
-          in_state = BITS;
+        in_state = START;
         baud_count_in++;
+      } else {
+        rxd = 1;
       }
       break;
     case START:
       if ((++baud_count_in) == baud_div) {
+        printf("START: %02x\n", in_stream.front());
         set(rxd, 0, in_stream.front(), in_byte_progress);
         in_byte_progress++;
         baud_count_in = 0;

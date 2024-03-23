@@ -35,6 +35,8 @@ pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 
 waveTrace *tfp;
 
+extern int baud_flag;
+
 void sig_handle(int sig) {
   tfp->close();
   fprintf(stderr, "FST written!\n");
@@ -53,36 +55,68 @@ void tick(VComposerTop *top) {
   }
 }
 
-void read_program(std::queue<unsigned char> &vec, const std::string &fname) {
+void push_val(const char buf[4], std::queue<unsigned char> &vec) {
+  for (int i = 0; i < 4; ++i) {
+    vec.push(buf[3-i]);
+  }
+}
+
+void push_val(const uint32_t val, std::queue<unsigned char> &vec) {
+  auto buf = (uint8_t *) &val;
+  for (int i = 0; i < 4; ++i) {
+    vec.push(buf[i]);
+  }
+}
+
+void read_program_chipkit(std::queue<unsigned char> &vec, const std::string &fname) {
   FILE *f = fopen(fname.c_str(), "r");
   char buf[256];
   char c;
-  int addr = 0;
+  int32_t addr = 0;
 
+  char inst_buf[4];
+  char inst_idx = 0;
   while ((c = getc(f)) != EOF) {
-    if (isspace(c)) while (isspace(c=getc(f)));
+    if (isspace(c)) while (isspace(c = getc(f)));
     if (c != '@') ungetc(c, f);
+    if (c == EOF) break;
+    if (c == -1) break;
     switch (c) {
-      case '@': {
+      case '@':
         fscanf(f, "%s", buf);
-        auto naddr = strtol(buf, nullptr, 16);
-        while (addr < naddr) {
-          vec.push('\0');
-          addr++;
-        }
+        addr = strtol(buf, nullptr, 16);
         break;
-      }
-      default:
-      {
+      default: {
         auto q = getc(f);
         ungetc(q, f);
         if (q == '@') continue;
         fscanf(f, "%s", buf);
-        vec.push(strtol(buf, nullptr, 16));
-        addr++;
+        inst_buf[inst_idx] = (char) strtol(buf, nullptr, 16);
+        if (++inst_idx == 4) {
+          vec.push('w');
+          push_val(addr, vec);
+          push_val(inst_buf, vec);
+
+          printf("pushing %x %02x %02x %02x %02x\n", addr, inst_buf[0], inst_buf[1], inst_buf[2], inst_buf[3]);
+          vec.push(0xa);
+          inst_idx = 0;
+          addr+=4;
+        }
         break;
       }
     }
+  }
+  assert(inst_idx == 0);
+  if (inst_idx != 0) {
+    for (; inst_idx % 4 != 0; ++inst_idx) {
+      inst_buf[inst_idx] = 0;
+    }
+    vec.push('w');
+    push_val(addr, vec);
+    push_val(inst_buf, vec);
+    // little endian
+    vec.push(0xa);
+    vec.push(0xd);
   }
 }
 
@@ -98,7 +132,8 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
   bool use_trace = false;
 
   std::queue<unsigned char> program, stdout_strm;
-  read_program(program, *trace_file);
+  read_program_chipkit(program, *trace_file);
+
 
   // using this to estimate AWS bandwidth
   // KRIA has much slower memory!
@@ -155,21 +190,24 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 #if NUM_DDR_CHANNELS >= 1
   init_ddr_interface(0)
 #if NUM_DDR_CHANNELS >= 2
-      init_ddr_interface(1)
+  init_ddr_interface(1)
 #if NUM_DDR_CHANNELS >= 4
-          init_ddr_interface(2)
-              init_ddr_interface(3)
+      init_ddr_interface(2)
+          init_ddr_interface(3)
 #endif
 #endif
 #endif
-      // reset circuit
-      top.reset = active_reset;
-//  top.CHIP_FESEL = 0;
-//  top.CHIP_SCEN = 0;
-//  top.CHIP_SCLK1 = top.CHIP_SCLK2 = top.CHIP_SHIFTIN = top.CHIP_SHIFTOUT = 0;
-//  top.CHIP_UART_M_BAUD_SEL = 0x7;
-//  top.CHIP_UART_M_RXD = 1;
-//  top.CHIP_UART_M_CTS = 1;
+  // reset circuit
+  top.reset = active_reset;
+  top.CHIP_UART_M_RXD = 1;
+  top.CHIP_UART_M_CTS = 0; // clear to send
+  // DO NOT MESS WITH THIS
+  top.CHIP_UART_M_BAUD_SEL = baud_flag;
+  top.CHIP_FESEL = 0; // uart
+  // disable scan
+  top.CHIP_SCEN = 0;
+  top.CHIP_SCLK1 = top.CHIP_SCLK2 = top.CHIP_SHIFTIN = top.CHIP_SHIFTOUT = 0;
+
   for (auto &mem: axi4_mems) {
     mem.r->setValid(0);
     mem.b->setValid(0);
@@ -184,6 +222,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 #endif
 
 
+  printf("initial reset\n");
   for (int i = 0; i < 50; ++i) {
     top.clock = 0;
     tick(&top);
@@ -199,11 +238,26 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 
   LOG(printf("main time %lld\n", main_time));
   unsigned long ms = 1;
+  int loops = 1000;
 
-  int loops = 0;
+  printf("steady1\n");
+  while (loops > 0) {
+    loops--;
+    top.clock = 1;
+    main_time += fpga_clock_inc;
+    tick(&top);
+    tfp->dump(main_time);
+
+    top.clock = 0;
+    main_time += fpga_clock_inc;
+    tick(&top);
+    tfp->dump(main_time);
+  }
+
+  printf("loading program\n");
   int last = program.size();
-  while (program.size() > 0) {
-    loops ++;
+  while (program.size() > 0 || top.CHIP_UART_M_RXD == 0) {
+    loops++;
     if (last != program.size() && (program.size() % 100 == 0)) {
       printf("\r%d %zu %llu", loops, program.size(), main_time);
       fflush(stdout);
@@ -217,15 +271,31 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
     top.clock = 0;
     main_time += fpga_clock_inc;
     tick(&top);
-    queue_uart(program, stdout_strm, top.STDUART_program_uart_rxd, top.STDUART_uart_txd, 1);
+    queue_uart(program, stdout_strm, top.CHIP_UART_M_RXD, top.STDUART_uart_txd);
+    tfp->dump(main_time);
+  }
+  printf("--program written--\n\n");
+  fflush(stdout);
+
+  loops = 1000;
+  printf("steady2\n");
+  while (loops > 0) {
+    loops--;
+    top.clock = 1;
+    main_time += fpga_clock_inc;
+    tick(&top);
     tfp->dump(main_time);
 
+    top.clock = 0;
+    main_time += fpga_clock_inc;
+    tick(&top);
+    tfp->dump(main_time);
   }
 
-  printf("--program written--\n\n"); fflush(stdout);
+  printf("reset2");
 
   top.reset = active_reset;
-  for (int i =0; i < 6; ++i) {
+  for (int i = 0; i < 6; ++i) {
     top.clock = 1;
     main_time += fpga_clock_inc;
     tick(&top);
@@ -237,13 +307,13 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
   }
   top.reset = !active_reset;
 
-
+  printf("run program");
   int last_size = stdout_strm.size();
 
-  int count = 1000000;
+  int count = 10000;
   while (not kill_sig
-  && (--count > 0)
-  ) {
+         && (--count > 0)
+          ) {
     // clock is high after posedge - changes now are taking place after posedge,
     // and will take effect on negedge
     if (main_time > ms * 1000 * 1000 * 1000) {
@@ -264,14 +334,15 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
     {
 
       // ------------ HANDLE COMMAND INTERFACE ----------------
-      queue_uart(program, stdout_strm, top.STDUART_program_uart_rxd, top.STDUART_uart_txd, 1);
+      assert(program.empty());
+      queue_uart(program, stdout_strm, top.CHIP_UART_M_RXD, top.STDUART_uart_txd);
+      queue_uart(program, stdout_strm, top.STDUART_uart_rxd, top.STDUART_uart_txd, 1);
       if (last_size != stdout_strm.size()) {
         printf("%c", stdout_strm.back());
         last_size = stdout_strm.size();
         if (stdout_strm.back() == 0x4) {
           // this is the kill signal defined by the arm source (see uart_stdout.h)
           kill_sig = true;
-
         }
       }
       // approx clock diff
@@ -468,7 +539,7 @@ int main(int argc, char **argv) {
     LOG(printf("Main thread exiting\n"));
   } catch (std::exception &e) {
     tfp->close();
-    throw(e);
+    throw (e);
   }
   sig_handle(0);
 }

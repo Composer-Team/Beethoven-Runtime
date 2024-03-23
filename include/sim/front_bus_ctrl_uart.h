@@ -11,7 +11,6 @@ void queue_uart(std::queue<unsigned char> &in_stream,
                 std::queue<unsigned char> &out_stream,
                 unsigned char &rxd,
                 unsigned char &txd,
-                int baud_div,
                 char in_enable = true,
                 char out_enable = true);
 
