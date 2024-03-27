@@ -42,7 +42,7 @@ namespace mem_ctrl {
 
   // = (DATA_BUS_WIDTH / 8) / DDR_BUS_WIDTH_BYTES
   struct memory_transaction {
-    char *addr;
+    uintptr_t addr;
     int size;
     int len;
     int axi_bus_beats_progress;
@@ -56,7 +56,7 @@ namespace mem_ctrl {
 
     std::vector<bool> ddr_bus_beats_retrieved;
 
-    memory_transaction(char *addr,
+    memory_transaction(uintptr_t addr,
                        int size,
                        int len,
                        int progress,

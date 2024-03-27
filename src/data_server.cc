@@ -386,7 +386,7 @@ void *address_translator::translate(uint64_t fp_addr) const {
     }
     it++;
   }
-  if (it == mappings.end() && SANITY) {
+  if (it == mappings.end()) {
     std::cerr << "BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: " << std::hex << fp_addr << ". You might be running outside of your allocated segment... " << std::endl;
     std::cerr << "Existing Mappings:" << std::endl;
     for(auto q: mappings) {
@@ -398,7 +398,7 @@ void *address_translator::translate(uint64_t fp_addr) const {
 #endif
     throw std::exception();
   }
-  if (it->fpga_addr + it->mapping_length <= fp_addr && SANITY) {
+  if (it->fpga_addr + it->mapping_length <= fp_addr) {
     std::cerr << "ADDRESS IS OUT OF BOUNDS FROM FPGA -> CPU\n"
               << std::endl;
     throw std::exception();

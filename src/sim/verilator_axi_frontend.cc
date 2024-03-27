@@ -372,7 +372,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
           char *ad = (char *) at.translate(addr);
           auto txsize = (int) 1 << axi4_mem.ar->getSize();
           auto txlen = axi4_mem.ar->getLen() + 1;
-          auto tx = std::make_shared<mem_ctrl::memory_transaction>(ad, txsize, txlen, 0, false,
+          auto tx = std::make_shared<mem_ctrl::memory_transaction>((uintptr_t)ad, txsize, txlen, 0, false,
                                                                    axi4_mem.ar->getId(), addr);
           // 64b per DRAM transaction
           RLOCK
@@ -393,9 +393,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
           auto tx = axi4_mem.read_transactions.front();
           int start = (tx->axi_bus_beats_progress * tx->size) % (DATA_BUS_WIDTH / 8);
           char *dest = (char *) axi4_mem.r->getData() + start;
-          if (SANITY) {
-            memcpy(dest, tx->addr, tx->size);
-          }
+          memcpy(dest, reinterpret_cast<char*>(tx->addr), tx->size);
           bool am_done = tx->len == (tx->axi_bus_beats_progress + 1);
           axi4_mem.r->setValid(1);
           axi4_mem.r->setLast(am_done && tx->can_be_last);
@@ -433,7 +431,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
             // align to 64B - zero out bottom 6b
             auto addr = trans->addr;
             while (strobe != 0) {
-              if (strobe & 1 && SANITY) {
+              if (strobe & 1) {
 #ifdef COMPOSER_HAS_DMA
                 auto curr_ptr = uintptr_t(addr + off);
                 auto base_ptr = uintptr_t(dma_ptr);
@@ -450,7 +448,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
                   addr[off] = src[off];
                 }
 #else
-                addr[off] = src[off];
+                reinterpret_cast<char*>(addr)[off] = src[off];
 #endif
               }
               off += 1;

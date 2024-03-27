@@ -123,10 +123,9 @@ if ("${CONTROL_LITE}" STREQUAL "1")
 endif ()
 
 if ("${NO_SANITY}" STREQUAL "1" OR "${FRONTEND}" STREQUAL "chipkit")
-    target_compile_definitions(ComposerRuntime PUBLIC SANITY=0)
-else ()
-    target_compile_definitions(ComposerRuntime PUBLIC SANITY=1)
-endif ()
+    target_compile_definitions(ComposerRuntime PUBLIC BAREMETAL_RUNTIME=1)
+    message("Building for chipkit")
+endif()
 
 if (${BUILD_SIM})
     verilate(ComposerRuntime

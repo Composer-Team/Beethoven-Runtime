@@ -14,5 +14,7 @@ void queue_uart(std::queue<unsigned char> &in_stream,
                 char in_enable = true,
                 char out_enable = true);
 
+void set_baud(unsigned int baud_flag);
+unsigned int get_baud_sel();
 
 #endif//COMPOSERRUNTIME_FRONT_BUS_CTRL_AXI_H
