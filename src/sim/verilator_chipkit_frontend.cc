@@ -96,10 +96,11 @@ static void readMemFile2ChipkitDMA(std::queue<unsigned char> &vec, const std::st
           push_val(addr, vec);
           push_val(inst_buf, vec);
 
-          printf("pushing %x %02x %02x %02x %02x\n", addr, (char)inst_buf[0], (char)inst_buf[1], (char)inst_buf[2], (char)inst_buf[3]);
+          printf("pushing %x %02x %02x %02x %02x\n", addr, (char) inst_buf[0], (char) inst_buf[1], (char) inst_buf[2],
+                 (char) inst_buf[3]);
           vec.push(0xa);
           inst_idx = 0;
-          addr+=4;
+          addr += 4;
         }
         break;
       }
@@ -334,10 +335,8 @@ void run_verilator(std::optional<std::string> trace_file,
             auto tx = axi4_mem.read_transactions.front();
             int start = (tx->axi_bus_beats_progress * tx->size) % (DATA_BUS_WIDTH / 8);
             char *dest = (char *) axi4_mem.r->getData() + start;
-            if (SANITY) {
-              for (int i = 0; i < tx->size; ++i) {
-                dest[i] = mem_get(tx->addr + i);
-              }
+            for (int i = 0; i < tx->size; ++i) {
+              dest[i] = mem_get(tx->addr + i);
             }
             bool am_done = tx->len == (tx->axi_bus_beats_progress + 1);
             axi4_mem.r->setValid(1);
@@ -377,7 +376,7 @@ void run_verilator(std::optional<std::string> trace_file,
               // align to 64B - zero out bottom 6b
               auto addr = trans->addr;
               while (strobe != 0) {
-                if (strobe & 1 && SANITY) {
+                if (strobe & 1) {
 #ifdef COMPOSER_HAS_DMA
                   auto curr_ptr = uintptr_t(addr + off);
                 auto base_ptr = uintptr_t(dma_ptr);
@@ -454,7 +453,7 @@ void run_verilator(std::optional<std::string> trace_file,
     top.clock = 0;
     main_time += fpga_clock_inc;
     tick(&top);
-    queue_uart(program, stdout_strm, top.CHIP_UART_M_RXD, top.STDUART_uart_txd);
+    queue_uart(program, stdout_strm, top.CHIP_UART_M_RXD, top.CHIP_UART_M_TXD);
     tfp->dump(main_time);
   }
   printf("--program written--\n\n");
@@ -514,18 +513,18 @@ void run_verilator(std::optional<std::string> trace_file,
 #endif
     top.clock = 1;// posedge
     main_time += fpga_clock_inc;
-      // ------------ HANDLE COMMAND INTERFACE ----------------
-      assert(program.empty());
-      queue_uart(program, stdout_strm, top.CHIP_UART_M_RXD, top.STDUART_uart_txd);
-      queue_uart(program, stdout_strm, top.STDUART_uart_rxd, top.STDUART_uart_txd, 1);
-      if (last_size != stdout_strm.size()) {
-        printf("%c", stdout_strm.back());
-        last_size = stdout_strm.size();
-        if (stdout_strm.back() == 0x4) {
-          // this is the kill signal defined by the arm source (see uart_stdout.h)
-          kill_sig = true;
-        }
+    // ------------ HANDLE COMMAND INTERFACE ----------------
+    assert(program.empty());
+    queue_uart(program, stdout_strm, top.CHIP_UART_M_RXD, top.STDUART_uart_txd);
+    queue_uart(program, stdout_strm, top.STDUART_uart_rxd, top.STDUART_uart_txd, 1);
+    if (last_size != stdout_strm.size()) {
+      printf("%c", stdout_strm.back());
+      last_size = stdout_strm.size();
+      if (stdout_strm.back() == 0x4) {
+        // this is the kill signal defined by the arm source (see uart_stdout.h)
+        kill_sig = true;
       }
+    }
     {
       // approx clock diff
       ddr_acc += ddr_clock_inc;
@@ -577,10 +576,8 @@ void run_verilator(std::optional<std::string> trace_file,
           auto tx = axi4_mem.read_transactions.front();
           int start = (tx->axi_bus_beats_progress * tx->size) % (DATA_BUS_WIDTH / 8);
           char *dest = (char *) axi4_mem.r->getData() + start;
-          if (SANITY) {
-            for (int i = 0; i < tx->size; ++i) {
-              dest[i] = mem_get(tx->addr + i);
-            }
+          for (int i = 0; i < tx->size; ++i) {
+            dest[i] = mem_get(tx->addr + i);
           }
           bool am_done = tx->len == (tx->axi_bus_beats_progress + 1);
           axi4_mem.r->setValid(1);
@@ -620,7 +617,7 @@ void run_verilator(std::optional<std::string> trace_file,
             // align to 64B - zero out bottom 6b
             auto addr = trans->addr;
             while (strobe != 0) {
-              if (strobe & 1 && SANITY) {
+              if (strobe & 1) {
 #ifdef COMPOSER_HAS_DMA
                 auto curr_ptr = uintptr_t(addr + off);
                 auto base_ptr = uintptr_t(dma_ptr);

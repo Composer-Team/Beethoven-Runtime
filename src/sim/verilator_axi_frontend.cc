@@ -203,6 +203,7 @@ void trace_rising_edge_post(VComposerTop &top) {
       break;
   }
 }
+
 TraceUnit::TraceUnit(TraceType ty, uint64_t address, uint32_t payload) : ty(ty), address(address), payload(payload) {}
 
 
@@ -271,9 +272,13 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 
 #if NUM_DDR_CHANNELS >= 1
   init_ddr_interface(0)
-      axi4_mems[0]
-          .r->setData((char *) &top.M00_AXI_rdata.at(0));
+#if DATA_BUS_WIDTH <= 64
+  axi4_mems[0].r->setData((char *) &top.M00_AXI_rdata);
+  axi4_mems[0].w->setData((char *) &top.M00_AXI_wdata);
+#else
+  axi4_mems[0].r->setData((char *) &top.M00_AXI_rdata.at(0));
   axi4_mems[0].w->setData((char *) &top.M00_AXI_wdata.at(0));
+#endif
 #if NUM_DDR_CHANNELS >= 2
   init_ddr_interface(1)
 #if NUM_DDR_CHANNELS >= 4
@@ -282,8 +287,8 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 #endif
 #endif
 #endif
-      // reset circuit
-      top.reset = active_reset;
+  // reset circuit
+  top.reset = active_reset;
   for (auto &mem: axi4_mems) {
     mem.r->setValid(0);
     mem.b->setValid(0);
@@ -372,7 +377,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
           char *ad = (char *) at.translate(addr);
           auto txsize = (int) 1 << axi4_mem.ar->getSize();
           auto txlen = axi4_mem.ar->getLen() + 1;
-          auto tx = std::make_shared<mem_ctrl::memory_transaction>((uintptr_t)ad, txsize, txlen, 0, false,
+          auto tx = std::make_shared<mem_ctrl::memory_transaction>((uintptr_t) ad, txsize, txlen, 0, false,
                                                                    axi4_mem.ar->getId(), addr);
           // 64b per DRAM transaction
           RLOCK
@@ -393,7 +398,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
           auto tx = axi4_mem.read_transactions.front();
           int start = (tx->axi_bus_beats_progress * tx->size) % (DATA_BUS_WIDTH / 8);
           char *dest = (char *) axi4_mem.r->getData() + start;
-          memcpy(dest, reinterpret_cast<char*>(tx->addr), tx->size);
+          memcpy(dest, reinterpret_cast<char *>(tx->addr), tx->size);
           bool am_done = tx->len == (tx->axi_bus_beats_progress + 1);
           axi4_mem.r->setValid(1);
           axi4_mem.r->setLast(am_done && tx->can_be_last);
@@ -448,7 +453,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
                   addr[off] = src[off];
                 }
 #else
-                reinterpret_cast<char*>(addr)[off] = src[off];
+                reinterpret_cast<char *>(addr)[off] = src[off];
 #endif
               }
               off += 1;
@@ -596,10 +601,10 @@ int main(int argc, char **argv) {
   std::optional<std::string> trace_file = {};
   for (int i = 1; i < argc; ++i) {
     assert(argv[i][0] == '-');
-    if (strcmp(argv[i]+1, "dramconfig") == 0){
-      dram_file = std::string(argv[i+1]);
-    } else if (strcmp(argv[i]+1, "tracefile") == 0) {
-      trace_file = std::string(argv[i+1]);
+    if (strcmp(argv[i] + 1, "dramconfig") == 0) {
+      dram_file = std::string(argv[i + 1]);
+    } else if (strcmp(argv[i] + 1, "tracefile") == 0) {
+      trace_file = std::string(argv[i + 1]);
     }
     ++i;
   }
@@ -618,7 +623,7 @@ int main(int argc, char **argv) {
     LOG(printf("Main thread exiting\n"));
   } catch (std::exception &e) {
     tfp->close();
-    throw(e);
+    throw (e);
   }
   sig_handle(0);
 }
