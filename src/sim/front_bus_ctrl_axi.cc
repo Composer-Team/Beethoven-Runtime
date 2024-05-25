@@ -42,7 +42,7 @@ response_transaction ongoing_rsp;
 update_state ongoing_update = UPDATE_IDLE_CMD;
 
 
-void update_command_state(VComposerTop &top){
+void update_command_state(ComposerTop &top){
   switch (ongoing_cmd.state) {
     // tell the composer that we're going to send 32-bits of a command over the PCIE bus
     case CMD_BITS_WRITE_ADDR:
@@ -161,6 +161,7 @@ void update_command_state(VComposerTop &top){
           (ongoing_update == UPDATE_IDLE_CMD || ongoing_update == UPDATE_IDLE_RESP)) {
         pthread_mutex_lock(&cmdserverlock);
         if (not cmds.empty()) {
+          printf("enqueueing command\n");
           bus_occupied = true;
           ongoing_cmd.state = CMD_BITS_WRITE_ADDR;
           if (cmds.front().getXd()) {
@@ -173,6 +174,8 @@ void update_command_state(VComposerTop &top){
           if (cmds.front().getXd() == 1)
             cmds_inflight++;
           cmds.pop();
+        } else {
+          fflush(stdout);
         }
         pthread_mutex_unlock(&cmdserverlock);
       }
@@ -181,7 +184,7 @@ void update_command_state(VComposerTop &top){
 
 }
 
-void update_resp_state(VComposerTop &top) {
+void update_resp_state(ComposerTop &top) {
   switch (ongoing_rsp.state) {
     case RESPT_INACTIVE:
       break;
@@ -276,12 +279,24 @@ void update_resp_state(VComposerTop &top) {
   }
 }
 
-void update_update_state(VComposerTop &top) {
+#ifndef DEFAULT_PL_CLOCK
+#define FPGA_CLOCK 100
+#else
+#define FPGA_CLOCK DEFAULT_PL_CLOCK
+#endif
+
+
+int check_freq_ctr = 0;
+
+void update_update_state(ComposerTop &top) {
   switch (ongoing_update) {
     case UPDATE_IDLE_RESP:
-      if (!bus_occupied && (main_time % check_freq == 0)) {
+      if (!bus_occupied && check_freq_ctr > check_freq) {
+        check_freq_ctr = 0;
         bus_occupied = true;
         ongoing_update = UPDATE_RESP_ADDR;
+      } else {
+        check_freq_ctr++;
       }
       break;
     case UPDATE_RESP_ADDR:
@@ -315,9 +330,12 @@ void update_update_state(VComposerTop &top) {
       }
       break;
     case UPDATE_IDLE_CMD:
-      if (!bus_occupied && (main_time % check_freq == 0)) {
+      if (!bus_occupied && check_freq_ctr > check_freq) {
+        check_freq_ctr = 0;
         bus_occupied = true;
         ongoing_update = UPDATE_CMD_ADDR;
+      } else {
+        check_freq_ctr++;
       }
       break;
     case UPDATE_CMD_ADDR:

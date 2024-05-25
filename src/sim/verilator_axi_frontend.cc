@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "VComposerTop.h"
+#include "ComposerTop.h"
 #include "cmd_server.h"
 #include "data_server.h"
 #include <csignal>
@@ -45,7 +45,7 @@ void sig_handle(int sig) {
   exit(sig);
 }
 
-void tick(VComposerTop *top) {
+void tick(ComposerTop *top) {
   try {
     top->eval();
   } catch (std::exception &e) {
@@ -122,7 +122,7 @@ static TraceMachineState state = IdleState;
 
 int time_in_idle = 0;
 
-void trace_rising_edge_pre(VComposerTop &top) {
+void trace_rising_edge_pre(ComposerTop &top) {
   if (top.reset == active_reset) return;
   switch (state) {
     case IdleState:
@@ -172,7 +172,7 @@ void trace_rising_edge_pre(VComposerTop &top) {
   }
 }
 
-void trace_rising_edge_post(VComposerTop &top) {
+void trace_rising_edge_post(ComposerTop &top) {
   if (top.reset == active_reset) return;
   top.S00_AXI_bready = false;
   top.S00_AXI_awvalid = false;
@@ -206,6 +206,47 @@ void trace_rising_edge_post(VComposerTop &top) {
 
 TraceUnit::TraceUnit(TraceType ty, uint64_t address, uint32_t payload) : ty(ty), address(address), payload(payload) {}
 
+void print_state(uint64_t mem, uint64_t time) {
+  std::string time_string;
+  // in seconds
+  double time_d = (double)time / 1e12;
+  if (time < 1000 * 1000 * 1000) {
+    time_string = std::to_string(double(time) / 1000 / 1000) + "µs";
+  } else {
+    time_string = std::to_string(double(time) / 1000 / 1000 / 1000) + "ms";
+  }
+
+  std::string mem_unit;
+  double mem_norm;
+  if (mem < 1024) {
+    mem_unit = "B";
+    mem_norm = (double)mem;
+  } else if (mem < 1024 * 1024) {
+    mem_unit = "KB";
+    mem_norm = (double)mem / 1024;
+  } else if (mem < 1024 * 1024 * 1024) {
+    mem_unit = "MB";
+    mem_norm = (double)mem / 1024 / 1024;
+  } else {
+    mem_unit = "GB";
+    mem_norm = (double)mem / 1024 / 1024 / 1024;
+  }
+
+  std::string mem_rate;
+  // compute bytes per second and normalize
+  double mem_rate_norm = (double)mem / time_d;
+  if (mem_rate_norm < 1024) {
+    mem_rate = std::to_string(mem_rate_norm) + "B/s";
+  } else if (mem_rate_norm < 1024 * 1024) {
+    mem_rate = std::to_string(mem_rate_norm / 1024) + "KB/s";
+  } else if (mem_rate_norm < 1024 * 1024 * 1024) {
+    mem_rate = std::to_string(mem_rate_norm / 1024 / 1024) + "MB/s";
+  } else {
+    mem_rate = std::to_string(mem_rate_norm / 1024 / 1024 / 1024) + "GB/s";
+  }
+
+  std::cout << "\rTime: " << time_string << " | Memory: " << mem_norm << mem_unit << " | Rate: " << mem_rate << " | ";
+}
 
 void run_verilator(std::optional<std::string> trace_file, const std::string &dram_config_file) {
 #if 500000 % FPGA_CLOCK != 0
@@ -229,17 +270,20 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
   float ddr_clock_inc = DDR_CLOCK / FPGA_CLOCK;// NOLINT
   printf("%f\n", ddr_clock_inc);
   float ddr_acc = 0;
+  uint64_t memory_transacted = 0;
+  uint64_t cycle_count = 0;
 
   // start servers to communicate with user programs
-  const char *v[3] = {"", "+verilator+seed+14934534", "+verilator+rand+reset+2"};
-  Verilated::commandArgs(3, v);
-  VComposerTop top;
+//  const char *v[3] = {"", "+verilator+seed+14934534", "+verilator+rand+reset+2"};
+//  const int cv = 3;
+const char *v[1] = {""};
+const int cv = 1;
+  Verilated::commandArgs(cv, v);
+  ComposerTop top;
   Verilated::traceEverOn(true);
   tfp = new waveTrace;
   top.trace(tfp, 30);
   tfp->open("trace" TRACE_FILE_ENDING );
-
-  LOG(printf("TESTING THIS"));
 
   std::cout << "Tracing!" << std::endl;
 
@@ -318,15 +362,9 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
   top.clock = 0;
 
   LOG(printf("main time %lld\n", main_time));
-  unsigned long ms = 1;
   while (not kill_sig) {
     // clock is high after posedge - changes now are taking place after posedge,
     // and will take effect on negedge
-    if (main_time > ms * 1000 * 1000 * 1000) {
-      printf("main time: %lu ms\n", ms);
-      fflush(stdout);
-      ++ms;
-    }
 
 #ifdef KILL_SIM
     if (ms >= KILL_SIM) {
@@ -336,6 +374,11 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 #endif
     top.clock = 1;// posedge
     main_time += fpga_clock_inc;
+    cycle_count++;
+    if ((cycle_count & 1024) == 0) {
+      print_state(memory_transacted, main_time);
+      fflush(stdout);
+    }
     {
 
       // ------------ HANDLE COMMAND INTERFACE ----------------
@@ -360,6 +403,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 
       for (auto &axi4_mem: axi4_mems) {
         if (axi4_mem.r->getValid() && axi4_mem.r->getReady()) {
+          memory_transacted += sizeof(axi4_mem.r->getStrobe()) << 3;
           RLOCK
           auto tx = axi4_mem.read_transactions.front();
           tx->axi_bus_beats_progress++;
@@ -391,6 +435,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
       for (mem_ctrl::mem_interface<ComposerMemIDDtype> &axi4_mem: axi4_mems) {
         if (axi4_mem.b->getReady() && axi4_mem.b->getValid()) {
           axi4_mem.b->send_ids.pop();
+          axi4_mem.num_in_flight_writes--;
         }
 
         RLOCK
@@ -423,38 +468,44 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
           axi4_mem.b->to_enqueue.pop();
         }
 
-        mem_ctrl::enqueue_transaction(*axi4_mem.aw, axi4_mem.write_transactions);
+        if (axi4_mem.aw->getValid() && axi4_mem.aw->getReady()) {
+          try {
+#ifdef BAREMETAL_RUNTIME
+            uintptr_t addr = axi4_mem.aw->getAddr();
+#else
+            char *addr = (char *) at.translate(axi4_mem.aw->getAddr());
+#endif
+            int sz = 1 << axi4_mem.aw->getSize();
+            int len = 1 + axi4_mem.aw->getLen();// per axi
+            bool is_fixed = axi4_mem.aw->getBurst() == 0;
+            int id = axi4_mem.aw->getId();
+            uint64_t fpga_addr = axi4_mem.aw->getAddr();
+            auto tx = std::make_shared<mem_ctrl::memory_transaction>(uintptr_t(addr), sz, len, 0, is_fixed, id, fpga_addr);
+            axi4_mem.write_transactions.push(tx);
+            axi4_mem.num_in_flight_writes++;
+          } catch (std::exception &e) {
+            tfp->dump(main_time);
+            tfp->close();
+            throw e;
+          }
+        }
+
+//        mem_ctrl::enqueue_transaction(*axi4_mem.aw, axi4_mem.write_transactions);
 
         if (not axi4_mem.write_transactions.empty()) {
           if (axi4_mem.w->getValid() && axi4_mem.w->getReady()) {
             auto trans = axi4_mem.write_transactions.front();
             // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
             char *src = axi4_mem.w->getData();
-            ComposerStrobeSimDtype strobe = axi4_mem.w->getStrobe();
+            auto strobe = axi4_mem.w->getStrobe();
             uint32_t off = 0;
             // for writes, we need to account for alignment and strobe,so we're re-aligning address here
             // align to 64B - zero out bottom 6b
             auto addr = trans->addr;
             while (strobe != 0) {
               if (strobe & 1) {
-#ifdef COMPOSER_HAS_DMA
-                auto curr_ptr = uintptr_t(addr + off);
-                auto base_ptr = uintptr_t(dma_ptr);
-                auto end_ptr = uintptr_t(dma_ptr + dma_len);
-                if (dma_in_progress and dma_write and curr_ptr < end_ptr and curr_ptr >= base_ptr) {
-                  // we're performing a DMA into the same address space so just make sure that the values match up...
-                  if (addr[off] != src[off]) {
-                    std::cerr << "DMA write was not a no-op. " << off << " " << int(addr[off]) << " " << int(src[off])
-                              << std::endl;
-                    tfp->close();
-                    throw std::exception();
-                  }
-                } else {
-                  addr[off] = src[off];
-                }
-#else
                 reinterpret_cast<char *>(addr)[off] = src[off];
-#endif
+                memory_transacted++;
               }
               off += 1;
               strobe >>= 1;
@@ -471,10 +522,13 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
               trans->dram_tx_len_bus_beats = trans->len * trans->size >> 3;
               trans->axi_bus_beats_progress = 1;
               axi4_mem.ddr_write_q.push_back(trans);
+              axi4_mem.w->setReady(!axi4_mem.write_transactions.empty() || axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
+            } else {
+              axi4_mem.w->setReady(1);
             }
           }
         } else {
-          axi4_mem.w->setReady(0);
+          axi4_mem.w->setReady(axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
         }
         WUNLOCK
 
@@ -485,8 +539,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 
         WLOCK
 
-        axi4_mem.w->setReady(axi4_mem.can_accept_write());
-        axi4_mem.aw->setReady(axi4_mem.can_accept_write());
+        axi4_mem.aw->setReady(axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
         WUNLOCK
       }
 

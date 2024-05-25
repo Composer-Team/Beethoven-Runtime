@@ -194,7 +194,7 @@ class [[maybe_unused]] device_allocator {
 
 
 public:
-  composer::remote_ptr malloc(uint64_t len) {
+  uint64_t malloc(uint64_t len) {
     const auto log_block_size = std::max(log2up(len), log_min_block);
     uint64_t block_size = 1 << log_block_size;
     uint32_t idx;
@@ -263,7 +263,7 @@ public:
         pthread_mutex_unlock(&my_head_lock);
       }
       //        printf("sbid: %lu, bid: %lu, flags: %d\n", superblock_id, block_id, superblocks[superblock_id].flags); fflush(stdout);
-      return composer::remote_ptr(superblock_id * superblock_size + block_id * block_size, nullptr, len);
+      return superblock_id * superblock_size + block_id * block_size;
     } else {
       // we're just going to use a huge allocation (not within a superblock)
       uint32_t num_superblocks_needed = 1 << (log_block_size - log_superblock_size);
@@ -347,7 +347,7 @@ public:
       for (uint32_t i = 1; i < num_superblocks_needed; i++) {
         superblocks[alloc_start + i].flags = 0;// they will not be marked as base allocations
       }
-      return composer::remote_ptr(alloc_start * superblock_size, nullptr, len);
+      return alloc_start * superblock_size;
     }
   }
 

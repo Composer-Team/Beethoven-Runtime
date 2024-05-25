@@ -125,16 +125,25 @@ endif ()
 if ("${NO_SANITY}" STREQUAL "1" OR "${FRONTEND}" STREQUAL "chipkit")
     target_compile_definitions(ComposerRuntime PUBLIC BAREMETAL_RUNTIME=1)
     message("Building for chipkit")
-endif()
+endif ()
 
 if (${BUILD_SIM})
+    # if file exists
+    if (EXISTS ${COMPOSER_DIR}/cmake_srcs.cmake)
+        include(${COMPOSER_DIR}/cmake_srcs.cmake)
+    else ()
+        set(SRCS ${VTOP})
+    endif ()
     verilate(ComposerRuntime
-            SOURCES ${VTOP}
+            SOURCES ${SRCS}
             INCLUDE_DIRS ${COMPOSER_DIR} $ENV{COMPOSER_ROOT}/Composer-Runtime/verilog_resources/ ${COMPOSER_DIR}/composer.build/ ${ADDITIONAL_SEARCH}
             TOP_MODULE ${TOP}
+            PREFIX ${TOP}
             TRACE_FST
             VERILATOR_ARGS --timescale 1ps/1ps --x-assign fast
             --timing -Wno-context -Wno-lint -Wno-style -Wno-symrsvdword -Wno-multidriven -Wno-combdly -Wno-zerodly
-            -Wno-moddup -Wno-unoptflat --threads 4
+            -Wno-moddup -Wno-unoptflat # --threads 4
     )
 endif ()
+
+add_subdirectory(tests)

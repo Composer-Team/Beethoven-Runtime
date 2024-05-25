@@ -354,6 +354,9 @@ namespace mem_ctrl {
     response_channel<IDType> *b = nullptr;
     std::queue<std::shared_ptr<memory_transaction>> write_transactions;
     std::queue<std::shared_ptr<memory_transaction>> read_transactions;
+
+    int num_in_flight_writes = 0;
+    static const int max_in_flight_writes = 32;
     int id;
     void enqueue_read(std::shared_ptr<mem_ctrl::memory_transaction> &tx) override {
       read_transactions.push(tx);

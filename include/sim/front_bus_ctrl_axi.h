@@ -6,7 +6,7 @@
 #define COMPOSERRUNTIME_FRONT_BUS_CTRL_AXI_H
 
 #include <cinttypes>
-#include <VComposerTop.h>
+#include <ComposerTop.h>
 
 enum cmd_transfer_state {
   CMD_INACTIVE,
@@ -60,11 +60,11 @@ struct response_transaction {
   resp_transfer_state state = RESPT_INACTIVE;
 };
 
-void update_command_state(VComposerTop &top);
+void update_command_state(ComposerTop &top);
 
-void update_resp_state(VComposerTop &top);
+void update_resp_state(ComposerTop &top);
 
-void update_update_state(VComposerTop &top);
+void update_update_state(ComposerTop &top);
 
 
 #endif//COMPOSERRUNTIME_FRONT_BUS_CTRL_AXI_H

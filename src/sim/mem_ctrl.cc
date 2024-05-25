@@ -161,27 +161,3 @@ void mem_ctrl::init(const std::string &dram_ini_file) {
   }
 }
 
-void mem_ctrl::enqueue_transaction(v_address_channel<ComposerMemIDDtype> &chan, std::queue<std::shared_ptr<memory_transaction>> &lst) {
-  if (chan.getValid() && chan.getReady()) {
-    try {
-#ifdef BAREMETAL_RUNTIME
-      uintptr_t addr = chan.getAddr();
-#else
-      char *addr = (char *) at.translate(chan.getAddr());
-#endif
-      int sz = 1 << chan.getSize();
-      int len = 1 + chan.getLen();// per axi
-      bool is_fixed = chan.getBurst() == 0;
-      int id = chan.getId();
-//      fprintf(stderr, "Enqueueing on awid channel %d\n", id);
-      uint64_t fpga_addr = chan.getAddr();
-      auto tx = std::make_shared<memory_transaction>(uintptr_t(addr), sz, len, 0, is_fixed, id, fpga_addr);
-      lst.push(tx);
-    } catch (std::exception &e) {
-      tfp->dump(main_time);
-      tfp->close();
-      throw e;
-    }
-  }
-}
-

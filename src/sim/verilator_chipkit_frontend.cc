@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "VComposerTop.h"
+#include "ComposerTop.h"
 #include "cmd_server.h"
 #include <csignal>
 #include <pthread.h>
@@ -43,7 +43,7 @@ void sig_handle(int sig) {
   exit(sig);
 }
 
-void tick(VComposerTop *top) {
+void tick(ComposerTop *top) {
   try {
     top->eval();
   } catch (std::exception &e) {
@@ -157,7 +157,7 @@ void run_verilator(std::optional<std::string> trace_file,
   // start servers to communicate with user programs
   const char *v[1] = {""};
   Verilated::commandArgs(0, v);
-  VComposerTop top;
+  ComposerTop top;
   Verilated::traceEverOn(true);
   tfp = new waveTrace;
   top.trace(tfp, 30);
@@ -521,7 +521,7 @@ void run_verilator(std::optional<std::string> trace_file,
       printf("%c", stdout_strm.back());
       last_size = stdout_strm.size();
       if (stdout_strm.back() == 0x4) {
-        // this is the kill signal defined by the arm source (see uart_stdout.h)
+        // this is the kill signal defined by the arm sourdce (see uart_stdout.h)
         kill_sig = true;
       }
     }
@@ -569,6 +569,7 @@ void run_verilator(std::optional<std::string> trace_file,
       for (mem_ctrl::mem_interface<ComposerMemIDDtype> &axi4_mem: axi4_mems) {
         if (axi4_mem.b->getReady() && axi4_mem.b->getValid()) {
           axi4_mem.b->send_ids.pop();
+          axi4_mem.num_in_flight_writes--;
         }
 
         RLOCK
@@ -603,7 +604,27 @@ void run_verilator(std::optional<std::string> trace_file,
           axi4_mem.b->to_enqueue.pop();
         }
 
-        mem_ctrl::enqueue_transaction(*axi4_mem.aw, axi4_mem.write_transactions);
+        if (axi4_mem.aw->getValid() && axi4_mem.aw->getReady()) {
+          try {
+#ifdef BAREMETAL_RUNTIME
+            uintptr_t addr = axi4_mem.aw->getAddr();
+#else
+            char *addr = (char *) at.translate(axi4_mem.aw->getAddr());
+#endif
+            int sz = 1 << axi4_mem.aw->getSize();
+            int len = 1 + axi4_mem.aw->getLen();// per axi
+            bool is_fixed = axi4_mem.aw->getBurst() == 0;
+            int id = axi4_mem.aw->getId();
+            uint64_t fpga_addr = axi4_mem.aw->getAddr();
+            auto tx = std::make_shared<mem_ctrl::memory_transaction>(uintptr_t(addr), sz, len, 0, is_fixed, id, fpga_addr);
+            axi4_mem.write_transactions.push(tx);
+            axi4_mem.num_in_flight_writes++;
+          } catch (std::exception &e) {
+            tfp->dump(main_time);
+            tfp->close();
+            throw e;
+          }
+        }
 
 
         if (not axi4_mem.write_transactions.empty()) {
@@ -653,10 +674,13 @@ void run_verilator(std::optional<std::string> trace_file,
               trans->dram_tx_len_bus_beats = trans->len * trans->size >> 3;
               trans->axi_bus_beats_progress = 1;
               axi4_mem.ddr_write_q.push_back(trans);
+              axi4_mem.w->setReady(!axi4_mem.write_transactions.empty() || axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
+            } else {
+              axi4_mem.w->setReady(1);
             }
           }
         } else {
-          axi4_mem.w->setReady(0);
+          axi4_mem.w->setReady(axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
         }
         WUNLOCK
 
@@ -667,8 +691,7 @@ void run_verilator(std::optional<std::string> trace_file,
 
         WLOCK
 
-        axi4_mem.w->setReady(axi4_mem.can_accept_write());
-        axi4_mem.aw->setReady(axi4_mem.can_accept_write());
+        axi4_mem.aw->setReady(axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
         WUNLOCK
       }
     }

@@ -185,9 +185,9 @@ static std::vector<uint16_t> available_ids;
         // allocate memory
 #ifdef COMPOSER_USE_CUSTOM_ALLOC
         auto fpga_addr = allocator->malloc(addr.op_argument);
-        at.add_mapping(fpga_addr.getFpgaAddr(), addr.op_argument, naddr);
+        at.add_mapping(fpga_addr, addr.op_argument, naddr);
         // return fpga address
-        addr.op_argument = fpga_addr.getFpgaAddr();
+        addr.op_argument = fpga_addr;
         LOG(printf("Allocated %llu bytes at %p. FPGA addr %llx\n", nBytes, naddr, fpga_addr.getFpgaAddr()));
 #else
         auto fpga_addr = (uint64_t) naddr;

@@ -30,8 +30,8 @@ typedef std::queue<TraceUnit> Trace;
 
 void init_trace(const std::string &fname);
 
-void trace_rising_edge_pre(VComposerTop &top);
-void trace_rising_edge_post(VComposerTop &top);
+void trace_rising_edge_pre(ComposerTop &top);
+void trace_rising_edge_post(ComposerTop &top);
 
 
 
