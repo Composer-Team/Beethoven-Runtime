@@ -2,12 +2,12 @@
 // Created by Chris Kjellqvist on 8/9/23.
 //
 
-#include "composer_allocator_declaration.h"
+#include "beethoven_allocator_declaration.h"
 #include "sim/front_bus_ctrl_axi.h"
 #include "sim/mem_ctrl.h"
 #include <verilated_fst_c.h>
 
-extern mem_ctrl::mem_interface<ComposerMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
+extern mem_ctrl::mem_interface<BeethovenMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
 #ifdef USE_VCD
 extern VerilatedVcdC *tfp;
 #else

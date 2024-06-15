@@ -2,8 +2,8 @@
 // Created by Chris Kjellqvist on 8/9/23.
 //
 
-#ifndef COMPOSERRUNTIME_FRONT_BUS_CTRL_AXI_H
-#define COMPOSERRUNTIME_FRONT_BUS_CTRL_AXI_H
+#ifndef BEETHOVENRUNTIME_FRONT_BUS_CTRL_AXI_H
+#define BEETHOVENRUNTIME_FRONT_BUS_CTRL_AXI_H
 
 #include <queue>
 
@@ -17,4 +17,4 @@ void queue_uart(std::queue<unsigned char> &in_stream,
 void set_baud(unsigned int baud_flag);
 unsigned int get_baud_sel();
 
-#endif//COMPOSERRUNTIME_FRONT_BUS_CTRL_AXI_H
+#endif//BEETHOVENRUNTIME_FRONT_BUS_CTRL_AXI_H

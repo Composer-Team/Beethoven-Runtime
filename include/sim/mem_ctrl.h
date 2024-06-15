@@ -2,9 +2,9 @@
 // Created by Chris Kjellqvist on 8/9/23.
 //
 
-#ifndef COMPOSERRUNTIME_MEM_CTRL_H
-#define COMPOSERRUNTIME_MEM_CTRL_H
-#include "composer_allocator_declaration.h"
+#ifndef BEETHOVENRUNTIME_MEM_CTRL_H
+#define BEETHOVENRUNTIME_MEM_CTRL_H
+#include "beethoven_allocator_declaration.h"
 #include "data_server.h"
 #include "ddr_macros.h"
 #include "dram_system.h"
@@ -106,7 +106,7 @@ namespace mem_ctrl {
     idtype *id = nullptr;
     CData *size = nullptr;
     CData *burst = nullptr;
-    ComposerMemAddressSimDtype *addr = nullptr;
+    BeethovenMemAddressSimDtype *addr = nullptr;
     CData *len = nullptr;
 
   public:
@@ -115,7 +115,7 @@ namespace mem_ctrl {
                                idtype &id,
                                CData &size,
                                CData &burst,
-                               ComposerMemAddressSimDtype &addr,
+                               BeethovenMemAddressSimDtype &addr,
                                CData &len) : ready(&ready),
                                              valid(&valid),
                                              id(&id),
@@ -164,11 +164,11 @@ namespace mem_ctrl {
       *v_address_channel::burst = burst;
     }
 
-    ComposerMemAddressSimDtype getAddr() const {
+    BeethovenMemAddressSimDtype getAddr() const {
       return *addr;
     }
 
-    void setAddr(ComposerMemAddressSimDtype addr) {
+    void setAddr(BeethovenMemAddressSimDtype addr) {
       *v_address_channel::addr = addr;
     }
 
@@ -191,13 +191,13 @@ namespace mem_ctrl {
     CData *valid;
     char *data = nullptr;
     idtype *id;
-    ComposerStrobeSimDtype *strobe;
+    BeethovenStrobeSimDtype *strobe;
     CData *last;
 
   public:
     explicit data_channel(CData &ready,
                           CData &valid,
-                          ComposerStrobeSimDtype *strobe,
+                          BeethovenStrobeSimDtype *strobe,
                           CData &last,
                           idtype *id) : ready(&ready),
                                         valid(&valid),
@@ -238,11 +238,11 @@ namespace mem_ctrl {
       //    std::cerr << "Got " << id << ", set as " << *data_channel::id << std::endl;
     }
 
-    ComposerStrobeSimDtype getStrobe() const {
+    BeethovenStrobeSimDtype getStrobe() const {
       return *strobe;
     }
 
-    void setStrobe(ComposerStrobeSimDtype strobe) {
+    void setStrobe(BeethovenStrobeSimDtype strobe) {
       *data_channel::strobe = strobe;
     }
 
@@ -369,9 +369,9 @@ namespace mem_ctrl {
     int current_read_channel_contents = -1;
   };
 
-  void enqueue_transaction(v_address_channel<ComposerMemIDDtype> &chan, std::queue<std::shared_ptr<memory_transaction>> &lst);
+  void enqueue_transaction(v_address_channel<BeethovenMemIDDtype> &chan, std::queue<std::shared_ptr<memory_transaction>> &lst);
 }
 
-void try_to_enqueue_ddr(mem_ctrl::mem_interface<ComposerMemIDDtype> &axi4_mem);
+void try_to_enqueue_ddr(mem_ctrl::mem_interface<BeethovenMemIDDtype> &axi4_mem);
 
-#endif//COMPOSERRUNTIME_MEM_CTRL_H
+#endif//BEETHOVENRUNTIME_MEM_CTRL_H

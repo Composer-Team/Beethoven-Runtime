@@ -6,8 +6,8 @@
 #include "../include/data_server.h"
 #include "fpga_utils.h"
 #include "mmio.h"
-#include <composer/verilator_server.h>
-#include <composer_allocator_declaration.h>
+#include <beethoven/verilator_server.h>
+#include <beethoven_allocator_declaration.h>
 #include <sys/stat.h>
 
 #include <cassert>
@@ -41,12 +41,12 @@ system_core_pair::system_core_pair(int system, int core) {
   this->core = core;
 }
 
-using namespace composer;
+using namespace beethoven;
 
 cmd_server_file *csf;
 
 pthread_mutex_t cmdserverlock = PTHREAD_MUTEX_INITIALIZER;
-std::queue<composer::rocc_cmd> cmds;
+std::queue<beethoven::rocc_cmd> cmds;
 std::unordered_map<system_core_pair, std::queue<int> *> in_flight;
 
 constexpr int num_cmd_beats = (int) roundUp((float) (32 * 5) / AXIL_BUS_WIDTH);
@@ -54,8 +54,8 @@ constexpr int num_cmd_beats = (int) roundUp((float) (32 * 5) / AXIL_BUS_WIDTH);
 static void *cmd_server_f(void *) {
   setup_mmio();
   // map in the shared file
-  int fd_composer = shm_open(cmd_server_file_name.c_str(), O_CREAT | O_RDWR, file_access_flags);
-  if (fd_composer < 0) {
+  int fd_beethoven = shm_open(cmd_server_file_name.c_str(), O_CREAT | O_RDWR, file_access_flags);
+  if (fd_beethoven < 0) {
     printf("Failed to initialize cmd_file\n%s\n", strerror(errno));
     exit(errno);
   } else {
@@ -63,16 +63,16 @@ static void *cmd_server_f(void *) {
   }
   // check the file size. It might already exist in which case we don't need to truncate it again
   struct stat shm_stats {};
-  fstat(fd_composer, &shm_stats);
+  fstat(fd_beethoven, &shm_stats);
   if (shm_stats.st_size < sizeof(cmd_server_file)) {
-    int tr_rc = ftruncate(fd_composer, sizeof(cmd_server_file));
+    int tr_rc = ftruncate(fd_beethoven, sizeof(cmd_server_file));
     if (tr_rc) {
       std::cerr << "Failed to truncate cmd_server file" << std::endl;
       throw std::exception();
     }
   }
   auto &addr = *(cmd_server_file *) mmap(nullptr, sizeof(cmd_server_file), file_access_prots,
-                                         MAP_SHARED, fd_composer, 0);
+                                         MAP_SHARED, fd_beethoven, 0);
   csf = &addr;
   // we need to initialize it! This used to be a race condition, where the cmd_server thread was racing against the
   // poller thread to get to the file. The poller often won, found old dat anad mucked everything up :(
@@ -171,7 +171,7 @@ void cmd_server::start() {
 }
 
 void register_reponse(uint32_t *r_buffer) {
-  composer::rocc_response r(r_buffer, pack_cfg);
+  beethoven::rocc_response r(r_buffer, pack_cfg);
   system_core_pair pr(r.system_id, r.core_id);
   pthread_mutex_lock(&cmdserverlock);
   auto it = in_flight.find(pr);

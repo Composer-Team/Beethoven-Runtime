@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "ComposerTop.h"
+#include "BeethovenTop.h"
 #include "cmd_server.h"
 #include <csignal>
 #include <pthread.h>
@@ -14,7 +14,7 @@
 #include "trace/trace_read.h"
 
 #include "util.h"
-#include <composer_allocator_declaration.h>
+#include <beethoven_allocator_declaration.h>
 
 
 #ifndef DEFAULT_PL_CLOCK
@@ -27,9 +27,9 @@ uint64_t main_time = 0;
 
 bool active_reset = true;
 
-extern std::queue<composer::rocc_cmd> cmds;
+extern std::queue<beethoven::rocc_cmd> cmds;
 extern std::unordered_map<system_core_pair, std::queue<int> *> in_flight;
-mem_ctrl::mem_interface<ComposerMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
+mem_ctrl::mem_interface<BeethovenMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
 
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -43,7 +43,7 @@ void sig_handle(int sig) {
   exit(sig);
 }
 
-void tick(ComposerTop *top) {
+void tick(BeethovenTop *top) {
   try {
     top->eval();
   } catch (std::exception &e) {
@@ -157,7 +157,7 @@ void run_verilator(std::optional<std::string> trace_file,
   // start servers to communicate with user programs
   const char *v[1] = {""};
   Verilated::commandArgs(0, v);
-  ComposerTop top;
+  BeethovenTop top;
   Verilated::traceEverOn(true);
   tfp = new waveTrace;
   top.trace(tfp, 30);
@@ -168,24 +168,24 @@ void run_verilator(std::optional<std::string> trace_file,
     axi4_mems[i].id = i;
   }
 
-#if defined(COMPOSER_HAS_DMA)
+#if defined(BEETHOVEN_HAS_DMA)
 
-  mem_ctrl::mem_interface<ComposerDMAIDtype> dma;
+  mem_ctrl::mem_interface<BeethovenDMAIDtype> dma;
   int dma_txprogress = 0;
   int dma_txlength = 0;
-  dma.aw = new mem_ctrl::v_address_channel<ComposerDMAIDtype>(top.dma_awready, top.dma_awvalid, top.dma_awid,
+  dma.aw = new mem_ctrl::v_address_channel<BeethovenDMAIDtype>(top.dma_awready, top.dma_awvalid, top.dma_awid,
                                                               top.dma_awsize, top.dma_awburst,
                                                               top.dma_awaddr, top.dma_awlen);
-  dma.ar = new mem_ctrl::v_address_channel<ComposerDMAIDtype>(top.dma_arready, top.dma_arvalid, top.dma_arid,
+  dma.ar = new mem_ctrl::v_address_channel<BeethovenDMAIDtype>(top.dma_arready, top.dma_arvalid, top.dma_arid,
                                                               top.dma_arsize, top.dma_arburst,
                                                               top.dma_araddr, top.dma_arlen);
-  dma.w = new mem_ctrl::data_channel<ComposerDMAIDtype>(top.dma_wready, top.dma_wvalid,
+  dma.w = new mem_ctrl::data_channel<BeethovenDMAIDtype>(top.dma_wready, top.dma_wvalid,
                                                         &top.dma_wstrb, top.dma_wlast, nullptr);
-  dma.r = new mem_ctrl::data_channel<ComposerDMAIDtype>(top.dma_rready, top.dma_rvalid,
+  dma.r = new mem_ctrl::data_channel<BeethovenDMAIDtype>(top.dma_rready, top.dma_rvalid,
                                                         nullptr, top.dma_rlast, &top.dma_rid);
   dma.w->setData((char *) top.dma_rdata.m_storage);
   dma.r->setData((char *) top.dma_wdata.m_storage);
-  dma.b = new mem_ctrl::response_channel<ComposerDMAIDtype>(top.dma_bready, top.dma_bvalid, top.dma_bid);
+  dma.b = new mem_ctrl::response_channel<BeethovenDMAIDtype>(top.dma_bready, top.dma_bvalid, top.dma_bid);
 #endif
   for (auto &axi4_mem: axi4_mems) {
     axi4_mem.init_dramsim3();
@@ -220,7 +220,7 @@ void run_verilator(std::optional<std::string> trace_file,
     mem.b->setValid(0);
     mem.aw->setReady(1);
   }
-#ifdef COMPOSER_HAS_DMA
+#ifdef BEETHOVEN_HAS_DMA
   dma.b->setReady(0);
   dma.ar->setValid(0);
   dma.aw->setValid(0);
@@ -325,7 +325,7 @@ void run_verilator(std::optional<std::string> trace_file,
         }
 
         // ------------ HANDLE MEMORY INTERFACES ----------------
-        for (mem_ctrl::mem_interface<ComposerMemIDDtype> &axi4_mem: axi4_mems) {
+        for (mem_ctrl::mem_interface<BeethovenMemIDDtype> &axi4_mem: axi4_mems) {
           if (axi4_mem.b->getReady() && axi4_mem.b->getValid()) {
             axi4_mem.b->send_ids.pop();
           }
@@ -370,14 +370,14 @@ void run_verilator(std::optional<std::string> trace_file,
               auto trans = axi4_mem.write_transactions.front();
               // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
               char *src = axi4_mem.w->getData();
-              ComposerStrobeSimDtype strobe = axi4_mem.w->getStrobe();
+              BeethovenStrobeSimDtype strobe = axi4_mem.w->getStrobe();
               uint32_t off = 0;
               // for writes, we need to account for alignment and strobe,so we're re-aligning address here
               // align to 64B - zero out bottom 6b
               auto addr = trans->addr;
               while (strobe != 0) {
                 if (strobe & 1) {
-#ifdef COMPOSER_HAS_DMA
+#ifdef BEETHOVEN_HAS_DMA
                   auto curr_ptr = uintptr_t(addr + off);
                 auto base_ptr = uintptr_t(dma_ptr);
                 auto end_ptr = uintptr_t(dma_ptr + dma_len);
@@ -566,7 +566,7 @@ void run_verilator(std::optional<std::string> trace_file,
       }
 
       // ------------ HANDLE MEMORY INTERFACES ----------------
-      for (mem_ctrl::mem_interface<ComposerMemIDDtype> &axi4_mem: axi4_mems) {
+      for (mem_ctrl::mem_interface<BeethovenMemIDDtype> &axi4_mem: axi4_mems) {
         if (axi4_mem.b->getReady() && axi4_mem.b->getValid()) {
           axi4_mem.b->send_ids.pop();
           axi4_mem.num_in_flight_writes--;
@@ -632,14 +632,14 @@ void run_verilator(std::optional<std::string> trace_file,
             auto trans = axi4_mem.write_transactions.front();
             // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
             char *src = axi4_mem.w->getData();
-            ComposerStrobeSimDtype strobe = axi4_mem.w->getStrobe();
+            BeethovenStrobeSimDtype strobe = axi4_mem.w->getStrobe();
             uint32_t off = 0;
             // for writes, we need to account for alignment and strobe,so we're re-aligning address here
             // align to 64B - zero out bottom 6b
             auto addr = trans->addr;
             while (strobe != 0) {
               if (strobe & 1) {
-#ifdef COMPOSER_HAS_DMA
+#ifdef BEETHOVEN_HAS_DMA
                 auto curr_ptr = uintptr_t(addr + off);
                 auto base_ptr = uintptr_t(dma_ptr);
                 auto end_ptr = uintptr_t(dma_ptr + dma_len);

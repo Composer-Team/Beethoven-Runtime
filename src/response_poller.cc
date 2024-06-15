@@ -10,7 +10,7 @@
 #endif
 
 #include "cmd_server.h"
-#include <composer_allocator_declaration.h>
+#include <beethoven_allocator_declaration.h>
 #include <thread>
 #include "util.h"
 

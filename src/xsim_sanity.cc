@@ -1,9 +1,9 @@
 //
 // Created by Chris Kjellqvist on 11/17/22.
 //
-#include "composer_allocator_declaration.h"
+#include "beethoven_allocator_declaration.h"
 
-#include <composer/rocc_cmd.h>
+#include <beethoven/rocc_cmd.h>
 
 #ifndef USEMAIN
 extern "C" {

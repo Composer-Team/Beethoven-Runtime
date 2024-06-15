@@ -2,8 +2,8 @@
 // Created by Christopher Kjellqvist on 2/2/24.
 //
 
-#ifndef COMPOSERRUNTIME_TRACE_READ_H
-#define COMPOSERRUNTIME_TRACE_READ_H
+#ifndef BEETHOVENRUNTIME_TRACE_READ_H
+#define BEETHOVENRUNTIME_TRACE_READ_H
 
 #include "sim/front_bus_ctrl_axi.h"
 #include <cinttypes>
@@ -30,9 +30,9 @@ typedef std::queue<TraceUnit> Trace;
 
 void init_trace(const std::string &fname);
 
-void trace_rising_edge_pre(ComposerTop &top);
-void trace_rising_edge_post(ComposerTop &top);
+void trace_rising_edge_pre(BeethovenTop &top);
+void trace_rising_edge_post(BeethovenTop &top);
 
 
 
-#endif//COMPOSERRUNTIME_TRACE_READ_H
+#endif//BEETHOVENRUNTIME_TRACE_READ_H

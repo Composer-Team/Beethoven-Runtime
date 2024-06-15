@@ -9,15 +9,15 @@
 #include <vector>
 
 #include "util.h"
-#include <composer/verilator_server.h>
-#include <composer_allocator_declaration.h>
+#include <beethoven/verilator_server.h>
+#include <beethoven_allocator_declaration.h>
 
 #include "../include/data_server.h"
 
 #include <fcntl.h>
 
 #ifdef SIM
-#ifdef COMPOSER_HAS_DMA
+#ifdef BEETHOVEN_HAS_DMA
 pthread_mutex_t dma_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t dma_wait_lock = PTHREAD_MUTEX_INITIALIZER;
 bool dma_in_progress = false;
@@ -47,9 +47,9 @@ extern bool kill_sig;
 #include <unistd.h>
 #endif
 
-#include <composer_allocator_declaration.h>
+#include <beethoven_allocator_declaration.h>
 
-using namespace composer;
+using namespace beethoven;
 
 address_translator at;
 
@@ -58,18 +58,18 @@ static std::vector<uint16_t> available_ids;
 #endif
 
 [[noreturn]] static void *data_server_f(void *) {
-  int fd_composer = shm_open(data_server_file_name.c_str(), O_CREAT | O_RDWR, file_access_flags);
-  if (fd_composer < 0) {
+  int fd_beethoven = shm_open(data_server_file_name.c_str(), O_CREAT | O_RDWR, file_access_flags);
+  if (fd_beethoven < 0) {
     std::cerr << "Failed to open data_server file" << std::endl;
     throw std::exception();
   }
 
   struct stat shm_stats {};
-  fstat(fd_composer, &shm_stats);
+  fstat(fd_beethoven, &shm_stats);
   LOG(std::cerr << shm_stats.st_size << std::endl;
       std::cerr << sizeof(data_server_file) << std::endl);
   if (shm_stats.st_size < sizeof(data_server_file)) {
-    int tr_rc = ftruncate(fd_composer, sizeof(data_server_file));
+    int tr_rc = ftruncate(fd_beethoven, sizeof(data_server_file));
     if (tr_rc) {
       std::cerr << "Failed to truncate data_server file" << std::endl;
       throw std::exception();
@@ -77,9 +77,9 @@ static std::vector<uint16_t> available_ids;
   }
 
   auto &addr = *(data_server_file *) mmap(nullptr, sizeof(data_server_file), file_access_prots,
-                                          MAP_SHARED, fd_composer, 0);
+                                          MAP_SHARED, fd_beethoven, 0);
 
-#ifdef COMPOSER_USE_CUSTOM_ALLOC
+#ifdef BEETHOVEN_USE_CUSTOM_ALLOC
   LOG(std::cerr << "Constructing allocator" << std::endl);
   auto allocator = new device_allocator();
   LOG(std::cerr << "Allocator constructed - data server ready" << std::endl);
@@ -135,7 +135,7 @@ static std::vector<uint16_t> available_ids;
   srand(time(nullptr));// NOLINT(cert-msc51-cpp)
   pthread_mutex_lock(&addr.server_mut);
   pthread_mutex_lock(&addr.server_mut);
-#if defined(SIM) && defined(COMPOSER_HAS_DMA)
+#if defined(SIM) && defined(BEETHOVEN_HAS_DMA)
   pthread_mutex_lock(&dma_wait_lock);
 #endif
   while (true) {
@@ -149,7 +149,7 @@ static std::vector<uint16_t> available_ids;
         fflush(stderr);
         break;
 #endif
-        auto fname = "/composer_file_" + std::to_string(rand());// NOLINT(cert-msc50-cpp)
+        auto fname = "/beethoven_file_" + std::to_string(rand());// NOLINT(cert-msc50-cpp)
         int nfd = shm_open(fname.c_str(), O_CREAT | O_RDWR, file_access_flags);
         if (nfd < 0) {
           std::cerr << "Failed to open shared memory segment: " << std::string(strerror(errno)) << std::endl;
@@ -183,7 +183,7 @@ static std::vector<uint16_t> available_ids;
         // copy file name to response field
         strcpy(addr.fname, fname.c_str());
         // allocate memory
-#ifdef COMPOSER_USE_CUSTOM_ALLOC
+#ifdef BEETHOVEN_USE_CUSTOM_ALLOC
         auto fpga_addr = allocator->malloc(addr.op_argument);
         at.add_mapping(fpga_addr, addr.op_argument, naddr);
         // return fpga address
@@ -198,7 +198,7 @@ static std::vector<uint16_t> available_ids;
         break;
       }
       case data_server_op::FREE:
-#ifdef COMPOSER_USE_CUSTOM_ALLOC
+#ifdef BEETHOVEN_USE_CUSTOM_ALLOC
         allocator->free(addr.op_argument);
 #endif
         LOG(printf("Freeing %llu bytes at %p\n", at.get_mapping(addr.op_argument).second, at.get_mapping(addr.op_argument).first);
@@ -209,7 +209,7 @@ static std::vector<uint16_t> available_ids;
 #if defined(SIM)
       case data_server_op::MOVE_TO_FPGA: {
         std::cerr << at.get_mapping(addr.op_argument).first << std::endl;
-#if defined(COMPOSER_HAS_DMA) and defined(SIM)
+#if defined(BEETHOVEN_HAS_DMA) and defined(SIM)
         //        for (int i = 0; i < addr.op3_argument; i += 256*64) {
         //          pthread_mutex_lock(&dma_lock);
         //          auto remaining = addr.op3_argument - i;
@@ -232,7 +232,7 @@ static std::vector<uint16_t> available_ids;
       }
       case data_server_op::MOVE_FROM_FPGA: {
         std::cerr << at.get_mapping(addr.op2_argument).first << std::endl;
-#if defined(COMPOSER_HAS_DMA) and defined(SIM)
+#if defined(BEETHOVEN_HAS_DMA) and defined(SIM)
         //        auto info = at.get_mapping(addr.op2_argument);
         //        if (addr.op3_argument != info.second) {
         //          throw std::exception();

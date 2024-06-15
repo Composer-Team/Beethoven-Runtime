@@ -4,7 +4,7 @@
 
 #include <iostream>
 #include "data_server.h"
-#include <composer/alloc.h>
+#include <beethoven/alloc.h>
 #include <random>
 
 device_allocator device_allocator;

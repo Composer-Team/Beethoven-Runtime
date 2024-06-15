@@ -70,7 +70,7 @@ void with_dramsim3_support::init_dramsim3() {
 
 }
 
-void try_to_enqueue_ddr(mem_interface<ComposerMemIDDtype> &axi4_mem) {
+void try_to_enqueue_ddr(mem_interface<BeethovenMemIDDtype> &axi4_mem) {
   RLOCK
   std::shared_ptr<mem_ctrl::memory_transaction> to_enqueue_read = {};
   // find next read we should send to DRAM. Prioritize older txs

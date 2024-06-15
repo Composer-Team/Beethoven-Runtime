@@ -2,17 +2,17 @@
 // Created by Chris Kjellqvist on 9/28/22.
 //
 
-#ifndef COMPOSER_VERILATOR_DATA_SERVER_H
-#define COMPOSER_VERILATOR_DATA_SERVER_H
+#ifndef BEETHOVEN_VERILATOR_DATA_SERVER_H
+#define BEETHOVEN_VERILATOR_DATA_SERVER_H
 
 #include <cmath>
-#include <composer_allocator_declaration.h>
+#include <beethoven_allocator_declaration.h>
 #include <queue>
 #include <set>
 #include "util.h"
 
 #if defined(SIM)
-#if defined(COMPOSER_HAS_DMA)
+#if defined(BEETHOVEN_HAS_DMA)
 #include <pthread.h>
 extern pthread_mutex_t dma_lock;
 extern pthread_mutex_t dma_wait_lock;
@@ -62,9 +62,9 @@ static constexpr uint8_t log2up(const uint64_t &val) {
 
 const uint32_t superblock_size = 1 << 21;
 const uint32_t min_block_size = 1 << 12;
-#ifdef COMPOSER_USE_CUSTOM_ALLOC
+#ifdef BEETHOVEN_USE_CUSTOM_ALLOC
 
-#include <composer/alloc.h>
+#include <beethoven/alloc.h>
 
 class [[maybe_unused]] device_allocator {
 //  uint64_t _sz = ALLOCATOR_SIZE_BYTES;
@@ -144,8 +144,8 @@ class [[maybe_unused]] device_allocator {
   // near address 0. This way, frees are more likely to completely free high addressed superblocks and reduce
   // free_slab_idx. NOTE: This may not be the right way to do this TODO UG
 
-  // TODO HOW DO WE DEAL WITH SECURITY? consider notes in composer_alloc.h - just load the remote_ptr with data that
-  //  can be double checked with composer-runtime's state
+  // TODO HOW DO WE DEAL WITH SECURITY? consider notes in beethoven_alloc.h - just load the remote_ptr with data that
+  //  can be double checked with beethoven-runtime's state
   std::array<std::set<superblock_ptr>, num_lists> superblock_head_list;
   std::array<pthread_mutex_t, num_lists> head_locks;
 
@@ -164,7 +164,7 @@ class [[maybe_unused]] device_allocator {
     uint32_t superblock_id, block_id;
     block_info(uint32_t sid, uint32_t bid) : superblock_id(sid), block_id(bid) {}
   };
-  block_info get_block_info(const composer::remote_ptr &ptr, bool verbose = false) {
+  block_info get_block_info(const beethoven::remote_ptr &ptr, bool verbose = false) {
     if (verbose) {
       printf("addr: %16lx\n", ptr.getFpgaAddr());
     }
@@ -276,7 +276,7 @@ public:
       //  walk over an allocation boundary (that's how I'm planning to implement security right now).
       if (num_superblocks_needed & 0xFFFF0000) {
         // too many!
-        fprintf(stderr, "FATAL - Composer does not currently support allocations larger than 128GB."
+        fprintf(stderr, "FATAL - Beethoven does not currently support allocations larger than 128GB."
                         " Notify developers and we can do something about it with some ease.\n");
         exit(1);
       }
@@ -332,7 +332,7 @@ public:
         // ensure there's enough space before we acquire it
         if (superblock_free_idx + num_superblocks_needed > superblock_free_idx_lim) {
           pthread_mutex_unlock(&superblock_free_idx_lock);
-          fprintf(stderr, "FATAL ERROR - out of memory in composer allocator\n");
+          fprintf(stderr, "FATAL ERROR - out of memory in beethoven allocator\n");
           exit(1);
         }
 
@@ -358,7 +358,7 @@ public:
     // sanity check flags
     auto flags = sb.flags;
     if ((flags & BLOCK_ALLOC) && (flags & BASE_ALLOCATION)) {
-      fprintf(stderr, "WARNING - incoherent flags in superblocks in composer allocator\n");
+      fprintf(stderr, "WARNING - incoherent flags in superblocks in beethoven allocator\n");
     }
     LOG(printf("free info: %d %d %d\n", bi.superblock_id, bi.block_id, flags));
     if (flags & BLOCK_ALLOC) {
@@ -378,7 +378,7 @@ public:
       if (is_unoccupied || is_newly_populated) {
         uint8_t head_idx = lbs - log_min_block;
         if (head_idx >= num_lists) {
-          fprintf(stderr, "FATAL - Invalid block information found in composer allocator block %d %d\n",
+          fprintf(stderr, "FATAL - Invalid block information found in beethoven allocator block %d %d\n",
                   log_min_block, lbs);
           exit(1);
         }
@@ -453,4 +453,4 @@ public:
 extern address_translator at;
 
 
-#endif//COMPOSER_VERILATOR_DATA_SERVER_H
+#endif//BEETHOVEN_VERILATOR_DATA_SERVER_H

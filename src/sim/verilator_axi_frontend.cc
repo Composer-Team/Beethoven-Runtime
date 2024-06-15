@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "ComposerTop.h"
+#include "BeethovenTop.h"
 #include "cmd_server.h"
 #include "data_server.h"
 #include <csignal>
@@ -14,7 +14,7 @@
 #include "sim/verilator.h"
 #include "trace/trace_read.h"
 
-#include <composer_allocator_declaration.h>
+#include <beethoven_allocator_declaration.h>
 #include "util.h"
 
 
@@ -29,9 +29,9 @@ uint64_t main_time = 0;
 
 bool active_reset = true;
 
-extern std::queue<composer::rocc_cmd> cmds;
+extern std::queue<beethoven::rocc_cmd> cmds;
 extern std::unordered_map<system_core_pair, std::queue<int> *> in_flight;
-mem_ctrl::mem_interface<ComposerMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
+mem_ctrl::mem_interface<BeethovenMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
 
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 bool kill_sig = false;
@@ -45,7 +45,7 @@ void sig_handle(int sig) {
   exit(sig);
 }
 
-void tick(ComposerTop *top) {
+void tick(BeethovenTop *top) {
   try {
     top->eval();
   } catch (std::exception &e) {
@@ -122,7 +122,7 @@ static TraceMachineState state = IdleState;
 
 int time_in_idle = 0;
 
-void trace_rising_edge_pre(ComposerTop &top) {
+void trace_rising_edge_pre(BeethovenTop &top) {
   if (top.reset == active_reset) return;
   switch (state) {
     case IdleState:
@@ -172,7 +172,7 @@ void trace_rising_edge_pre(ComposerTop &top) {
   }
 }
 
-void trace_rising_edge_post(ComposerTop &top) {
+void trace_rising_edge_post(BeethovenTop &top) {
   if (top.reset == active_reset) return;
   top.S00_AXI_bready = false;
   top.S00_AXI_awvalid = false;
@@ -279,7 +279,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 const char *v[1] = {""};
 const int cv = 1;
   Verilated::commandArgs(cv, v);
-  ComposerTop top;
+  BeethovenTop top;
   Verilated::traceEverOn(true);
   tfp = new waveTrace;
   top.trace(tfp, 30);
@@ -291,24 +291,24 @@ const int cv = 1;
     axi4_mems[i].id = i;
   }
 
-#if defined(COMPOSER_HAS_DMA)
+#if defined(BEETHOVEN_HAS_DMA)
 
-  mem_ctrl::mem_interface<ComposerDMAIDtype> dma;
+  mem_ctrl::mem_interface<BeethovenDMAIDtype> dma;
   int dma_txprogress = 0;
   int dma_txlength = 0;
-  dma.aw = new mem_ctrl::v_address_channel<ComposerDMAIDtype>(top.dma_awready, top.dma_awvalid, top.dma_awid,
+  dma.aw = new mem_ctrl::v_address_channel<BeethovenDMAIDtype>(top.dma_awready, top.dma_awvalid, top.dma_awid,
                                                               top.dma_awsize, top.dma_awburst,
                                                               top.dma_awaddr, top.dma_awlen);
-  dma.ar = new mem_ctrl::v_address_channel<ComposerDMAIDtype>(top.dma_arready, top.dma_arvalid, top.dma_arid,
+  dma.ar = new mem_ctrl::v_address_channel<BeethovenDMAIDtype>(top.dma_arready, top.dma_arvalid, top.dma_arid,
                                                               top.dma_arsize, top.dma_arburst,
                                                               top.dma_araddr, top.dma_arlen);
-  dma.w = new mem_ctrl::data_channel<ComposerDMAIDtype>(top.dma_wready, top.dma_wvalid,
+  dma.w = new mem_ctrl::data_channel<BeethovenDMAIDtype>(top.dma_wready, top.dma_wvalid,
                                                         &top.dma_wstrb, top.dma_wlast, nullptr);
-  dma.r = new mem_ctrl::data_channel<ComposerDMAIDtype>(top.dma_rready, top.dma_rvalid,
+  dma.r = new mem_ctrl::data_channel<BeethovenDMAIDtype>(top.dma_rready, top.dma_rvalid,
                                                         nullptr, top.dma_rlast, &top.dma_rid);
   dma.w->setData((char *) top.dma_rdata.m_storage);
   dma.r->setData((char *) top.dma_wdata.m_storage);
-  dma.b = new mem_ctrl::response_channel<ComposerDMAIDtype>(top.dma_bready, top.dma_bvalid, top.dma_bid);
+  dma.b = new mem_ctrl::response_channel<BeethovenDMAIDtype>(top.dma_bready, top.dma_bvalid, top.dma_bid);
 #endif
   for (auto &axi4_mem: axi4_mems) {
     axi4_mem.init_dramsim3();
@@ -338,7 +338,7 @@ const int cv = 1;
     mem.b->setValid(0);
     mem.aw->setReady(1);
   }
-#ifdef COMPOSER_HAS_DMA
+#ifdef BEETHOVEN_HAS_DMA
   dma.b->setReady(0);
   dma.ar->setValid(0);
   dma.aw->setValid(0);
@@ -432,7 +432,7 @@ const int cv = 1;
 
 
       // ------------ HANDLE MEMORY INTERFACES ----------------
-      for (mem_ctrl::mem_interface<ComposerMemIDDtype> &axi4_mem: axi4_mems) {
+      for (mem_ctrl::mem_interface<BeethovenMemIDDtype> &axi4_mem: axi4_mems) {
         if (axi4_mem.b->getReady() && axi4_mem.b->getValid()) {
           axi4_mem.b->send_ids.pop();
           axi4_mem.num_in_flight_writes--;
@@ -543,7 +543,7 @@ const int cv = 1;
         WUNLOCK
       }
 
-#ifdef COMPOSER_HAS_DMA
+#ifdef BEETHOVEN_HAS_DMA
       pthread_mutex_lock(&dma_lock);
       // enqueue dma transaction into dma axi interface
       dma.aw->setValid(0);

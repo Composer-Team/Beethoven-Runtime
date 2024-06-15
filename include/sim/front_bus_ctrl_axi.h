@@ -2,11 +2,11 @@
 // Created by Chris Kjellqvist on 8/9/23.
 //
 
-#ifndef COMPOSERRUNTIME_FRONT_BUS_CTRL_AXI_H
-#define COMPOSERRUNTIME_FRONT_BUS_CTRL_AXI_H
+#ifndef BEETHOVENRUNTIME_FRONT_BUS_CTRL_AXI_H
+#define BEETHOVENRUNTIME_FRONT_BUS_CTRL_AXI_H
 
 #include <cinttypes>
-#include <ComposerTop.h>
+#include <BeethovenTop.h>
 
 enum cmd_transfer_state {
   CMD_INACTIVE,
@@ -60,11 +60,11 @@ struct response_transaction {
   resp_transfer_state state = RESPT_INACTIVE;
 };
 
-void update_command_state(ComposerTop &top);
+void update_command_state(BeethovenTop &top);
 
-void update_resp_state(ComposerTop &top);
+void update_resp_state(BeethovenTop &top);
 
-void update_update_state(ComposerTop &top);
+void update_update_state(BeethovenTop &top);
 
 
-#endif//COMPOSERRUNTIME_FRONT_BUS_CTRL_AXI_H
+#endif//BEETHOVENRUNTIME_FRONT_BUS_CTRL_AXI_H

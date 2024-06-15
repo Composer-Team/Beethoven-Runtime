@@ -2,8 +2,8 @@
 // Created by Chris Kjellqvist on 2/23/23.
 //
 
-#ifndef COMPOSERRUNTIME_UTIL_H
-#define COMPOSERRUNTIME_UTIL_H
+#ifndef BEETHOVENRUNTIME_UTIL_H
+#define BEETHOVENRUNTIME_UTIL_H
 
 constexpr int roundUp(float q) {
   float d = q - (int) q;
@@ -22,4 +22,4 @@ constexpr int roundUp(float q) {
 #define LOG(x) x
 #endif
 
-#endif //COMPOSERRUNTIME_UTIL_H
+#endif //BEETHOVENRUNTIME_UTIL_H

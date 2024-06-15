@@ -1,14 +1,14 @@
 //
 // Created by Chris Kjellqvist on 9/29/22.
 //
-#ifndef COMPOSER_VERILATOR_CMD_SERVER_H
-#define COMPOSER_VERILATOR_CMD_SERVER_H
+#ifndef BEETHOVEN_VERILATOR_CMD_SERVER_H
+#define BEETHOVEN_VERILATOR_CMD_SERVER_H
 
 #include <queue>
 #include <unordered_map>
-#include <composer/verilator_server.h>
+#include <beethoven/verilator_server.h>
 
-extern composer::cmd_server_file *csf;
+extern beethoven::cmd_server_file *csf;
 
 struct system_core_pair {
   int system;
@@ -36,4 +36,4 @@ private:
 
 void register_reponse(uint32_t *r_buffer);
 
-#endif //COMPOSER_VERILATOR_CMD_SERVER_H
+#endif //BEETHOVEN_VERILATOR_CMD_SERVER_H

@@ -2,8 +2,8 @@
 // Created by Chris Kjellqvist on 10/29/22.
 //
 
-#ifndef COMPOSER_VERILATOR_FPGA_UTILS_H
-#define COMPOSER_VERILATOR_FPGA_UTILS_H
+#ifndef BEETHOVEN_VERILATOR_FPGA_UTILS_H
+#define BEETHOVEN_VERILATOR_FPGA_UTILS_H
 #include <pthread.h>
 extern pthread_mutex_t main_lock;
 #if defined(F1) || defined(Kria)
@@ -45,4 +45,4 @@ int wrapper_fpga_dma_burst_read(int fd, uint8_t *buffer, size_t xfer_sz,
 
 #endif
 
-#endif //COMPOSER_VERILATOR_FPGA_UTILS_H
+#endif //BEETHOVEN_VERILATOR_FPGA_UTILS_H

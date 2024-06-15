@@ -2,10 +2,10 @@
 // Created by Chris Kjellqvist on 10/29/22.
 //
 
-#ifndef COMPOSER_VERILATOR_VERILATOR_H
-#define COMPOSER_VERILATOR_VERILATOR_H
+#ifndef BEETHOVEN_VERILATOR_VERILATOR_H
+#define BEETHOVEN_VERILATOR_VERILATOR_H
 #include "dram_system.h"
-#include <composer_allocator_declaration.h>
+#include <beethoven_allocator_declaration.h>
 #include <verilated.h>
 #include <optional>
 
@@ -29,4 +29,4 @@ void sig_handle(int sig);
 
 extern bool active_reset;
 
-#endif//COMPOSER_VERILATOR_VERILATOR_H
+#endif//BEETHOVEN_VERILATOR_VERILATOR_H

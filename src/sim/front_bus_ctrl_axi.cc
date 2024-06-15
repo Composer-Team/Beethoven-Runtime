@@ -3,7 +3,7 @@
 //
 
 #include "sim/front_bus_ctrl_axi.h"
-#include "composer_allocator_declaration.h"
+#include "beethoven_allocator_declaration.h"
 #include "sim/mem_ctrl.h"
 #include "util.h"
 #include <cmd_server.h>
@@ -13,14 +13,14 @@
 
 static bool bus_occupied = false;
 extern pthread_mutex_t cmdserverlock;
-extern std::queue<composer::rocc_cmd> cmds;
+extern std::queue<beethoven::rocc_cmd> cmds;
 extern std::unordered_map<system_core_pair, std::queue<int> *> in_flight;
 static std::map<std::tuple<int, int>, unsigned long long> start_times;
 extern uint64_t main_time;
 static int cmds_inflight = 0;
 static int check_freq = 50;
 extern bool kill_sig;
-extern mem_ctrl::mem_interface<ComposerMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
+extern mem_ctrl::mem_interface<BeethovenMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
 #ifdef USE_VCD
 extern VerilatedVcdC *tfp;
 #else
@@ -42,9 +42,9 @@ response_transaction ongoing_rsp;
 update_state ongoing_update = UPDATE_IDLE_CMD;
 
 
-void update_command_state(ComposerTop &top){
+void update_command_state(BeethovenTop &top){
   switch (ongoing_cmd.state) {
-    // tell the composer that we're going to send 32-bits of a command over the PCIE bus
+    // tell the beethoven that we're going to send 32-bits of a command over the PCIE bus
     case CMD_BITS_WRITE_ADDR:
       ongoing_cmd.ready_for_command = false;
       top.S00_AXI_awvalid = 1;
@@ -184,7 +184,7 @@ void update_command_state(ComposerTop &top){
 
 }
 
-void update_resp_state(ComposerTop &top) {
+void update_resp_state(BeethovenTop &top) {
   switch (ongoing_rsp.state) {
     case RESPT_INACTIVE:
       break;
@@ -235,7 +235,7 @@ void update_resp_state(ComposerTop &top) {
       if (top.S00_AXI_bvalid) {
         if (top.S00_AXI_bresp == 0) {
           if (ongoing_rsp.progress == response_transaction::payload_length) {
-            composer::rocc_response r(ongoing_rsp.resbuf, pack_cfg);
+            beethoven::rocc_response r(ongoing_rsp.resbuf, pack_cfg);
             auto id = std::tuple<int, int>(r.system_id, r.core_id);
             auto start = start_times[id];
             LOG(printf("Command took %f ms\n", float((main_time - start)) / 1000 / 1000 / 1000));
@@ -288,7 +288,7 @@ void update_resp_state(ComposerTop &top) {
 
 int check_freq_ctr = 0;
 
-void update_update_state(ComposerTop &top) {
+void update_update_state(BeethovenTop &top) {
   switch (ongoing_update) {
     case UPDATE_IDLE_RESP:
       if (!bus_occupied && check_freq_ctr > check_freq) {
