@@ -10,7 +10,8 @@
 int DDR_BUS_WIDTH_BITS = 64;
 int DDR_BUS_WIDTH_BYTES = 8;
 int axi_ddr_bus_multiplicity;
-int DDR_BUS_BURST_LENGTH;
+int DDR_ENQUEUE_SIZE_BYTES;
+int TOTAL_BURST;
 dramsim3::Config *dramsim3config = nullptr;
 
 extern uint64_t main_time;
@@ -39,15 +40,13 @@ void with_dramsim3_support::init_dramsim3() {
         pthread_mutex_lock(&this->read_queue_lock);
         auto tx = in_flight_reads[addr]->front();
         tx->dram_tx_load_progress++;
-        for (int i = 0; i < dramsim3config->BL; ++i) {
+        for (int i = 0; i < TOTAL_BURST; ++i) {
           tx->ddr_bus_beats_retrieved[int(addr - tx->fpga_addr) / DDR_BUS_WIDTH_BYTES + i] = true;
         }
-        int bytes_loaded = tx->dram_tx_load_progress * DDR_BUS_WIDTH_BYTES * dramsim3config->BL;
-        int total_tx_size = tx->size * tx->len;
 
         while (tx->dramsim_hasBeatReady()) {
           bool done = (tx->axi_bus_beats_progress == tx->axi_bus_beats_length() - 1);
-          auto intermediate_tx = std::make_shared<mem_ctrl::memory_transaction>(tx->addr, tx->size, 1, 0, false, tx->id, 0);
+          auto intermediate_tx = std::make_shared<mem_ctrl::memory_transaction>(tx->addr, tx->size, 1, 0, false, tx->id, 0, true);
           tx->addr += tx->size;
           intermediate_tx->fpga_addr = tx->fpga_addr;
           intermediate_tx->can_be_last = done;
@@ -90,7 +89,7 @@ void try_to_enqueue_ddr(mem_interface<BeethovenMemIDDtype> &axi4_mem) {
 
       to_enqueue_read = mt;
       auto dimm_base = mem_ctrl::get_dimm_address(to_enqueue_read->fpga_addr);
-      auto dimm_addr = dimm_base + DDR_BUS_WIDTH_BYTES * dramsim3config->BL * to_enqueue_read->dram_tx_axi_enqueue_progress;
+      auto dimm_addr = dimm_base + DDR_BUS_WIDTH_BYTES * TOTAL_BURST * to_enqueue_read->dram_tx_axi_enqueue_progress;
       axi4_mem.mem_sys->AddTransaction(dimm_addr, false);
 
       // remember it as being in flight. Make a queue if necessary and store it there
@@ -124,7 +123,7 @@ void try_to_enqueue_ddr(mem_interface<BeethovenMemIDDtype> &axi4_mem) {
 
   if (to_enqueue_write != nullptr) {
     auto dimm_addr = mem_ctrl::get_dimm_address(to_enqueue_write->fpga_addr) +
-                     to_enqueue_write->dram_tx_axi_enqueue_progress * DDR_BUS_WIDTH_BYTES * axi_ddr_bus_multiplicity * dramsim3config->BL;
+                     to_enqueue_write->dram_tx_axi_enqueue_progress * DDR_BUS_WIDTH_BYTES * axi_ddr_bus_multiplicity * TOTAL_BURST;
     to_enqueue_write->dram_tx_axi_enqueue_progress++;
     axi4_mem.mem_sys->AddTransaction(dimm_addr, true);
     if (axi4_mem.in_flight_writes.find(dimm_addr) == axi4_mem.in_flight_writes.end())
@@ -145,7 +144,8 @@ void mem_ctrl::init(const std::string &dram_ini_file) {
   DDR_BUS_WIDTH_BITS = dramsim3config->bus_width;
   DDR_BUS_WIDTH_BYTES = DDR_BUS_WIDTH_BITS / 8;
   axi_ddr_bus_multiplicity = (DATA_BUS_WIDTH / 8) / DDR_BUS_WIDTH_BYTES;
-  DDR_BUS_BURST_LENGTH = dramsim3config->BL;
+  TOTAL_BURST = dramsim3config->BL;
+  DDR_ENQUEUE_SIZE_BYTES = DDR_BUS_WIDTH_BYTES * TOTAL_BURST;
 
   if (DDR_BUS_WIDTH_BYTES > (DATA_BUS_WIDTH / 8)) {
     std::cerr << DDR_BUS_WIDTH_BYTES << "</= " << (DATA_BUS_WIDTH / 8) << std::endl;

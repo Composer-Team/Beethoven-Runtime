@@ -61,7 +61,7 @@ void push_val(const char buf[4], std::queue<unsigned char> &vec) {
 }
 
 void push_val(const uint32_t val, std::queue<unsigned char> &vec) {
-  auto buf = (uint8_t *) &val;
+  auto buf = (uint8_t * ) & val;
   for (int i = 0; i < 4; ++i) {
     vec.push(buf[i]);
   }
@@ -370,36 +370,34 @@ void run_verilator(std::optional<std::string> trace_file,
               auto trans = axi4_mem.write_transactions.front();
               // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
               char *src = axi4_mem.w->getData();
-              BeethovenStrobeSimDtype strobe = axi4_mem.w->getStrobe();
+              //BeethovenStrobeSimDtype strobe = axi4_mem.w->getStrobe();
+
               uint32_t off = 0;
               // for writes, we need to account for alignment and strobe,so we're re-aligning address here
               // align to 64B - zero out bottom 6b
               auto addr = trans->addr;
-              while (strobe != 0) {
-                if (strobe & 1) {
+              for (int i = 0; i < DATA_BUS_WIDTH; ++i) {
 #ifdef BEETHOVEN_HAS_DMA
-                  auto curr_ptr = uintptr_t(addr + off);
-                auto base_ptr = uintptr_t(dma_ptr);
-                auto end_ptr = uintptr_t(dma_ptr + dma_len);
-                if (dma_in_progress and dma_write and curr_ptr < end_ptr and curr_ptr >= base_ptr) {
-                  // we're performing a DMA into the same address space so just make sure that the values match up...
-                  if (addr[off] != src[off]) {
-                    std::cerr << "DMA write was not a no-op. " << off << " " << int(addr[off]) << " " << int(src[off])
-                              << std::endl;
-                    tfp->close();
-                    throw std::exception();
+                    auto curr_ptr = uintptr_t(addr + off);
+                  auto base_ptr = uintptr_t(dma_ptr);
+                  auto end_ptr = uintptr_t(dma_ptr + dma_len);
+                  if (dma_in_progress and dma_write and curr_ptr < end_ptr and curr_ptr >= base_ptr) {
+                    // we're performing a DMA into the same address space so just make sure that the values match up...
+                    if (addr[off] != src[off]) {
+                      std::cerr << "DMA write was not a no-op. " << off << " " << int(addr[off]) << " " << int(src[off])
+                                << std::endl;
+                      tfp->close();
+                      throw std::exception();
+                    }
+                  } else {
+                    addr[off] = src[off];
                   }
-                } else {
-                  addr[off] = src[off];
-                }
 #else
-                  printf("writing addr(%x) dat(%x)\n", addr + off, src[off]);
-                  mem_set(addr + off, src[off]);
+                    printf("writing addr(%x) dat(%x)\n", addr + off, src[off]);
+                    mem_set(addr + off, src[off]);
 #endif
+                  off += 1;
                 }
-                off += 1;
-                strobe >>= 1;
-              }
               trans->axi_bus_beats_progress++;
 
               if (not trans->fixed) {
@@ -616,7 +614,8 @@ void run_verilator(std::optional<std::string> trace_file,
             bool is_fixed = axi4_mem.aw->getBurst() == 0;
             int id = axi4_mem.aw->getId();
             uint64_t fpga_addr = axi4_mem.aw->getAddr();
-            auto tx = std::make_shared<mem_ctrl::memory_transaction>(uintptr_t(addr), sz, len, 0, is_fixed, id, fpga_addr);
+            auto tx = std::make_shared<mem_ctrl::memory_transaction>(uintptr_t(addr), sz, len, 0, is_fixed, id,
+                                                                     fpga_addr);
             axi4_mem.write_transactions.push(tx);
             axi4_mem.num_in_flight_writes++;
           } catch (std::exception &e) {
@@ -674,7 +673,8 @@ void run_verilator(std::optional<std::string> trace_file,
               trans->dram_tx_len_bus_beats = trans->len * trans->size >> 3;
               trans->axi_bus_beats_progress = 1;
               axi4_mem.ddr_write_q.push_back(trans);
-              axi4_mem.w->setReady(!axi4_mem.write_transactions.empty() || axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
+              axi4_mem.w->setReady(!axi4_mem.write_transactions.empty() ||
+                                   axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
             } else {
               axi4_mem.w->setReady(1);
             }

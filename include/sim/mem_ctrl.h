@@ -28,10 +28,12 @@ extern uint64_t main_time;
 #define RUNLOCK pthread_mutex_unlock(&axi4_mem.read_queue_lock);
 #define WUNLOCK pthread_mutex_unlock(&axi4_mem.write_queue_lock);
 
-extern int DDR_BUS_WIDTH_BITS;
-extern int DDR_BUS_WIDTH_BYTES;
+//extern int DDR_BUS_WIDTH_BITS;
+//extern int DDR_BUS_WIDTH_BYTES;
 extern int axi_ddr_bus_multiplicity;
-extern int DDR_BUS_BURST_LENGTH;
+extern int DDR_ENQUEUE_SIZE_BYTES;
+extern int TOTAL_BURST;
+//extern int DDR_BUS_BURST_LENGTH;
 extern address_translator at;
 extern dramsim3::Config *dramsim3config;
 
@@ -49,10 +51,12 @@ namespace mem_ctrl {
     int id;
     bool fixed;
     uint64_t fpga_addr;
-    int dram_tx_len_bus_beats;
+    int dram_tx_n_enqueues;
     int dram_tx_axi_enqueue_progress = 0;
     int dram_tx_load_progress = 0;
     bool can_be_last = true;
+
+    bool is_intermediate;
 
     std::vector<bool> ddr_bus_beats_retrieved;
 
@@ -62,16 +66,22 @@ namespace mem_ctrl {
                        int progress,
                        bool fixed,
                        int id,
-                       uint64_t fpga_addr) : addr(addr),
+                       uint64_t fpga_addr,
+                       bool is_intermediate) : addr(addr),
                                              size(size),
                                              len(len),
                                              axi_bus_beats_progress(progress),
                                              fixed(fixed),
                                              id(id),
-                                             fpga_addr(fpga_addr) {
-      dram_tx_len_bus_beats = (len * size) / DDR_BUS_WIDTH_BYTES;
-      if (dram_tx_len_bus_beats == 0) dram_tx_len_bus_beats = 1;
-      for (int i = 0; i < dram_tx_len_bus_beats; ++i) {
+                                             fpga_addr(fpga_addr),
+                                             is_intermediate(is_intermediate) {
+      dram_tx_n_enqueues = (len * size) / DDR_ENQUEUE_SIZE_BYTES;
+      if (!is_intermediate) {
+//        printf("Transaction of size %d, len %d, n_enqueues %d\n\n", size, len, dram_tx_n_enqueues);
+      }
+      fflush(stdout);
+      if (dram_tx_n_enqueues == 0) dram_tx_n_enqueues = 1;
+      for (int i = 0; i < dram_tx_n_enqueues; ++i) {
         ddr_bus_beats_retrieved.emplace_back(false);
       }
     }
@@ -91,7 +101,7 @@ namespace mem_ctrl {
     }
 
     [[nodiscard]] bool dramsim_tx_finished() const {
-      return dram_tx_axi_enqueue_progress * DDR_BUS_BURST_LENGTH >= dram_tx_len_bus_beats;
+      return dram_tx_axi_enqueue_progress >= dram_tx_n_enqueues;
     }
 
     [[nodiscard]] int axi_bus_beats_length() const {

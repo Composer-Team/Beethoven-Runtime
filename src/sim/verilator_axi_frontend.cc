@@ -420,9 +420,9 @@ const int cv = 1;
           uint64_t addr = axi4_mem.ar->getAddr();
           char *ad = (char *) at.translate(addr);
           auto txsize = (int) 1 << axi4_mem.ar->getSize();
-          auto txlen = axi4_mem.ar->getLen() + 1;
+          auto txlen = (int)(axi4_mem.ar->getLen()) + 1;
           auto tx = std::make_shared<mem_ctrl::memory_transaction>((uintptr_t) ad, txsize, txlen, 0, false,
-                                                                   axi4_mem.ar->getId(), addr);
+                                                                   axi4_mem.ar->getId(), addr, false);
           // 64b per DRAM transaction
           RLOCK
           axi4_mem.ddr_read_q.push_back(tx);
@@ -476,11 +476,11 @@ const int cv = 1;
             char *addr = (char *) at.translate(axi4_mem.aw->getAddr());
 #endif
             int sz = 1 << axi4_mem.aw->getSize();
-            int len = 1 + axi4_mem.aw->getLen();// per axi
+            int len = 1 + int(axi4_mem.aw->getLen());// per axi
             bool is_fixed = axi4_mem.aw->getBurst() == 0;
             int id = axi4_mem.aw->getId();
             uint64_t fpga_addr = axi4_mem.aw->getAddr();
-            auto tx = std::make_shared<mem_ctrl::memory_transaction>(uintptr_t(addr), sz, len, 0, is_fixed, id, fpga_addr);
+            auto tx = std::make_shared<mem_ctrl::memory_transaction>(uintptr_t(addr), sz, len, 0, is_fixed, id, fpga_addr, false);
             axi4_mem.write_transactions.push(tx);
             axi4_mem.num_in_flight_writes++;
           } catch (std::exception &e) {
@@ -521,7 +521,7 @@ const int cv = 1;
             if (axi4_mem.w->getLast()) {
               axi4_mem.write_transactions.pop();
               trans->dram_tx_axi_enqueue_progress = 0;
-              trans->dram_tx_len_bus_beats = trans->len * trans->size >> 3;
+              trans->dram_tx_n_enqueues = std::max((trans->len * (trans->size >> 3))/DDR_ENQUEUE_SIZE_BYTES, 1);
               trans->axi_bus_beats_progress = 1;
               axi4_mem.ddr_write_q.push_back(trans);
               axi4_mem.w->setReady(!axi4_mem.write_transactions.empty() || axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
