@@ -79,6 +79,9 @@ namespace mem_ctrl {
       if (!is_intermediate) {
 //        printf("Transaction of size %d, len %d, n_enqueues %d\n\n", size, len, dram_tx_n_enqueues);
       }
+      if (dram_tx_n_enqueues == 32) {
+        printf("");
+      }
 //      fflush(stdout);
       if (dram_tx_n_enqueues == 0) dram_tx_n_enqueues = 1;
       for (int i = 0; i < dram_tx_n_enqueues * TOTAL_BURST; ++i) {
@@ -333,12 +336,12 @@ namespace mem_ctrl {
       return ddr_read_q.size() < max_q_length;
     }
 
-    static int tx2bank(const std::shared_ptr<memory_transaction> mt) {
-      auto dimm_base = get_dimm_address(mt->fpga_addr);
-      auto dimm_addr = dimm_base + 8 * mt->dram_tx_axi_enqueue_progress;
-
-      return (int) ((dimm_addr & ~(0xFFFL)) >> 12);
-    }
+//    static int tx2bank(const std::shared_ptr<memory_transaction> mt) {
+//      auto dimm_base = get_dimm_address(mt->fpga_addr);
+//      auto dimm_addr = dimm_base + 8 * mt->dram_tx_axi_enqueue_progress;
+//
+//      return (int) ((dimm_addr & ~(0xFFFL)) >> 12);
+//    }
 
     void init_dramsim3();
   };

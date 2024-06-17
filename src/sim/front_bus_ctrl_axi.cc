@@ -21,6 +21,8 @@ static int cmds_inflight = 0;
 static int check_freq = 50;
 extern bool kill_sig;
 extern mem_ctrl::mem_interface<BeethovenMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
+extern uint64_t time_last_command;
+extern uint64_t memory_transacted;
 #ifdef USE_VCD
 extern VerilatedVcdC *tfp;
 #else
@@ -117,6 +119,8 @@ void update_command_state(BeethovenTop &top){
           if (ongoing_cmd.progress == command_transaction::payload_length) {
             for (auto &axi_mem: axi4_mems) {
               axi_mem.mem_sys->ResetStats();
+              time_last_command = main_time;
+              memory_transacted = 0;
             }
             ongoing_cmd.state = CMD_INACTIVE;
             bus_occupied = false;
