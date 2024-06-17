@@ -31,12 +31,10 @@ axi4_mems[DDR_NUM].ar = new mem_ctrl::v_address_channel<BeethovenMemIDDtype>(top
                                       top.M0 ## DDR_NUM ## _AXI_arlen); \
 axi4_mems[DDR_NUM].w = new mem_ctrl::data_channel<BeethovenMemIDDtype>(top.M0 ## DDR_NUM ## _AXI_wready, \
                                   top.M0 ## DDR_NUM ## _AXI_wvalid, \
-                                  &top.M0 ## DDR_NUM ## _AXI_wstrb, \
                                   top.M0 ## DDR_NUM ## _AXI_wlast, \
                                   nullptr); \
 axi4_mems[DDR_NUM].r = new mem_ctrl::data_channel<BeethovenMemIDDtype>(top.M0 ## DDR_NUM ## _AXI_rready, \
                                   top.M0 ## DDR_NUM ## _AXI_rvalid, \
-                                  nullptr, \
                                   top.M0 ## DDR_NUM ## _AXI_rlast, \
                                   &top.M0 ## DDR_NUM ## _AXI_rid); \
 axi4_mems[DDR_NUM].b = new mem_ctrl::response_channel<BeethovenMemIDDtype>(top.M0 ## DDR_NUM ## _AXI_bready, \

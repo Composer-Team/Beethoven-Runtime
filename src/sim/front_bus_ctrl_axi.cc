@@ -29,7 +29,7 @@ extern VerilatedFstC *tfp;
 
 static void sig_handle(int sig) {
   for (auto q: axi4_mems) {
-    q.mem_sys->PrintEpochStats();
+    q.mem_sys->PrintStats();
   }
   tfp->close();
   fprintf(stderr, "FST written!\n");

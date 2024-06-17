@@ -403,7 +403,7 @@ const int cv = 1;
 
       for (auto &axi4_mem: axi4_mems) {
         if (axi4_mem.r->getValid() && axi4_mem.r->getReady()) {
-          memory_transacted += sizeof(axi4_mem.r->getStrobe()) << 3;
+	  memory_transacted += (DATA_BUS_WIDTH >> 3);
           RLOCK
           auto tx = axi4_mem.read_transactions.front();
           tx->axi_bus_beats_progress++;
@@ -497,11 +497,12 @@ const int cv = 1;
             auto trans = axi4_mem.write_transactions.front();
             // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
             char *src = axi4_mem.w->getData();
-            auto strobe = axi4_mem.w->getStrobe();
+//            auto strobe = axi4_mem.w->getStrobe();
             uint32_t off = 0;
             // for writes, we need to account for alignment and strobe,so we're re-aligning address here
             // align to 64B - zero out bottom 6b
             auto addr = trans->addr;
+	    /*
             while (strobe != 0) {
               if (strobe & 1) {
                 reinterpret_cast<char *>(addr)[off] = src[off];
@@ -510,6 +511,7 @@ const int cv = 1;
               off += 1;
               strobe >>= 1;
             }
+	    */
             trans->axi_bus_beats_progress++;
 
             if (not trans->fixed) {
@@ -583,7 +585,7 @@ const int cv = 1;
             dma.w->setValid(1);
             memcpy(dma.w->getData(), dma_ptr + 64 * dma_txprogress, 64);
             dma.w->setLast(dma_txprogress + 1 == dma_txlength);
-            dma.w->setStrobe(0xFFFFFFFFFFFFFFFFL);
+//            dma.w->setStrobe(0xFFFFFFFFFFFFFFFFL);
             if (dma.w->getReady()) {
               dma_txprogress++;
             }
@@ -656,6 +658,7 @@ int main(int argc, char **argv) {
     assert(argv[i][0] == '-');
     if (strcmp(argv[i] + 1, "dramconfig") == 0) {
       dram_file = std::string(argv[i + 1]);
+      std::cerr << "dramconfig is " << *dram_file << std::endl;
     } else if (strcmp(argv[i] + 1, "tracefile") == 0) {
       trace_file = std::string(argv[i + 1]);
     }

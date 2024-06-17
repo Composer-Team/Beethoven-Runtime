@@ -142,7 +142,7 @@ if (${BUILD_SIM})
             TRACE_FST
             VERILATOR_ARGS --timescale 1ps/1ps --x-assign fast
             --timing -Wno-context -Wno-lint -Wno-style -Wno-symrsvdword -Wno-multidriven -Wno-combdly -Wno-zerodly
-            -Wno-moddup -Wno-unoptflat # --threads 4
+            -Wno-moddup -Wno-unoptflat --threads 4
     )
 endif ()
 

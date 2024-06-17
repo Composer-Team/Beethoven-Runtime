@@ -191,17 +191,14 @@ namespace mem_ctrl {
     CData *valid;
     char *data = nullptr;
     idtype *id;
-    BeethovenStrobeSimDtype *strobe;
     CData *last;
 
   public:
     explicit data_channel(CData &ready,
                           CData &valid,
-                          BeethovenStrobeSimDtype *strobe,
                           CData &last,
                           idtype *id) : ready(&ready),
                                         valid(&valid),
-                                        strobe(strobe),
                                         last(&last),
                                         id(id) {}
 
@@ -236,14 +233,6 @@ namespace mem_ctrl {
     void setId(idtype id) {
       *data_channel::id = id;
       //    std::cerr << "Got " << id << ", set as " << *data_channel::id << std::endl;
-    }
-
-    BeethovenStrobeSimDtype getStrobe() const {
-      return *strobe;
-    }
-
-    void setStrobe(BeethovenStrobeSimDtype strobe) {
-      *data_channel::strobe = strobe;
     }
 
     CData getLast() const {
