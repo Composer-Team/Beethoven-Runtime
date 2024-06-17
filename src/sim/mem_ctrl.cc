@@ -41,6 +41,11 @@ void with_dramsim3_support::init_dramsim3() {
         auto tx = in_flight_reads[addr]->front();
         tx->dram_tx_load_progress++;
         for (int i = 0; i < TOTAL_BURST; ++i) {
+          int off = int(addr - tx->fpga_addr) / DDR_BUS_WIDTH_BYTES + i;
+          if (off >= tx->ddr_bus_beats_retrieved.size()) {
+            printf("%d/%d\n", off, tx->ddr_bus_beats_retrieved.size());
+          }
+          fflush(stdout);
           tx->ddr_bus_beats_retrieved[int(addr - tx->fpga_addr) / DDR_BUS_WIDTH_BYTES + i] = true;
         }
 

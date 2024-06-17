@@ -79,9 +79,9 @@ namespace mem_ctrl {
       if (!is_intermediate) {
 //        printf("Transaction of size %d, len %d, n_enqueues %d\n\n", size, len, dram_tx_n_enqueues);
       }
-      fflush(stdout);
+//      fflush(stdout);
       if (dram_tx_n_enqueues == 0) dram_tx_n_enqueues = 1;
-      for (int i = 0; i < dram_tx_n_enqueues; ++i) {
+      for (int i = 0; i < dram_tx_n_enqueues * TOTAL_BURST; ++i) {
         ddr_bus_beats_retrieved.emplace_back(false);
       }
     }
