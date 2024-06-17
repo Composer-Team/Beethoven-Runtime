@@ -80,7 +80,9 @@ void try_to_enqueue_ddr(mem_interface<BeethovenMemIDDtype> &axi4_mem) {
   // find next read we should send to DRAM. Prioritize older txs
   for (auto it = axi4_mem.ddr_read_q.begin(); it != axi4_mem.ddr_read_q.end(); ++it) {
     auto &mt = *it;
-    if (axi4_mem.mem_sys->WillAcceptTransaction(mt->fpga_addr, false)) {
+    auto dimm_base = mem_ctrl::get_dimm_address(to_enqueue_read->fpga_addr);
+    auto dimm_addr = dimm_base + DDR_BUS_WIDTH_BYTES * TOTAL_BURST * to_enqueue_read->dram_tx_axi_enqueue_progress;
+    if (axi4_mem.mem_sys->WillAcceptTransaction(dimm_addr, false)) {
       // AXI stipulates that for multiple transactions on the same ID, the returned packets need to be serialized
       // Since this list is ordered old -> new, we need to search from the beginning of the list to the current iterator
       //  to see if there is a transaction with the same ID. If so, we need to skip and issue later.
@@ -93,8 +95,6 @@ void try_to_enqueue_ddr(mem_interface<BeethovenMemIDDtype> &axi4_mem) {
       if (foundHigherPriorityInID) continue;
 
       to_enqueue_read = mt;
-      auto dimm_base = mem_ctrl::get_dimm_address(to_enqueue_read->fpga_addr);
-      auto dimm_addr = dimm_base + DDR_BUS_WIDTH_BYTES * TOTAL_BURST * to_enqueue_read->dram_tx_axi_enqueue_progress;
       axi4_mem.mem_sys->AddTransaction(dimm_addr, false);
 
       // remember it as being in flight. Make a queue if necessary and store it there
@@ -129,13 +129,16 @@ void try_to_enqueue_ddr(mem_interface<BeethovenMemIDDtype> &axi4_mem) {
   if (to_enqueue_write != nullptr) {
     auto dimm_addr = mem_ctrl::get_dimm_address(to_enqueue_write->fpga_addr) +
                      to_enqueue_write->dram_tx_axi_enqueue_progress * DDR_BUS_WIDTH_BYTES * axi_ddr_bus_multiplicity * TOTAL_BURST;
-    to_enqueue_write->dram_tx_axi_enqueue_progress++;
-    axi4_mem.mem_sys->AddTransaction(dimm_addr, true);
-    if (axi4_mem.in_flight_writes.find(dimm_addr) == axi4_mem.in_flight_writes.end())
-      axi4_mem.in_flight_writes[dimm_addr] = new std::queue<std::shared_ptr<mem_ctrl::memory_transaction>>;
-    axi4_mem.in_flight_writes[dimm_addr]->push(to_enqueue_write);
-    if (to_enqueue_write->dramsim_tx_finished()) {
-      axi4_mem.ddr_write_q.erase(std::find(axi4_mem.ddr_write_q.begin(), axi4_mem.ddr_write_q.end(), to_enqueue_write));
+    if (axi4_mem.mem_sys->WillAcceptTransaction(dimm_addr, true)) {
+      to_enqueue_write->dram_tx_axi_enqueue_progress++;
+      axi4_mem.mem_sys->AddTransaction(dimm_addr, true);
+      if (axi4_mem.in_flight_writes.find(dimm_addr) == axi4_mem.in_flight_writes.end())
+        axi4_mem.in_flight_writes[dimm_addr] = new std::queue<std::shared_ptr<mem_ctrl::memory_transaction>>;
+      axi4_mem.in_flight_writes[dimm_addr]->push(to_enqueue_write);
+      if (to_enqueue_write->dramsim_tx_finished()) {
+        axi4_mem.ddr_write_q.erase(
+                std::find(axi4_mem.ddr_write_q.begin(), axi4_mem.ddr_write_q.end(), to_enqueue_write));
+      }
     }
 //    fprintf(stderr, "Starting write tx %d\n", to_enqueue_write->id);
   }
