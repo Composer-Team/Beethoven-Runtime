@@ -209,10 +209,9 @@ TraceUnit::TraceUnit(TraceType ty, uint64_t address, uint32_t payload) : ty(ty),
 extern int writes_emitted;
 extern int reads_emitted;
 
-void print_state(uint64_t mem, uint64_t time) {
+void print_state(uint64_t mem, uint64_t time, uint64_t time_since) {
   std::string time_string;
   // in seconds
-  double time_d = (double) time / 1e12;
   if (time < 1000 * 1000 * 1000) {
     time_string = std::to_string(double(time) / 1000 / 1000) + "µs";
   } else {
@@ -237,6 +236,7 @@ void print_state(uint64_t mem, uint64_t time) {
 
   std::string mem_rate;
   // compute bytes per second and normalize
+  double time_d = (double) time_since / 1e12;
   double mem_rate_norm = (double) mem / time_d;
   if (mem_rate_norm < 1024) {
     mem_rate = std::to_string(mem_rate_norm) + "B/s";
@@ -381,7 +381,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
     main_time += fpga_clock_inc;
     cycle_count++;
     if ((cycle_count & 1024) == 0) {
-      print_state(memory_transacted, main_time - time_last_command);
+      print_state(memory_transacted, main_time, main_time - time_last_command);
       fflush(stdout);
     }
     {
