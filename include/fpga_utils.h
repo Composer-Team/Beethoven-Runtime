@@ -4,8 +4,12 @@
 
 #ifndef BEETHOVEN_VERILATOR_FPGA_UTILS_H
 #define BEETHOVEN_VERILATOR_FPGA_UTILS_H
+
 #include <pthread.h>
+
+extern "C" {
 extern pthread_mutex_t main_lock;
+};
 #if defined(F1) || defined(Kria)
 extern pthread_mutex_t bus_lock;
 #endif

@@ -37,8 +37,10 @@ BeethovenTop top;
 
 mem_intf_t axi4_mems[NUM_DDR_CHANNELS];
 
+extern "C" {
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 bool kill_sig = false;
+};
 
 waveTrace *tfp;
 
@@ -225,8 +227,8 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
   axi4_mems[0].r->setData((char *) &top.M00_AXI_rdata);
   axi4_mems[0].w.setData((char *) &top.M00_AXI_wdata);
 #else
-  axi4_mems[0].r.setData((uint8_t *) &top.M00_AXI_rdata.at(0));
-  axi4_mems[0].w.setData((uint8_t *) &top.M00_AXI_wdata.at(0));
+  axi4_mems[0].r.setData((uint8_t * ) & top.M00_AXI_rdata.at(0));
+  axi4_mems[0].w.setData((uint8_t * ) & top.M00_AXI_wdata.at(0));
 #endif
 #if NUM_DDR_CHANNELS >= 2
   init_ddr_interface(1)
@@ -281,7 +283,8 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
     main_time += fpga_clock_inc;
     cycle_count++;
 
-    if ((cycle_count & 1024) == 0 && std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time_last_print).count() > 500) {
+    if ((cycle_count & 1024) == 0 && std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::high_resolution_clock::now() - time_last_print).count() > 500) {
       time_last_print = std::chrono::high_resolution_clock::now();
       print_state(memory_transacted, main_time, main_time - time_last_command);
       fflush(stdout);
@@ -411,7 +414,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
             // for writes, we need to account for alignment and strobe,so we're re-aligning address here
             // align to 64B - zero out bottom 6b
             auto addr = trans->addr;
-            while (off < sizeof(BeethovenTop::M00_AXI_wstrb)*8) {
+            while (off < sizeof(BeethovenTop::M00_AXI_wstrb) * 8) {
               if (axi4_mem.w.getStrb(off)) {
                 reinterpret_cast<char *>(addr)[off] = src[off];
                 memory_transacted++;
@@ -431,7 +434,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
               trans->axi_bus_beats_progress = 1;
               axi4_mem.ddr_write_q.push_back(trans);
               axi4_mem.w.setReady(!axi4_mem.write_transactions.empty() ||
-                                   axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
+                                  axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
             } else {
               axi4_mem.w.setReady(1);
             }

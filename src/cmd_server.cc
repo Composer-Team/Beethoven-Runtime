@@ -33,7 +33,9 @@
 
 #endif
 #ifdef SIM
+extern "C" {
 extern bool kill_sig;
+};
 #endif
 
 system_core_pair::system_core_pair(int system, int core) {
@@ -62,7 +64,7 @@ static void *cmd_server_f(void *) {
     LOG(printf("Successfully intialized cmd_file at %s\n", cmd_server_file_name.c_str()));
   }
   // check the file size. It might already exist in which case we don't need to truncate it again
-  struct stat shm_stats {};
+  struct stat shm_stats{};
   fstat(fd_beethoven, &shm_stats);
   if (shm_stats.st_size < sizeof(cmd_server_file)) {
     int tr_rc = ftruncate(fd_beethoven, sizeof(cmd_server_file));
@@ -86,7 +88,7 @@ static void *cmd_server_f(void *) {
   pthread_mutex_lock(&addr.server_mut);
   while (true) {
     LOG(std::cerr << "Got Command in Server" << std::endl;
-        auto start = std::chrono::high_resolution_clock::now());
+                auto start = std::chrono::high_resolution_clock::now());
     // allocate space for response
     int id;
     // dont' process FLUSH commands on FPGA, they're only used
@@ -114,21 +116,21 @@ static void *cmd_server_f(void *) {
     }
 #if defined(FPGA) || defined(VSIM)
 #if defined(F1) or defined(Kria)
-    // wake up response poller if this command expects a response
-    if (addr.cmd.getXd()) sem_post(&addr.processes_waiting);
-    pthread_mutex_lock(&bus_lock);
+      // wake up response poller if this command expects a response
+      if (addr.cmd.getXd()) sem_post(&addr.processes_waiting);
+      pthread_mutex_lock(&bus_lock);
 #endif
-    uint32_t pack[5];
-    addr.cmd.pack(pack_cfg, pack);
-    //    if (sizeof(pack[0]) > 64) {
-    //      printf("FAILURE - cannot use peek-poke give the current ");
-    //      exit(1);
-    //    }
-    for (int i = 0; i < num_cmd_beats; ++i) {// command is 5 32-bit payloads
-      while (!peek_mmio(CMD_READY)) {}
-      poke_mmio(CMD_BITS, pack[i]);
-      poke_mmio(CMD_VALID, 1);
-    }
+      uint32_t pack[5];
+      addr.cmd.pack(pack_cfg, pack);
+      //    if (sizeof(pack[0]) > 64) {
+      //      printf("FAILURE - cannot use peek-poke give the current ");
+      //      exit(1);
+      //    }
+      for (int i = 0; i < num_cmd_beats; ++i) {// command is 5 32-bit payloads
+        while (!peek_mmio(CMD_READY)) {}
+        poke_mmio(CMD_BITS, pack[i]);
+        poke_mmio(CMD_VALID, 1);
+      }
 #endif
     LOG(std::cerr << "Successfully delivered command\n"
                   << std::endl);
@@ -154,7 +156,9 @@ static void *cmd_server_f(void *) {
     }
 
     LOG(auto end = std::chrono::high_resolution_clock::now();
-        std::cerr << "Command submission took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "µs" << std::endl);
+                std::cerr << "Command submission took "
+                          << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "µs"
+                          << std::endl);
     pthread_mutex_unlock(&addr.cmd_recieve_server_resp_lock);
     pthread_mutex_unlock(&cmdserverlock);
     // re-lock self to stall
