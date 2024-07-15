@@ -359,6 +359,9 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
           axi4_mem.r.setValid(1);
           axi4_mem.r.setLast(am_done && tx->can_be_last);
           axi4_mem.r.setId(tx->id);
+          if (axi4_mem.r.getLast()) {
+            printf("return %d\n", tx->id);
+          }
         } else {
           axi4_mem.r.setValid(0);
           axi4_mem.r.setLast(false);
