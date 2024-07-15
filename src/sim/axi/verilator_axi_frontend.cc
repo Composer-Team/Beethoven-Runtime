@@ -4,6 +4,7 @@
 #include "cmd_server.h"
 #include "data_server.h"
 #include <csignal>
+#include <chrono>
 #include <pthread.h>
 #include <queue>
 #include <verilated.h>
@@ -251,7 +252,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 #endif
 
   top.S00_AXI_awvalid = top.S00_AXI_wvalid = top.S00_AXI_rready = top.S00_AXI_arvalid = top.S00_AXI_bready = 0;
-
+  auto time_last_print = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < 50; ++i) {
     top.clock = 0;
     tick(&top);
@@ -279,7 +280,9 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
     top.clock = 1;// posedge
     main_time += fpga_clock_inc;
     cycle_count++;
-    if ((cycle_count & 1024) == 0) {
+
+    if ((cycle_count & 1024) == 0 && std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time_last_print).count() > 500) {
+      time_last_print = std::chrono::high_resolution_clock::now();
       print_state(memory_transacted, main_time, main_time - time_last_command);
       fflush(stdout);
     }
@@ -412,7 +415,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
               if (axi4_mem.w.getStrb(off)) {
                 reinterpret_cast<char *>(addr)[off] = src[off];
                 memory_transacted++;
-                printf("writing %x\n", src[off]);
+//                printf("writing %x\n", src[off]);
               }
               off += 1;
             }
