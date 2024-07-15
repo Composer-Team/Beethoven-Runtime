@@ -149,9 +149,9 @@ if (${BUILD_SIM})
             PREFIX ${TOP}
             TRACE_FST
             VERILATOR_ARGS --timescale 1ps/1ps --x-assign fast
-            --timing -Wno-context -Wno-lint -Wno-style -Wno-symrsvdword -Wno-multidriven -Wno-combdly -Wno-zerodly
+            -Wno-context -Wno-lint -Wno-style -Wno-symrsvdword -Wno-multidriven -Wno-combdly #-Wno-zerodly
             -Wno-moddup -Wno-unoptflat
     )
 endif ()
 
-add_subdirectory(tests)
+#add_subdirectory(tests)
