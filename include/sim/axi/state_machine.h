@@ -1,12 +1,10 @@
 //
-// Created by Chris Kjellqvist on 8/9/23.
+// Created by Christopher Kjellqvist on 7/8/24.
 //
 
-#ifndef BEETHOVENRUNTIME_FRONT_BUS_CTRL_AXI_H
-#define BEETHOVENRUNTIME_FRONT_BUS_CTRL_AXI_H
-
-#include <cinttypes>
-#include <BeethovenTop.h>
+#ifndef BEETHOVENRUNTIME_STATE_MACHINE_H
+#define BEETHOVENRUNTIME_STATE_MACHINE_H
+#include "BeethovenTop.h"
 
 enum cmd_transfer_state {
   CMD_INACTIVE,
@@ -66,5 +64,7 @@ void update_resp_state(BeethovenTop &top);
 
 void update_update_state(BeethovenTop &top);
 
+void trace_rising_edge_pre(BeethovenTop &top);
+void trace_rising_edge_post(BeethovenTop &top);
 
-#endif//BEETHOVENRUNTIME_FRONT_BUS_CTRL_AXI_H
+#endif //BEETHOVENRUNTIME_STATE_MACHINE_H

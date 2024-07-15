@@ -3,7 +3,7 @@
 //
 
 #include "beethoven_allocator_declaration.h"
-#include "sim/front_bus_ctrl_axi.h"
+#include "sim/axi/front_bus_ctrl_axi.h"
 #include "sim/mem_ctrl.h"
 #include <verilated_fst_c.h>
 

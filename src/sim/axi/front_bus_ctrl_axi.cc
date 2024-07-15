@@ -2,11 +2,12 @@
 // Created by Chris Kjellqvist on 8/9/23.
 //
 
-#include "sim/front_bus_ctrl_axi.h"
+#include "sim/axi/front_bus_ctrl_axi.h"
 #include "beethoven_allocator_declaration.h"
 #include "sim/mem_ctrl.h"
 #include "util.h"
-#include <cmd_server.h>
+#include "cmd_server.h"
+#include "sim/axi/state_machine.h"
 #include <csignal>
 #include <verilated_fst_c.h>
 #include <verilated_vcd_c.h>
@@ -20,7 +21,7 @@ extern uint64_t main_time;
 static int cmds_inflight = 0;
 static int check_freq = 50;
 extern bool kill_sig;
-extern mem_ctrl::mem_interface<BeethovenMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
+extern mem_intf_t axi4_mems[NUM_DDR_CHANNELS];
 extern uint64_t time_last_command;
 extern uint64_t memory_transacted;
 #ifdef USE_VCD

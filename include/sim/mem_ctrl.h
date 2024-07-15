@@ -4,10 +4,12 @@
 
 #ifndef BEETHOVENRUNTIME_MEM_CTRL_H
 #define BEETHOVENRUNTIME_MEM_CTRL_H
+
 #include "beethoven_allocator_declaration.h"
 #include "data_server.h"
 #include "ddr_macros.h"
 #include "dram_system.h"
+#include "BeethovenTop.h"
 #include <dramsim3.h>
 #include <memory>
 #include <queue>
@@ -16,11 +18,12 @@
 #include <verilated_vcd_c.h>
 extern VerilatedVcdC *tfp;
 #else
+
 #include <verilated_fst_c.h>
+
 extern VerilatedFstC *tfp;
 #endif
 extern uint64_t main_time;
-
 
 
 #define RLOCK pthread_mutex_lock(&axi4_mem.read_queue_lock);
@@ -68,13 +71,13 @@ namespace mem_ctrl {
                        int id,
                        uint64_t fpga_addr,
                        bool is_intermediate) : addr(addr),
-                                             size(size),
-                                             len(len),
-                                             axi_bus_beats_progress(progress),
-                                             fixed(fixed),
-                                             id(id),
-                                             fpga_addr(fpga_addr),
-                                             is_intermediate(is_intermediate) {
+                                               size(size),
+                                               len(len),
+                                               axi_bus_beats_progress(progress),
+                                               fixed(fixed),
+                                               id(id),
+                                               fpga_addr(fpga_addr),
+                                               is_intermediate(is_intermediate) {
       dram_tx_n_enqueues = (len * size) / DDR_ENQUEUE_SIZE_BYTES;
       if (!is_intermediate) {
 //        printf("Transaction of size %d, len %d, n_enqueues %d\n\n", size, len, dram_tx_n_enqueues);
@@ -112,212 +115,236 @@ namespace mem_ctrl {
     }
   };
 
-  template<typename idtype >
+  template<typename id_t, typename axisize_t, typename burst_t, typename addr_t, typename len_t>
   class v_address_channel {
-    CData *ready = nullptr;
-    CData *valid = nullptr;
-    idtype *id = nullptr;
-    CData *size = nullptr;
-    CData *burst = nullptr;
-    BeethovenMemAddressSimDtype *addr = nullptr;
-    CData *len = nullptr;
-
+    uint8_t *ready_field = nullptr;
+    uint8_t *valid_field = nullptr;
+    id_t *id_field = nullptr;
+    axisize_t *size_field = nullptr;
+    burst_t *burst_field = nullptr;
+    addr_t *addr_field = nullptr;
+    len_t *len_field = nullptr;
   public:
-    explicit v_address_channel(CData &ready,
-                               CData &valid,
-                               idtype &id,
-                               CData &size,
-                               CData &burst,
-                               BeethovenMemAddressSimDtype &addr,
-                               CData &len) : ready(&ready),
-                                             valid(&valid),
-                                             id(&id),
-                                             size(&size),
-                                             burst(&burst),
-                                             addr(&addr),
-                                             len(&len) {}
 
-    [[nodiscard]] CData getReady() const {
-      return *ready;
+    ~v_address_channel() = default;
+
+    v_address_channel() = default;
+
+    void init(uint8_t &ready,
+              uint8_t &valid,
+              id_t &id,
+              axisize_t &size,
+              burst_t &burst,
+              addr_t &addr,
+              len_t &len) {
+      ready_field = &ready;
+      valid_field = &valid;
+      id_field = &id;
+      size_field = &size;
+      burst_field = &burst;
+      addr_field = &addr;
+      len_field = &len;
     }
 
-    void setReady(CData ready) {
-      *v_address_channel::ready = ready;
+    [[nodiscard]] bool getReady() const {
+      return bool(*ready_field);
     }
 
-    CData getValid() const {
-      return *valid;
+    void setReady(bool ready) {
+      *v_address_channel::ready_field = (uint8_t) ready;
     }
 
-    void setValid(CData valid) {
-      *v_address_channel::valid = valid;
+    bool getValid() const {
+      return *valid_field;
     }
 
-    idtype getId() const {
-      return *id;
+    void setValid(bool valid) {
+      *v_address_channel::valid_field = valid;
     }
 
-    void setId(idtype id) {
-      *v_address_channel::id = id;
+    id_t getId() const {
+      return *id_field;
+    }
+
+    void setId(uint64_t id) {
+      *v_address_channel::id_field = id;
     }
 
     CData getSize() const {
-      return *size;
+      return *size_field;
     }
 
     void setSize(CData size) {
-      *v_address_channel::size = size;
+      *v_address_channel::size_field = size;
     }
 
     CData getBurst() const {
-      return *burst;
+      return *burst_field;
     }
 
     void setBurst(CData burst) {
-      *v_address_channel::burst = burst;
+      *v_address_channel::burst_field = burst;
     }
 
     BeethovenMemAddressSimDtype getAddr() const {
-      return *addr;
+      return *addr_field;
     }
 
     void setAddr(BeethovenMemAddressSimDtype addr) {
-      *v_address_channel::addr = addr;
+      *v_address_channel::addr_field = addr;
     }
 
     CData getLen() const {
-      return *len;
+      return *len_field;
     }
 
     void setLen(CData len) {
-      *v_address_channel::len = len;
+      *v_address_channel::len_field = len;
     }
 
     bool fire() {
-      return *ready && *valid;
+      return *ready_field && *valid_field;
     }
   };
 
-  template<typename idtype>
-  class data_channel {
-    CData *ready;
-    CData *valid;
-    char *data = nullptr;
-    idtype *id;
-    CData *last;
+  template<typename id_t, typename strb_t>
+  struct data_channel {
+    uint8_t *ready;
+    uint8_t *valid;
+    uint8_t *data;
+    strb_t *strb;
+    id_t *id;
+    uint8_t *last;
 
   public:
-    explicit data_channel(CData &ready,
-                          CData &valid,
-                          CData &last,
-                          idtype *id) : ready(&ready),
-                                        valid(&valid),
-                                        last(&last),
-                                        id(id) {}
 
-    void setData(char *data) {
+    ~data_channel() = default;
+
+    data_channel() = default;
+
+    void init(uint8_t &ready,
+              uint8_t &valid,
+              uint8_t &last,
+              id_t *id,
+              strb_t *strb) {
+      data_channel::ready = &ready;
+      data_channel::valid = &valid;
+      data_channel::last = &last;
+      data_channel::id = id;
+      data_channel::strb = strb;
+    }
+
+    void setData(uint8_t *data) {
       data_channel::data = data;
     }
 
-    CData getReady() const {
+    uint8_t getReady() const {
       return *ready;
     }
 
-    void setReady(CData ready) {
+    void setReady(uint8_t ready) {
       *data_channel::ready = ready;
     }
 
-    CData getValid() const {
+    uint8_t getValid() const {
       return *valid;
     }
 
-    void setValid(CData valid) {
+    void setValid(uint8_t valid) {
       *data_channel::valid = valid;
     }
 
-    char *getData() const {
+    uint8_t *getData() const {
       return data;
     }
 
-    idtype getId() const {
+    id_t getId() const {
       return *id;
     }
 
-    void setId(idtype id) {
+    void setId(id_t id) {
       *data_channel::id = id;
-      //    std::cerr << "Got " << id << ", set as " << *data_channel::id << std::endl;
     }
 
-    CData getLast() const {
+    uint8_t getLast() const {
       return *last;
     }
 
-    void setLast(CData last) {
+    void setLast(uint8_t last) {
       *data_channel::last = last;
     }
 
     bool fire() {
       return *ready && *valid;
     }
+
+    bool getStrb(int i) const {
+      return *strb & (1 << i);
+    }
   };
 
-  template<typename idtype>
+  template<typename id_t>
   class response_channel {
-    CData *ready;
-    CData *valid;
-    idtype *id;
+    uint8_t *ready_field;
+    uint8_t *valid_field;
+    id_t *id_field;
 
   public:
-    std::queue<int> send_ids;
-    std::queue<int> to_enqueue;
-    explicit response_channel(CData &ready,
-                              CData &valid,
-                              idtype &id) : ready(&ready),
-                                            valid(&valid),
-                                            id(&id) {}
+    std::queue<id_t> send_ids;
+    std::queue<id_t> to_enqueue;
 
-    CData getReady() const {
-      return *ready;
+    ~response_channel() = default;
+
+    response_channel() = default;
+
+    void init(uint8_t &ready,
+              uint8_t &valid,
+              id_t *id) {
+      ready_field = &ready;
+      valid_field = &valid;
+      id_field = id;
     }
 
-    void setReady(CData ready) {
-      *response_channel::ready = ready;
+    uint8_t getReady() const {
+      return *ready_field;
     }
 
-    CData getValid() const {
-      return *valid;
+    void setReady(uint8_t ready) {
+      *response_channel::ready_field = ready;
     }
 
-    void setValid(CData valid) {
-      *response_channel::valid = valid;
+    uint8_t getValid() const {
+      return *valid_field;
     }
 
-    idtype getId() const {
-      return *id;
+    void setValid(uint8_t valid) {
+      *response_channel::valid_field = valid;
     }
 
-    void setId(idtype id) {
-      *response_channel::id = id;
+    id_t getId() const {
+      return *id_field;
     }
 
-    const std::queue<int> &getSendIds() const {
+    void setId(id_t id) {
+      *response_channel::id_field = id;
+    }
+
+    const std::queue<id_t> &getSendIds() const {
       return send_ids;
     }
 
-    void setSendIds(const std::queue<int> &sendIds) {
+    void setSendIds(const std::queue<id_t> &sendIds) {
       send_ids = sendIds;
     }
 
     bool fire() {
-      return *ready && *valid;
+      return *ready_field && *valid_field;
     }
   };
 
   struct with_dramsim3_support {
 
     virtual void enqueue_read(std::shared_ptr<mem_ctrl::memory_transaction> &tx) = 0;
-
-    virtual void enqueue_response(int id) = 0;
 
     std::map<uint64_t, std::queue<std::shared_ptr<memory_transaction>> *> in_flight_reads;
     std::map<uint64_t, std::queue<std::shared_ptr<memory_transaction>> *> in_flight_writes;
@@ -328,52 +355,58 @@ namespace mem_ctrl {
     const static int max_q_length = 40;
     std::vector<std::shared_ptr<memory_transaction>> ddr_read_q;
     std::vector<std::shared_ptr<memory_transaction>> ddr_write_q;
+
     //  std::set<int> bank2tx;
     bool can_accept_write() {
       return ddr_write_q.size() < max_q_length;
     }
+
     bool can_accept_read() {
       return ddr_read_q.size() < max_q_length;
     }
 
-//    static int tx2bank(const std::shared_ptr<memory_transaction> mt) {
-//      auto dimm_base = get_dimm_address(mt->fpga_addr);
-//      auto dimm_addr = dimm_base + 8 * mt->dram_tx_axi_enqueue_progress;
-//
-//      return (int) ((dimm_addr & ~(0xFFFL)) >> 12);
-//    }
-
     void init_dramsim3();
+
+    virtual void enqueue_response(int id) = 0;
   };
 
-  template<typename IDType>
-  struct mem_interface: with_dramsim3_support
-  {
-    v_address_channel<IDType> *aw = nullptr;
-    v_address_channel<IDType> *ar = nullptr;
-    data_channel<IDType> *w = nullptr;
-    data_channel<IDType> *r = nullptr;
-    response_channel<IDType> *b = nullptr;
+  template<typename id_t, typename axisize_t, typename burst_t, typename addr_t, typename len_t, typename strb_t>
+  struct mem_interface : with_dramsim3_support {
+    v_address_channel<id_t, axisize_t, burst_t, addr_t, len_t> aw;
+    v_address_channel<id_t, axisize_t, burst_t, addr_t, len_t> ar;
+    data_channel<id_t, strb_t> w;
+    data_channel<id_t, strb_t> r;
+    response_channel<id_t> b;
     std::queue<std::shared_ptr<memory_transaction>> write_transactions;
     std::queue<std::shared_ptr<memory_transaction>> read_transactions;
+
+    ~mem_interface() = default;
 
     int num_in_flight_writes = 0;
     static const int max_in_flight_writes = 32;
     int id;
+
     void enqueue_read(std::shared_ptr<mem_ctrl::memory_transaction> &tx) override {
       read_transactions.push(tx);
     }
 
-    void enqueue_response(int id) override {
-      b->to_enqueue.push(static_cast<IDType>(id));
+    void enqueue_response(int id) {
+      b.to_enqueue.push(id);
     }
-
-    int current_read_channel_contents = -1;
   };
 
-  void enqueue_transaction(v_address_channel<BeethovenMemIDDtype> &chan, std::queue<std::shared_ptr<memory_transaction>> &lst);
 }
 
-void try_to_enqueue_ddr(mem_ctrl::mem_interface<BeethovenMemIDDtype> &axi4_mem);
+
+
+
+#define prep(x) std::decay_t<decltype(x)>
+
+typedef mem_ctrl::mem_interface<prep(BeethovenTop::M00_AXI_arid), prep(BeethovenTop::M00_AXI_arsize), prep(BeethovenTop::M00_AXI_arburst), prep(BeethovenTop::M00_AXI_araddr), prep(BeethovenTop::M00_AXI_arlen), prep(BeethovenTop::M00_AXI_wstrb)> mem_intf_t;
+#ifdef BEETHOVEN_HAS_DMA
+typedef mem_ctrl::mem_interface<prep(BeethovenTop::dma_arid), prep(BeethovenTop::dma_arsize), prep(BeethovenTop::dma_arburst), prep(BeethovenTop::dma_araddr), prep(BeethovenTop::dma_arlen), prep(BeethovenTop::dma_wstrb)> dma_intf_t;
+#endif
+
+void try_to_enqueue_ddr(mem_intf_t &);
 
 #endif//BEETHOVENRUNTIME_MEM_CTRL_H

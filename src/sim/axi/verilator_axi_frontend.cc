@@ -9,7 +9,7 @@
 #include <verilated.h>
 
 #include "sim/ddr_macros.h"
-#include "sim/front_bus_ctrl_axi.h"
+#include "sim/axi/front_bus_ctrl_axi.h"
 #include "sim/mem_ctrl.h"
 #include "sim/verilator.h"
 #include "trace/trace_read.h"
@@ -30,7 +30,11 @@ bool active_reset = true;
 
 extern std::queue<beethoven::rocc_cmd> cmds;
 extern std::unordered_map<system_core_pair, std::queue<int> *> in_flight;
-mem_ctrl::mem_interface<BeethovenMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
+
+BeethovenTop top;
+
+
+mem_intf_t axi4_mems[NUM_DDR_CHANNELS];
 
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 bool kill_sig = false;
@@ -61,8 +65,8 @@ void tick(BeethovenTop *top) {
 
 #include "trace/trace_read.h"
 #include "sim/verilator.h"
+#include "sim/axi/state_machine.h"
 
-Trace *trace = nullptr;
 
 void init_trace(const std::string &fname) {
   FILE *f = fopen(fname.c_str(), "r");
@@ -108,100 +112,6 @@ void init_trace(const std::string &fname) {
   return;
 }
 
-enum TraceMachineState {
-  IdleState,
-  ReadAddressState,
-  ReadState,
-  WriteAddressState,
-  WriteState,
-  WriteResponse
-};
-
-static TraceMachineState state = IdleState;
-
-int time_in_idle = 0;
-
-void trace_rising_edge_pre(BeethovenTop &top) {
-  if (top.reset == active_reset) return;
-  switch (state) {
-    case IdleState:
-      time_in_idle++;
-      if (time_in_idle == 100) {
-        if (trace->empty()) {
-          sig_handle(0);
-        } else {
-          if (trace->front().ty == ReadConditionType)
-            state = ReadAddressState;
-          else
-            state = WriteAddressState;
-        }
-      }
-      break;
-    case ReadAddressState:
-      if (top.S00_AXI_arready && top.S00_AXI_arvalid) {
-        state = ReadState;
-      }
-      break;
-    case ReadState:
-      if (top.S00_AXI_rready && top.S00_AXI_rvalid) {
-        state = IdleState;
-        time_in_idle = 0;
-        if (trace->front().payload == top.S00_AXI_rdata) {
-          trace->pop();
-        }
-      }
-      break;
-    case WriteAddressState:
-      if (top.S00_AXI_awready && top.S00_AXI_awvalid) {
-        state = WriteState;
-      }
-      break;
-    case WriteState:
-      if (top.S00_AXI_wready && top.S00_AXI_wvalid) {
-        state = WriteResponse;
-      }
-      break;
-    case WriteResponse:
-      if (top.S00_AXI_bvalid && top.S00_AXI_bready) {
-        trace->pop();
-        state = IdleState;
-        time_in_idle = 0;
-      }
-      break;
-  }
-}
-
-void trace_rising_edge_post(BeethovenTop &top) {
-  if (top.reset == active_reset) return;
-  top.S00_AXI_bready = false;
-  top.S00_AXI_awvalid = false;
-  top.S00_AXI_arvalid = false;
-  top.S00_AXI_wvalid = false;
-  top.S00_AXI_rready = false;
-  switch (state) {
-    case IdleState:
-      break;
-    case WriteAddressState:
-      top.S00_AXI_awvalid = true;
-      top.S00_AXI_awaddr = trace->front().address;
-      break;
-    case WriteState:
-      top.S00_AXI_wdata = trace->front().payload;
-      top.S00_AXI_wstrb = 0xF;
-      top.S00_AXI_wvalid = true;
-      break;
-    case ReadAddressState:
-      top.S00_AXI_arvalid = true;
-      top.S00_AXI_araddr = trace->front().address;
-      break;
-    case ReadState:
-      top.S00_AXI_rready = true;
-      break;
-    case WriteResponse:
-      top.S00_AXI_bready = true;
-      break;
-  }
-}
 
 TraceUnit::TraceUnit(TraceType ty, uint64_t address, uint32_t payload) : ty(ty), address(address), payload(payload) {}
 
@@ -248,7 +158,8 @@ void print_state(uint64_t mem, uint64_t time, uint64_t time_since) {
     mem_rate = std::to_string(mem_rate_norm / 1024 / 1024 / 1024) + "GB/s";
   }
 
-  std::cout << "\rTime: " << time_string << " | Memory: " << mem_norm << mem_unit << " | Rate: " << mem_rate << " | w(" << writes_emitted << ") r(" << reads_emitted << ")";
+  std::cout << "\rTime: " << time_string << " | Memory: " << mem_norm << mem_unit << " | Rate: " << mem_rate << " | w("
+            << writes_emitted << ") r(" << reads_emitted << ")";
 }
 
 uint64_t time_last_command = 0;
@@ -278,13 +189,9 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
   float ddr_acc = 0;
   uint64_t cycle_count = 0;
 
-  // start servers to communicate with user programs
-//  const char *v[3] = {"", "+verilator+seed+14934534", "+verilator+rand+reset+2"};
-//  const int cv = 3;
   const char *v[1] = {""};
   const int cv = 1;
   Verilated::commandArgs(cv, v);
-  BeethovenTop top;
   Verilated::traceEverOn(true);
   tfp = new waveTrace;
   top.trace(tfp, 30);
@@ -298,57 +205,49 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 
 #if defined(BEETHOVEN_HAS_DMA)
 
-  mem_ctrl::mem_interface<BeethovenDMAIDtype> dma;
+  dma_intf_t dma;
   int dma_txprogress = 0;
   int dma_txlength = 0;
-  dma.aw = new mem_ctrl::v_address_channel<BeethovenDMAIDtype>(top.dma_awready, top.dma_awvalid, top.dma_awid,
-                                                              top.dma_awsize, top.dma_awburst,
-                                                              top.dma_awaddr, top.dma_awlen);
-  dma.ar = new mem_ctrl::v_address_channel<BeethovenDMAIDtype>(top.dma_arready, top.dma_arvalid, top.dma_arid,
-                                                              top.dma_arsize, top.dma_arburst,
-                                                              top.dma_araddr, top.dma_arlen);
-  dma.w = new mem_ctrl::data_channel<BeethovenDMAIDtype>(top.dma_wready, top.dma_wvalid,
-                                                        &top.dma_wstrb, top.dma_wlast, nullptr);
-  dma.r = new mem_ctrl::data_channel<BeethovenDMAIDtype>(top.dma_rready, top.dma_rvalid,
-                                                        nullptr, top.dma_rlast, &top.dma_rid);
-  dma.w->setData((char *) top.dma_rdata.m_storage);
-  dma.r->setData((char *) top.dma_wdata.m_storage);
-  dma.b = new mem_ctrl::response_channel<BeethovenDMAIDtype>(top.dma_bready, top.dma_bvalid, top.dma_bid);
+  dma.aw.init(top.dma_awready, top.dma_awvalid, top.dma_awid, top.dma_awsize, top.dma_awburst, top.dma_awaddr, top.dma_awlen);
+  dma.ar.init(top.dma_arready, top.dma_arvalid, top.dma_arid, top.dma_arsize, top.dma_arburst, top.dma_araddr, top.dma_arlen);
+  dma.w.init(top.dma_wready, top.dma_wvalid, top.dma_wlast, nullptr, &top.dma_wstrb);
+  dma.r.init(top.dma_rready, top.dma_rvalid, top.dma_rlast, &top.dma_rlast, nullptr);
+  dma.b.init(top.dma_bready, top.dma_bvalid, &top.dma_bid);
 #endif
   for (auto &axi4_mem: axi4_mems) {
     axi4_mem.init_dramsim3();
   }
-
+//
 #if NUM_DDR_CHANNELS >= 1
-  init_ddr_interface(0)
+  init_ddr_interface(0);
 #if DATA_BUS_WIDTH <= 64
   axi4_mems[0].r->setData((char *) &top.M00_AXI_rdata);
-  axi4_mems[0].w->setData((char *) &top.M00_AXI_wdata);
+  axi4_mems[0].w.setData((char *) &top.M00_AXI_wdata);
 #else
-  axi4_mems[0].r->setData((char *) &top.M00_AXI_rdata.at(0));
-  axi4_mems[0].w->setData((char *) &top.M00_AXI_wdata.at(0));
+  axi4_mems[0].r.setData((uint8_t *) &top.M00_AXI_rdata.at(0));
+  axi4_mems[0].w.setData((uint8_t *) &top.M00_AXI_wdata.at(0));
 #endif
 #if NUM_DDR_CHANNELS >= 2
   init_ddr_interface(1)
 #if NUM_DDR_CHANNELS >= 4
-      init_ddr_interface(2)
-          init_ddr_interface(3)
+  init_ddr_interface(2)
+  init_ddr_interface(3)
 #endif
 #endif
 #endif
   // reset circuit
   top.reset = active_reset;
   for (auto &mem: axi4_mems) {
-    mem.r->setValid(0);
-    mem.b->setValid(0);
-    mem.aw->setReady(1);
+    mem.r.setValid(0);
+    mem.b.setValid(0);
+    mem.aw.setReady(1);
   }
 #ifdef BEETHOVEN_HAS_DMA
-  dma.b->setReady(0);
-  dma.ar->setValid(0);
-  dma.aw->setValid(0);
-  dma.w->setValid(0);
-  dma.r->setReady(0);
+  dma.b.setReady(0);
+  dma.ar.setValid(0);
+  dma.aw.setValid(0);
+  dma.w.setValid(0);
+  dma.r.setReady(0);
 #endif
 
   top.S00_AXI_awvalid = top.S00_AXI_wvalid = top.S00_AXI_rready = top.S00_AXI_arvalid = top.S00_AXI_bready = 0;
@@ -407,7 +306,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
       }
 
       for (auto &axi4_mem: axi4_mems) {
-        if (axi4_mem.r->getValid() && axi4_mem.r->getReady()) {
+        if (axi4_mem.r.getValid() && axi4_mem.r.getReady()) {
           memory_transacted += (DATA_BUS_WIDTH >> 3);
           RLOCK
           auto tx = axi4_mem.read_transactions.front();
@@ -415,19 +314,19 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
           if (not tx->fixed) {
             tx->addr += tx->size;
           }
-          if (axi4_mem.r->getLast() || !tx->can_be_last) {
+          if (axi4_mem.r.getLast() || !tx->can_be_last) {
             axi4_mem.read_transactions.pop();
           }
           RUNLOCK
         }
 
-        if (axi4_mem.ar->getReady() && axi4_mem.ar->getValid()) {
-          uint64_t addr = axi4_mem.ar->getAddr();
+        if (axi4_mem.ar.getReady() && axi4_mem.ar.getValid()) {
+          uint64_t addr = axi4_mem.ar.getAddr();
           char *ad = (char *) at.translate(addr);
-          auto txsize = (int) 1 << axi4_mem.ar->getSize();
-          auto txlen = (int) (axi4_mem.ar->getLen()) + 1;
+          auto txsize = (int) 1 << axi4_mem.ar.getSize();
+          auto txlen = (int) (axi4_mem.ar.getLen()) + 1;
           auto tx = std::make_shared<mem_ctrl::memory_transaction>((uintptr_t) ad, txsize, txlen, 0, false,
-                                                                   axi4_mem.ar->getId(), addr, false);
+                                                                   axi4_mem.ar.getId(), addr, false);
           // 64b per DRAM transaction
           RLOCK
           axi4_mem.ddr_read_q.push_back(tx);
@@ -437,9 +336,9 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 
 
       // ------------ HANDLE MEMORY INTERFACES ----------------
-      for (mem_ctrl::mem_interface<BeethovenMemIDDtype> &axi4_mem: axi4_mems) {
-        if (axi4_mem.b->getReady() && axi4_mem.b->getValid()) {
-          axi4_mem.b->send_ids.pop();
+      for (mem_intf_t &axi4_mem: axi4_mems) {
+        if (axi4_mem.b.getReady() && axi4_mem.b.getValid()) {
+          axi4_mem.b.send_ids.pop();
           axi4_mem.num_in_flight_writes--;
         }
 
@@ -447,44 +346,44 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
         if (not axi4_mem.read_transactions.empty()) {
           auto tx = axi4_mem.read_transactions.front();
           int start = (tx->axi_bus_beats_progress * tx->size) % (DATA_BUS_WIDTH / 8);
-          char *dest = (char *) axi4_mem.r->getData() + start;
+          char *dest = (char *) axi4_mem.r.getData() + start;
           memcpy(dest, reinterpret_cast<char *>(tx->addr), tx->size);
           bool am_done = tx->len == (tx->axi_bus_beats_progress + 1);
-          axi4_mem.r->setValid(1);
-          axi4_mem.r->setLast(am_done && tx->can_be_last);
-          axi4_mem.r->setId(tx->id);
+          axi4_mem.r.setValid(1);
+          axi4_mem.r.setLast(am_done && tx->can_be_last);
+          axi4_mem.r.setId(tx->id);
         } else {
-          axi4_mem.r->setValid(0);
-          axi4_mem.r->setLast(false);
+          axi4_mem.r.setValid(0);
+          axi4_mem.r.setLast(false);
         }
         RUNLOCK
 
         WLOCK
         // update all channels with new information now that we've updated states
-        if (not axi4_mem.b->send_ids.empty()) {
-          axi4_mem.b->setValid(1);
-          axi4_mem.b->setId(axi4_mem.b->send_ids.front());
+        if (not axi4_mem.b.send_ids.empty()) {
+          axi4_mem.b.setValid(1);
+          axi4_mem.b.setId(axi4_mem.b.send_ids.front());
         } else {
-          axi4_mem.b->setValid(0);
+          axi4_mem.b.setValid(0);
         }
 
-        if (!axi4_mem.b->to_enqueue.empty()) {
-          axi4_mem.b->send_ids.push(axi4_mem.b->to_enqueue.front());
-          axi4_mem.b->to_enqueue.pop();
+        if (!axi4_mem.b.to_enqueue.empty()) {
+          axi4_mem.b.send_ids.push(axi4_mem.b.to_enqueue.front());
+          axi4_mem.b.to_enqueue.pop();
         }
 
-        if (axi4_mem.aw->getValid() && axi4_mem.aw->getReady()) {
+        if (axi4_mem.aw.getValid() && axi4_mem.aw.getReady()) {
           try {
 #ifdef BAREMETAL_RUNTIME
-            uintptr_t addr = axi4_mem.aw->getAddr();
+            uintptr_t addr = axi4_mem.aw.getAddr();
 #else
-            char *addr = (char *) at.translate(axi4_mem.aw->getAddr());
+            char *addr = (char *) at.translate(axi4_mem.aw.getAddr());
 #endif
-            int sz = 1 << axi4_mem.aw->getSize();
-            int len = 1 + int(axi4_mem.aw->getLen());// per axi
-            bool is_fixed = axi4_mem.aw->getBurst() == 0;
-            int id = axi4_mem.aw->getId();
-            uint64_t fpga_addr = axi4_mem.aw->getAddr();
+            int sz = 1 << axi4_mem.aw.getSize();
+            int len = 1 + int(axi4_mem.aw.getLen());// per axi
+            bool is_fixed = axi4_mem.aw.getBurst() == 0;
+            int id = axi4_mem.aw.getId();
+            uint64_t fpga_addr = axi4_mem.aw.getAddr();
             auto tx = std::make_shared<mem_ctrl::memory_transaction>(uintptr_t(addr), sz, len, 0, is_fixed, id,
                                                                      fpga_addr, false);
             axi4_mem.write_transactions.push(tx);
@@ -499,88 +398,86 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 //        mem_ctrl::enqueue_transaction(*axi4_mem.aw, axi4_mem.write_transactions);
 
         if (not axi4_mem.write_transactions.empty()) {
-          if (axi4_mem.w->getValid() && axi4_mem.w->getReady()) {
+          if (axi4_mem.w.getValid() && axi4_mem.w.getReady()) {
             memory_transacted += (DATA_BUS_WIDTH >> 3);
             auto trans = axi4_mem.write_transactions.front();
             // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
-            char *src = axi4_mem.w->getData();
-//            auto strobe = axi4_mem.w->getStrobe();
+            uint8_t *src = axi4_mem.w.getData();
+//            auto strobe = axi4_mem.w.getStrb();
             uint32_t off = 0;
             // for writes, we need to account for alignment and strobe,so we're re-aligning address here
             // align to 64B - zero out bottom 6b
             auto addr = trans->addr;
-            /*
-                  while (strobe != 0) {
-                    if (strobe & 1) {
-                      reinterpret_cast<char *>(addr)[off] = src[off];
-                      memory_transacted++;
-                    }
-                    off += 1;
-                    strobe >>= 1;
-                  }
-            */
+            while (off < sizeof(BeethovenTop::M00_AXI_wstrb)*8) {
+              if (axi4_mem.w.getStrb(off)) {
+                reinterpret_cast<char *>(addr)[off] = src[off];
+                memory_transacted++;
+                printf("writing %x\n", src[off]);
+              }
+              off += 1;
+            }
             trans->axi_bus_beats_progress++;
 
             if (not trans->fixed) {
               trans->addr += trans->size;
             }
 
-            if (axi4_mem.w->getLast()) {
+            if (axi4_mem.w.getLast()) {
               axi4_mem.write_transactions.pop();
               trans->dram_tx_axi_enqueue_progress = 0;
               trans->axi_bus_beats_progress = 1;
               axi4_mem.ddr_write_q.push_back(trans);
-              axi4_mem.w->setReady(!axi4_mem.write_transactions.empty() ||
+              axi4_mem.w.setReady(!axi4_mem.write_transactions.empty() ||
                                    axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
             } else {
-              axi4_mem.w->setReady(1);
+              axi4_mem.w.setReady(1);
             }
           }
         } else {
-          axi4_mem.w->setReady(axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
+          axi4_mem.w.setReady(axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
         }
         WUNLOCK
 
         RLOCK
         // to signify that the AXI4 DDR Controller is busy enqueueing another transaction in the DRAM
-        axi4_mem.ar->setReady(axi4_mem.can_accept_read());
+        axi4_mem.ar.setReady(axi4_mem.can_accept_read());
         RUNLOCK
 
         WLOCK
 
-        axi4_mem.aw->setReady(axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
+        axi4_mem.aw.setReady(axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
         WUNLOCK
       }
 
 #ifdef BEETHOVEN_HAS_DMA
       pthread_mutex_lock(&dma_lock);
       // enqueue dma transaction into dma axi interface
-      dma.aw->setValid(0);
-      dma.ar->setValid(0);
-      dma.b->setReady(0);
-      dma.w->setValid(0);
-      dma.r->setReady(0);
+      dma.aw.setValid(0);
+      dma.ar.setValid(0);
+      dma.b.setReady(0);
+      dma.w.setValid(0);
+      dma.r.setReady(0);
       if (dma_valid && not dma_in_progress) {
         dma_txprogress = 0;
         dma_txlength = int(dma_len >> 6);
         if (dma_write) {
-          dma.aw->setValid(1);
-          dma.aw->setAddr(dma_fpga_addr);
-          dma.aw->setId(0);
-          dma.aw->setSize(6);
-          dma.aw->setLen((dma_len / 64) - 1);
-          dma.aw->setBurst(1);
-          if (dma.aw->fire()) {
+          dma.aw.setValid(1);
+          dma.aw.setAddr(dma_fpga_addr);
+          dma.aw.setId(0);
+          dma.aw.setSize(6);
+          dma.aw.setLen((dma_len / 64) - 1);
+          dma.aw.setBurst(1);
+          if (dma.aw.fire()) {
             dma_in_progress = true;
           }
         } else {
-          dma.ar->setValid(1);
-          dma.ar->setAddr(dma_fpga_addr);
-          dma.ar->setId(0);
-          dma.ar->setSize(6);
-          dma.ar->setLen((dma_len / 64) - 1);
-          dma.ar->setBurst(1);
-          if (dma.ar->fire()) {
+          dma.ar.setValid(1);
+          dma.ar.setAddr(dma_fpga_addr);
+          dma.ar.setId(0);
+          dma.ar.setSize(6);
+          dma.ar.setLen((dma_len / 64) - 1);
+          dma.ar.setBurst(1);
+          if (dma.ar.fire()) {
             dma_in_progress = true;
           }
         }
@@ -589,25 +486,25 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
       if (dma_in_progress) {
         if (dma_write) {
           if (dma_txprogress < dma_txlength) {
-            dma.w->setValid(1);
-            memcpy(dma.w->getData(), dma_ptr + 64 * dma_txprogress, 64);
-            dma.w->setLast(dma_txprogress + 1 == dma_txlength);
-//            dma.w->setStrobe(0xFFFFFFFFFFFFFFFFL);
-            if (dma.w->getReady()) {
+            dma.w.setValid(1);
+            memcpy(dma.w.getData(), dma_ptr + 64 * dma_txprogress, 64);
+            dma.w.setLast(dma_txprogress + 1 == dma_txlength);
+//            dma.w.setStrobe(0xFFFFFFFFFFFFFFFFL);
+            if (dma.w.getReady()) {
               dma_txprogress++;
             }
           } else {
-            dma.b->setReady(1);
-            if (dma.b->fire()) {
+            dma.b.setReady(1);
+            if (dma.b.fire()) {
               dma_valid = false;
               dma_in_progress = false;
               pthread_mutex_unlock(&dma_wait_lock);
             }
           }
         } else {
-          dma.r->setReady(1);
-          if (dma.r->fire()) {
-            char *rval = dma.r->getData();
+          dma.r.setReady(1);
+          if (dma.r.fire()) {
+            uint8_t *rval = dma.r.getData();
             char *src_val = dma_ptr + 64 * dma_txprogress;
             for (int i = 0; i < 64; ++i) {
               if (rval[i] != src_val[i]) {

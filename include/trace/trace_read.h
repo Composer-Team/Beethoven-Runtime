@@ -5,7 +5,6 @@
 #ifndef BEETHOVENRUNTIME_TRACE_READ_H
 #define BEETHOVENRUNTIME_TRACE_READ_H
 
-#include "sim/front_bus_ctrl_axi.h"
 #include <cinttypes>
 #include <functional>
 #include <queue>
@@ -30,8 +29,6 @@ typedef std::queue<TraceUnit> Trace;
 
 void init_trace(const std::string &fname);
 
-void trace_rising_edge_pre(BeethovenTop &top);
-void trace_rising_edge_post(BeethovenTop &top);
 
 
 
