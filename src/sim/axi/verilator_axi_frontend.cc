@@ -333,6 +333,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
           auto txlen = (int) (axi4_mem.ar.getLen()) + 1;
           auto tx = std::make_shared<mem_ctrl::memory_transaction>((uintptr_t) ad, txsize, txlen, 0, false,
                                                                    axi4_mem.ar.getId(), addr, false);
+          printf("got id %d\n", axi4_mem.ar.getId());
           // 64b per DRAM transaction
           RLOCK
           axi4_mem.ddr_read_q.push_back(tx);
