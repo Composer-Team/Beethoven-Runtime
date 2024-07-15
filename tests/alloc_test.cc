@@ -4,12 +4,14 @@
 
 #include <iostream>
 #include "data_server.h"
-#include <beethoven/alloc.h>
+#include <beethoven/fpga_handle.h>
 #include <random>
 
-device_allocator device_allocator;
+
+using namespace beethoven;
 
 int main() {
+  fpga_handle_t handle;
   std::vector<unsigned long> sizes;
 // for 4K up to 512MB by power of two, make allocations
   for (int i = 12; i <= 29; i++) {
@@ -20,10 +22,10 @@ int main() {
   std::mt19937 g(rd());
   std::shuffle(sizes.begin(), sizes.end(), g);
 
-  std::vector<uint64_t> ptrs;
+  std::vector<remote_ptr> ptrs;
 
   for (auto size : sizes) {
-    auto ptr = device_allocator.malloc(size);
+    auto ptr = handle.malloc(size);
     ptrs.push_back(ptr);
   }
 
@@ -31,7 +33,7 @@ int main() {
   std::shuffle(ptrs.begin(), ptrs.end(), g);
   // free them
   for (auto ptr : ptrs) {
-    device_allocator.free(ptr);
+    handle.free(ptr);
   }
 
 
