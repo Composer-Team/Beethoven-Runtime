@@ -2,7 +2,10 @@
 // Created by Chris Kjellqvist on 8/9/23.
 //
 
+
 #include "sim/mem_ctrl.h"
+
+#if NUM_DDR_CHANNELS >= 1
 #include "verilated.h"
 #include <verilated_fst_c.h>
 
@@ -167,3 +170,4 @@ void mem_ctrl::init(const std::string &dram_ini_file) {
   }
 }
 
+#endif

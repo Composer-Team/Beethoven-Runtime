@@ -57,8 +57,10 @@ address_translator at;
 static std::vector<uint16_t> available_ids;
 #endif
 
+static data_server_file *dsf;
+
 [[noreturn]] static void *data_server_f(void *) {
-  int fd_beethoven = shm_open(data_server_file_name.c_str(), O_CREAT | O_RDWR, file_access_flags);
+  int fd_beethoven = shm_open(data_server_file_name().c_str(), O_CREAT | O_RDWR, file_access_flags);
   if (fd_beethoven < 0) {
     std::cerr << "Failed to open data_server file" << std::endl;
     throw std::exception();
@@ -431,4 +433,9 @@ std::pair<void *, uint64_t> address_translator::get_mapping(uint64_t fpga_addr) 
   }
   std::cerr << "Mapping not found!" << std::endl;
   throw std::exception();
+}
+
+data_server::~data_server() {
+  munmap(&dsf, sizeof(data_server_file));
+  shm_unlink(data_server_file_name().c_str());
 }

@@ -30,6 +30,7 @@ struct std::hash<system_core_pair> {
 
 struct cmd_server {
   static void start();
+  ~cmd_server();
 private:
   pthread_t thread;
 };

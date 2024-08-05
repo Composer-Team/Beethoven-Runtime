@@ -28,8 +28,12 @@ if ("${FRONTEND}" STREQUAL "chipkit")
     set(SRC ${SRC} src/chipkit/chipkit_frontend.cc src/chipkit/chipkit_bus_ctrl.cc)
 endif ()
 
+if ("${SIMULATOR}" STREQUAL "")
+    set (SIMULATOR "verilator")
+endif ()
+
 if ("${TARGET}" STREQUAL "sim")
-    find_package(verilator REQUIRED)
+    find_package(verilator REQUIRED VERSION 5.0.0)
     add_link_options(-latomic)
     set(SRC ${SRC} src/sim/mem_ctrl.cc)
     if (NOT DEFINED FRONTEND)
@@ -47,23 +51,6 @@ if ("${TARGET}" STREQUAL "sim")
     endif ()
     target_compile_definitions(BeethovenRuntime PUBLIC SIM)
     set(BUILD_SIM 1)
-elseif ("${TARGET}" STREQUAL "trace_sim")
-    find_package(verilator REQUIRED)
-    add_executable(BeethovenRuntime ${SRC} src/sim/axi/verilator_axi_frontend.cc src/sim/mem_ctrl.cc src/sim/axi/front_bus_ctrl_axi.cc)
-    add_subdirectory(DRAMsim3)
-    target_link_libraries(BeethovenRuntime PRIVATE dramsim3 args)
-    if ("${USE_WAVES}" STREQUAL "")
-        set(vargs "${vargs} --trace")
-    endif ()
-    target_compile_definitions(BeethovenRuntime PUBLIC SIM)
-    set(BUILD_SIM 1)
-elseif ("${TARGET}" STREQUAL "vsim")
-    add_library(BeethovenRuntime STATIC
-            ${SRC} src/response_poller.cc src/fpga_utils.c src/fpga_main.cc ${AWS_SDK}/sdk/userspace/utils/sh_dpi_tasks.c)
-    include_directories(${AWS_SDK}/hdk/common/software/include ${AWS_SDK}/sdk/userspace/include ${AWS_SDK}/sdk/userspace/include/utils/)
-    target_compile_definitions(BeethovenRuntime PUBLIC VSIM FPGA)
-    target_link_libraries(BeethovenRuntime PRIVATE rt pthread fpga_mgmt)
-    set(BUILD_FPGA 1)
 elseif ("${TARGET}" STREQUAL "fpga")
     if ("${BACKEND}" STREQUAL "")
         message(FATAL_ERROR "Must define backend for FPGA. F1 or Kria")
@@ -75,20 +62,8 @@ elseif ("${TARGET}" STREQUAL "fpga")
     endif ()
     target_compile_definitions(BeethovenRuntime PUBLIC FPGA=1 ${BACKEND})
     set(BUILD_FPGA 1)
-elseif ("${TARGET}" STREQUAL "sanity_xsim")
-    add_library(BeethovenRuntime STATIC ${FILE} ${AWS_SDK}/sdk/userspace/utils/sh_dpi_tasks.c)
-    include_directories(${AWS_SDK}/hdk/common/software/include ${AWS_SDK}/sdk/userspace/include ${AWS_SDK}/sdk/userspace/include/utils/)
-    target_compile_definitions(BeethovenRuntime PUBLIC VSIM)
-    target_link_libraries(BeethovenRuntime PRIVATE pthread fpga_mgmt)
-    set(BUILD_FPGA 1)
-elseif ("${TARGET}" STREQUAL "sanity_fpga")
-    add_executable(BeethovenRuntime ${FILE} ${AWS_SDK}/sdk/userspace/utils/sh_dpi_tasks.c)
-    include_directories(${AWS_SDK}/hdk/common/software/include ${AWS_SDK}/sdk/userspace/include ${AWS_SDK}/sdk/userspace/include/utils/)
-    target_compile_definitions(BeethovenRuntime PUBLIC VSIM FPGA)
-    target_link_libraries(BeethovenRuntime PRIVATE [pthread fpga_mgmt)
-    set(BUILD_FPGA 1)
 else ()
-    message(FATAL_ERROR "Must define build target: 'sim', 'fpga', or 'vsim'. Got '${TARGET}'. -DTARGET=<opt>")
+    message(FATAL_ERROR "Must define build target: 'sim', or 'fpga'. Got '${TARGET}'. -DTARGET=<opt>")
 endif ()
 
 # Tie in beethoven
@@ -131,18 +106,14 @@ if ("${CONTROL_LITE}" STREQUAL "1")
     target_compile_definitions(BeethovenRuntime PUBLIC CONTROL_LITE)
 endif ()
 
-if ("${NO_SANITY}" STREQUAL "1" OR "${FRONTEND}" STREQUAL "chipkit")
+if ("${FRONTEND}" STREQUAL "chipkit")
     target_compile_definitions(BeethovenRuntime PUBLIC BAREMETAL_RUNTIME=1)
     message("Building for chipkit")
 endif ()
 
-if (${BUILD_SIM})
+if (${BUILD_SIM} AND ("${SIMULATOR}" STREQUAL "verilator"))
     # if file exists
-    if (EXISTS ${BEETHOVEN_DIR}/cmake_srcs.cmake)
-        include(${BEETHOVEN_DIR}/cmake_srcs.cmake)
-    else ()
-        set(SRCS ${VTOP})
-    endif ()
+    include(${BEETHOVEN_DIR}/cmake_srcs.cmake)
     verilate(BeethovenRuntime
             SOURCES ${SRCS}
             INCLUDE_DIRS ${BEETHOVEN_DIR} $ENV{BEETHOVEN_ROOT}/Beethoven-Runtime/verilog_resources/ ${BEETHOVEN_DIR}/beethoven.build/ ${ADDITIONAL_SEARCH}
@@ -150,9 +121,7 @@ if (${BUILD_SIM})
             PREFIX ${TOP}
             TRACE_FST
             VERILATOR_ARGS --timescale 1ps/1ps --x-assign fast
-            -Wno-context -Wno-lint -Wno-style -Wno-symrsvdword -Wno-multidriven -Wno-combdly #-Wno-zerodly
+            -Wno-context -Wno-lint -Wno-style -Wno-symrsvdword -Wno-multidriven -Wno-combdly -Wno-zerodly
             -Wno-moddup -Wno-unoptflat
     )
 endif ()
-
-#add_subdirectory(tests)

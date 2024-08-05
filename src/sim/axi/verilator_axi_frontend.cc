@@ -35,7 +35,9 @@ extern std::unordered_map<system_core_pair, std::queue<int> *> in_flight;
 BeethovenTop top;
 
 
+#if NUM_DDR_CHANNELS >= 1
 mem_intf_t axi4_mems[NUM_DDR_CHANNELS];
+#endif
 
 extern "C" {
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -118,9 +120,10 @@ void init_trace(const std::string &fname) {
 
 TraceUnit::TraceUnit(TraceType ty, uint64_t address, uint32_t payload) : ty(ty), address(address), payload(payload) {}
 
-
+#if NUM_DDR_CHANNELS >= 1
 extern int writes_emitted;
 extern int reads_emitted;
+#endif
 
 void print_state(uint64_t mem, uint64_t time, uint64_t time_since) {
   std::string time_string;
@@ -147,6 +150,7 @@ void print_state(uint64_t mem, uint64_t time, uint64_t time_since) {
     mem_norm = (double) mem / 1024 / 1024 / 1024;
   }
 
+#if NUM_DDR_CHANNELS >= 1
   std::string mem_rate;
   // compute bytes per second and normalize
   double time_d = (double) time_since / 1e12;
@@ -163,6 +167,9 @@ void print_state(uint64_t mem, uint64_t time, uint64_t time_since) {
 
   std::cout << "\rTime: " << time_string << " | Memory: " << mem_norm << mem_unit << " | Rate: " << mem_rate << " | w("
             << writes_emitted << ") r(" << reads_emitted << ")";
+#else
+  std::cout << "\rTime: " << time_string;
+#endif
 }
 
 uint64_t time_last_command = 0;
@@ -172,23 +179,26 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
 #if 500000 % FPGA_CLOCK != 0
   fprintf(stderr, "Provided FPGA clock rate (%d MHz) does not evenly divide 500. This may result in some inaccuracies in precise simulation measurements.", FPGA_CLOCK);
 #endif
-
-  mem_ctrl::init(dram_config_file);
   bool use_trace = false;
   if (trace_file.has_value()) {
     init_trace(*trace_file);
     use_trace = true;
   }
-  // using this to estimate AWS bandwidth
-  // KRIA has much slower memory!
-  // Config dramsim3config("../DRAMsim3/configs/Kria.ini", "./");
-  const float DDR_CLOCK = 1000.0 / dramsim3config->tCK;// NOLINT
-
-
   auto fpga_clock_inc = 500000 / FPGA_CLOCK;
+
+#if NUM_DDR_CHANNELS >= 1
+  mem_ctrl::init(dram_config_file);
+  const float DDR_CLOCK = 1000.0 / dramsim3config->tCK;// NOLINT
   std::cout << "FPGA CLOCK RATE (MHz): " << FPGA_CLOCK << std::endl;
   float ddr_clock_inc = DDR_CLOCK / FPGA_CLOCK;// NOLINT
   printf("%f\n", ddr_clock_inc);
+
+#endif
+  // using this to estimate AWS bandwidth
+  // KRIA has much slower memory!
+  // Config dramsim3config("../DRAMsim3/configs/Kria.ini", "./");
+
+
   float ddr_acc = 0;
   uint64_t cycle_count = 0;
 
@@ -201,7 +211,9 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
   tfp->open("trace" TRACE_FILE_ENDING);
 
   std::cout << "Tracing!" << std::endl;
+  top.reset = active_reset;
 
+#if NUM_DDR_CHANNELS >= 1
   for (int i = 0; i < NUM_DDR_CHANNELS; ++i) {
     axi4_mems[i].id = i;
   }
@@ -221,7 +233,6 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
     axi4_mem.init_dramsim3();
   }
 //
-#if NUM_DDR_CHANNELS >= 1
   init_ddr_interface(0);
 #if DATA_BUS_WIDTH <= 64
   axi4_mems[0].r->setData((char *) &top.M00_AXI_rdata);
@@ -237,9 +248,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
   init_ddr_interface(3)
 #endif
 #endif
-#endif
   // reset circuit
-  top.reset = active_reset;
   for (auto &mem: axi4_mems) {
     mem.r.setValid(0);
     mem.b.setValid(0);
@@ -252,6 +261,8 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
   dma.w.setValid(0);
   dma.r.setReady(0);
 #endif
+#endif
+
 
   top.S00_AXI_awvalid = top.S00_AXI_wvalid = top.S00_AXI_rready = top.S00_AXI_arvalid = top.S00_AXI_bready = 0;
   auto time_last_print = std::chrono::high_resolution_clock::now();
@@ -301,6 +312,8 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
         update_update_state(top);
       }
 
+#if NUM_DDR_CHANNELS >= 1
+      // ------------ HANDLE MEMORY INTERFACES ----------------
       // approx clock diff
       ddr_acc += ddr_clock_inc;
       while (ddr_acc >= 1) {
@@ -341,8 +354,6 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
         }
       }
 
-
-      // ------------ HANDLE MEMORY INTERFACES ----------------
       for (mem_intf_t &axi4_mem: axi4_mems) {
         if (axi4_mem.b.getReady() && axi4_mem.b.getValid()) {
           axi4_mem.b.send_ids.pop();
@@ -534,6 +545,7 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
       }
       pthread_mutex_unlock(&dma_lock);
 #endif
+#endif
     }
     if (use_trace) {
       if (main_time > fpga_clock_inc * 200)
@@ -553,9 +565,11 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
   LOG(printf("printing traces\n"));
   fflush(stdout);
   tfp->close();
+#if NUM_DDR_CHANNELS >= 1
   for (auto &axi_mem: axi4_mems) {
     axi_mem.mem_sys->PrintStats();
   }
+#endif
   sig_handle(0);
 }
 

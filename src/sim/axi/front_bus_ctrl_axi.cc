@@ -21,7 +21,9 @@ extern uint64_t main_time;
 static int cmds_inflight = 0;
 static int check_freq = 50;
 extern bool kill_sig;
+#if NUM_DDR_CHANNELS >= 1
 extern mem_intf_t axi4_mems[NUM_DDR_CHANNELS];
+#endif
 extern uint64_t time_last_command;
 extern uint64_t memory_transacted;
 #ifdef USE_VCD
@@ -31,9 +33,11 @@ extern VerilatedFstC *tfp;
 #endif
 
 static void sig_handle(int sig) {
+#if NUM_DDR_CHANNELS >= 1
   for (auto q: axi4_mems) {
     q.mem_sys->PrintStats();
   }
+#endif
   tfp->close();
   fprintf(stderr, "FST written!\n");
   fflush(stderr);
@@ -118,11 +122,13 @@ void update_command_state(BeethovenTop &top){
           ongoing_cmd.progress++;
           // send last thing, yield bus
           if (ongoing_cmd.progress == command_transaction::payload_length) {
+#if NUM_DDR_CHANNELS >= 1
             for (auto &axi_mem: axi4_mems) {
               axi_mem.mem_sys->ResetStats();
               time_last_command = main_time;
               memory_transacted = 0;
             }
+#endif
             ongoing_cmd.state = CMD_INACTIVE;
             bus_occupied = false;
           } else {

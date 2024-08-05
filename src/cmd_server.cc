@@ -56,7 +56,7 @@ constexpr int num_cmd_beats = (int) roundUp((float) (32 * 5) / AXIL_BUS_WIDTH);
 static void *cmd_server_f(void *) {
   setup_mmio();
   // map in the shared file
-  int fd_beethoven = shm_open(cmd_server_file_name.c_str(), O_CREAT | O_RDWR, file_access_flags);
+  int fd_beethoven = shm_open(cmd_server_file_name().c_str(), O_CREAT | O_RDWR, file_access_flags);
   if (fd_beethoven < 0) {
     printf("Failed to initialize cmd_file\n%s\n", strerror(errno));
     exit(errno);
@@ -73,6 +73,7 @@ static void *cmd_server_f(void *) {
       throw std::exception();
     }
   }
+
   auto &addr = *(cmd_server_file *) mmap(nullptr, sizeof(cmd_server_file), file_access_prots,
                                          MAP_SHARED, fd_beethoven, 0);
   csf = &addr;
@@ -164,9 +165,15 @@ static void *cmd_server_f(void *) {
     // re-lock self to stall
     pthread_mutex_lock(&addr.server_mut);
   }
-  //  munmap(&addr, sizeof(cmd_server_file));
-  //  shm_unlink(cmd_server_file_name.c_str());
-  //  return nullptr;
+  munmap(&addr, sizeof(cmd_server_file));
+  shm_unlink(cmd_server_file_name().c_str());
+
+}
+
+
+cmd_server::~cmd_server() {
+  munmap(&csf, sizeof(cmd_server_file));
+  shm_unlink(cmd_server_file_name().c_str());
 }
 
 void cmd_server::start() {

@@ -28,6 +28,7 @@ extern bool dma_in_progress;
 
 struct data_server {
   static void start();
+  ~data_server();
 };
 
 struct address_translator {

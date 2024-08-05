@@ -6,6 +6,9 @@
 #define BEETHOVENRUNTIME_MEM_CTRL_H
 
 #include "beethoven_allocator_declaration.h"
+
+#if NUM_DDR_CHANNELS >= 1
+
 #include "data_server.h"
 #include "ddr_macros.h"
 #include "dram_system.h"
@@ -408,5 +411,7 @@ typedef mem_ctrl::mem_interface<prep(BeethovenTop::dma_arid), prep(BeethovenTop:
 #endif
 
 void try_to_enqueue_ddr(mem_intf_t &);
+
+#endif
 
 #endif//BEETHOVENRUNTIME_MEM_CTRL_H
