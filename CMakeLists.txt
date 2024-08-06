@@ -20,26 +20,45 @@ endif ()
 set(AWS_SDK "$ENV{BEETHOVEN_ROOT}/aws-fpga")
 include_directories(include)
 
-# define frontend sources for simulator
-if ("${FRONTEND}" STREQUAL "axi" OR "${FRONTEND}" STREQUAL "")
-    set(SRC ${SRC} src/sim/axi/verilator_axi_frontend.cc src/sim/axi/front_bus_ctrl_axi.cc src/sim/axi/state_machine.cc)
-endif ()
-if ("${FRONTEND}" STREQUAL "chipkit")
-    set(SRC ${SRC} src/chipkit/chipkit_frontend.cc src/chipkit/chipkit_bus_ctrl.cc)
-endif ()
-
 if ("${SIMULATOR}" STREQUAL "")
-    set (SIMULATOR "verilator")
+    set(SIMULATOR "verilator")
 endif ()
 
 if ("${TARGET}" STREQUAL "sim")
-    find_package(verilator REQUIRED VERSION 5.0.0)
-    add_link_options(-latomic)
+    #    find_package(verilator REQUIRED VERSION )
+    # change find_package to require at least major version 5.0.0
+
+    # define frontend sources for simulator
+    if ("${FRONTEND}" STREQUAL "axi" OR "${FRONTEND}" STREQUAL "")
+        set(SRC ${SRC} src/sim/axi/front_bus_ctrl_axi.cc
+                src/sim/axi/state_machine.cc
+                src/sim/tick.cc)
+        if ("${SIMULATOR}" STREQUAL "verilator")
+            set(SRC ${SRC} src/sim/axi/verilator_axi_frontend.cc)
+            find_package(verilator REQUIRED VERSION 5.0.0)
+            add_link_options(-latomic)
+        endif ()
+    endif ()
+    if ("${FRONTEND}" STREQUAL "chipkit")
+        set(SRC ${SRC} src/chipkit/chipkit_frontend.cc src/chipkit/chipkit_bus_ctrl.cc)
+    endif ()
+
     set(SRC ${SRC} src/sim/mem_ctrl.cc)
     if (NOT DEFINED FRONTEND)
         set(FRONTEND "axi")
     endif ()
-    add_executable(BeethovenRuntime ${SRC})
+
+    if ("${SIMULATOR}" STREQUAL "verilator")
+        find_package(verilator REQUIRED VERSION 5.0.0)
+        add_compile_definitions(VERILATOR=1)
+        add_executable(BeethovenRuntime ${SRC})
+    elseif ("${SIMULATOR}" STREQUAL "vcs")
+        add_compile_definitions(VCS=1)
+        add_library(BeethovenRuntime ${SRC})
+    else ()
+        message(FATAL_ERROR "Unsupported simulator")
+    endif ()
+
     if (NOT "${KILL_SIM_AFTER}" STREQUAL "")
         target_compile_definitions(BeethovenRuntime PRIVATE KILL_SIM=${KILL_SIM_AFTER})
     endif ()
@@ -111,8 +130,12 @@ if ("${FRONTEND}" STREQUAL "chipkit")
     message("Building for chipkit")
 endif ()
 
+<<<<<<< HEAD
 if (${BUILD_SIM} AND ("${SIMULATOR}" STREQUAL "verilator"))
     # if file exists
+=======
+if (${BUILD_SIM} AND ${SIMULATOR} STREQUAL "verilator")
+>>>>>>> 1a28fac (changes for vcs)
     include(${BEETHOVEN_DIR}/cmake_srcs.cmake)
     verilate(BeethovenRuntime
             SOURCES ${SRCS}

@@ -6,8 +6,10 @@
 #include "sim/mem_ctrl.h"
 
 #if NUM_DDR_CHANNELS >= 1
+#ifdef VERILATOR
 #include "verilated.h"
 #include <verilated_fst_c.h>
+#endif
 
 
 int DDR_BUS_WIDTH_BITS = 64;
@@ -145,6 +147,11 @@ void try_to_enqueue_ddr(mem_intf_t &axi4_mem) {
   }
   WUNLOCK
 }
+
+
+#if NUM_DDR_CHANNELS >= 1
+mem_intf_t axi4_mems[NUM_DDR_CHANNELS];
+#endif
 
 void mem_ctrl::init(const std::string &dram_ini_file) {
   dramsim3config = new dramsim3::Config(dram_ini_file, "./");

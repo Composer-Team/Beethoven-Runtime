@@ -167,7 +167,7 @@ class [[maybe_unused]] device_allocator {
   };
   block_info get_block_info(const beethoven::remote_ptr &ptr, bool verbose = false) {
     if (verbose) {
-      printf("addr: %16lx\n", ptr.getFpgaAddr());
+      std::cout << "addr: " << ptr.getFpgaAddr() << std::endl;
     }
     uint32_t superblock_id = (ptr.getFpgaAddr() >> log_superblock_size) & superblock_id_mask();
     auto &sb = superblocks[superblock_id];
@@ -181,7 +181,7 @@ class [[maybe_unused]] device_allocator {
 
   block_info get_block_info(uint64_t fpga_addr, bool verbose = false) {
     if (verbose) {
-      printf("addr: %16lx\n", fpga_addr);
+      std::cout << "addr: " << fpga_addr << std::endl;
     }
     uint32_t superblock_id = (fpga_addr >> log_superblock_size) & superblock_id_mask();
     auto &sb = superblocks[superblock_id];
