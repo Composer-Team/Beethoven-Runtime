@@ -148,11 +148,7 @@ struct AXIControlIntf : public ControlIntf {
         // send the command over the PCIE bus
       case CMD_BITS_WRITE_DAT:
         w_valid.set(1);
-#if AXIL_BUS_WIDTH <= 64
         w_data.set(ongoing_cmd.cmdbuf[ongoing_cmd.progress]);
-#else
-        top.S00_AXI_wdata.at(0) = ongoing_cmd.cmdbuf[ongoing_cmd.progress];
-#endif
         LOG(printf("Writing %x to %x\n", top.S00_AXI_wdata, CMD_BITS));
         if (w_ready.get(0)) {
           ongoing_cmd.state = CMD_BITS_WRITE_B;
