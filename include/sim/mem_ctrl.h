@@ -22,6 +22,7 @@
 extern uint64_t main_time;
 
 #include "sim/axi/vcs_handle.h"
+
 #define RLOCK pthread_mutex_lock(&axi4_mem.read_queue_lock);
 #define WLOCK pthread_mutex_lock(&axi4_mem.write_queue_lock);
 #define RUNLOCK pthread_mutex_unlock(&axi4_mem.read_queue_lock);
@@ -186,7 +187,14 @@ using mem_intf_t = mem_ctrl::mem_interface<
         GetSetWrapper<uint8_t>,
         GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH/8>>;
 #else
-typedef mem_ctrl::mem_interface<VCSHandle, VCSHandle, VCSHandle, VCSHandle, VCSHandle, VCSHandle, VCSHandle, VCSHandle> mem_intf_t;
+typedef mem_ctrl::mem_interface<VCSShortHandle,
+        VCSShortHandle,
+        VCSShortHandle,
+        VCSShortHandle,
+        VCSShortHandle,
+        VCSLongHandle,
+        VCSShortHandle,
+        VCSLongHandle> mem_intf_t;
 #endif
 
 #ifdef BEETHOVEN_HAS_DMA
@@ -204,10 +212,10 @@ GetSetWrapper<prep(BeethovenTop::dma_arid)>,
 #endif
 #endif
 
-  void try_to_enqueue_ddr(mem_intf_t &);
+void try_to_enqueue_ddr(mem_intf_t &);
 
 #endif
-#if NUM_DDR_CHANNELS >=1
-  extern mem_intf_t axi4_mems[NUM_DDR_CHANNELS];
+#if NUM_DDR_CHANNELS >= 1
+extern mem_intf_t axi4_mems[NUM_DDR_CHANNELS];
 #endif
 #endif//BEETHOVENRUNTIME_MEM_CTRL_H

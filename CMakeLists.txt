@@ -31,12 +31,13 @@ if ("${TARGET}" STREQUAL "sim")
     # define frontend sources for simulator
     if ("${FRONTEND}" STREQUAL "axi" OR "${FRONTEND}" STREQUAL "")
         set(SRC ${SRC} src/sim/axi/front_bus_ctrl_axi.cc
-                src/sim/axi/state_machine.cc
                 src/sim/tick.cc)
         if ("${SIMULATOR}" STREQUAL "verilator")
             set(SRC ${SRC} src/sim/axi/verilator_axi_frontend.cc)
             find_package(verilator REQUIRED VERSION 5.0.0)
             add_link_options(-latomic)
+        elseif ("${SIMULATOR}" STREQUAL "vcs")
+            set(SRC ${SRC} src/sim/axi/vcs_axi_frontend.cc)
         endif ()
     endif ()
     if ("${FRONTEND}" STREQUAL "chipkit")
@@ -130,12 +131,7 @@ if ("${FRONTEND}" STREQUAL "chipkit")
     message("Building for chipkit")
 endif ()
 
-<<<<<<< HEAD
 if (${BUILD_SIM} AND ("${SIMULATOR}" STREQUAL "verilator"))
-    # if file exists
-=======
-if (${BUILD_SIM} AND ${SIMULATOR} STREQUAL "verilator")
->>>>>>> 1a28fac (changes for vcs)
     include(${BEETHOVEN_DIR}/cmake_srcs.cmake)
     verilate(BeethovenRuntime
             SOURCES ${SRCS}

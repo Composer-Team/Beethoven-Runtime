@@ -7,14 +7,62 @@
 
 #include "vpi_user.h"
 
-class VCSHandle {
+class VCSShortHandle {
+  vpiHandle handle;
+public:
+  VCSShortHandle(vpiHandle handle) {
+    this->handle = handle;
+    if ((vpi_get(vpiSize, handle) >> 5) > 1) {
+      std::cerr << "value is too big, quitting";
+      exit(1);
+    }
+  }
+
+  VCSShortHandle() = default;
+
+  [[nodiscard]] uint32_t get() const {
+    s_vpi_value value;
+    value.format = vpiIntVal;
+    vpi_get_value(handle, &value);
+    return value.value.integer;
+  }
+
+  [[nodiscard]] uint32_t get(int chunk) const {
+    s_vpi_value value;
+    value.format = vpiVectorVal;
+    vpi_get_value(handle, &value);
+    return value.value.vector[chunk].aval;
+  }
+
+  void set(int32_t val) const {
+    s_vpi_value value;
+    value.format = vpiIntVal;
+    value.value.integer = val;
+    vpi_put_value(handle, &value, nullptr, vpiNoDelay);
+  }
+
+  void set(const uint8_t &payload, uint32_t idx) const {
+    // first, get the payload
+    s_vpi_value value;
+    value.format = vpiIntVal;
+    vpi_get_value(handle, &value);
+    // then, set the payload
+    value.value.integer = (value.value.integer & ~(0xFF << (idx * 8))) | ((uint32_t)(payload) << (idx * 8));
+    vpi_put_value(handle, &value, nullptr, vpiNoDelay);
+  }
+
+};
+
+class VCSLongHandle {
   vpiHandle handle;
   int nchunks;
 public:
-  explicit VCSHandle(vpiHandle handle) {
+  VCSLongHandle(vpiHandle handle) {
     this->handle = handle;
     nchunks = vpi_get(vpiSize, handle) >> 5; // number of 32-bit chunks
   }
+
+  VCSLongHandle() = default;
 
   [[nodiscard]] uint32_t get(int idx) const {
     if (nchunks == 1) {
@@ -30,23 +78,29 @@ public:
       return value.value.vector[idx].aval;
     }
   }
-  [[nodiscard]] std::unique_ptr<uint32_t> get() const {
+
+  [[nodiscard]] std::unique_ptr<uint8_t[]> get() const {
     s_vpi_value value;
     value.format = vpiVectorVal;
     vpi_get_value(handle, &value);
-    std::unique_ptr<uint32_t> ret(new uint32_t[nchunks]);
+    std::unique_ptr<uint8_t[]> ret(new uint8_t[nchunks]);
     for (int i = 0; i < nchunks; i++) {
-      ret.get()[i] = value.value.vector[i].aval;
+      uint32_t payload = value.value.vector[i].aval;
+      for (int j = 0; j < 4; ++j) {
+        ret.get()[i * 4 + j] = (payload >> (j * 8)) & 0xFF;
+      }
     }
     return std::move(ret);
 
   }
+
   void set(int32_t val) const {
     s_vpi_value value;
     value.format = vpiIntVal;
     value.value.integer = val;
     vpi_put_value(handle, &value, nullptr, vpiNoDelay);
   }
+
   void set(const uint32_t *val) const {
     s_vpi_value value;
     value.format = vpiVectorVal;
@@ -57,7 +111,20 @@ public:
     }
     value.value.vector = vec;
     vpi_put_value(handle, &value, nullptr, vpiNoDelay);
-    delete [] vec;
+    delete[] vec;
+  }
+
+  void set(const uint8_t &payload, uint32_t idx) const {
+    // first, get the payload
+    s_vpi_value value;
+    value.format = vpiVectorVal;
+    vpi_get_value(handle, &value);
+    // then, set the payload inside the correct chunk
+    int chunk = idx / 4;
+    int chunkVal = value.value.vector[chunk].aval;
+    value.value.vector[chunk].aval = (chunkVal & ~(0xFF << (idx * 8))) | ((uint32_t)(payload) << (idx * 8));
+    // now write back
+    vpi_put_value(handle, &value, nullptr, vpiNoDelay);
   }
 };
 

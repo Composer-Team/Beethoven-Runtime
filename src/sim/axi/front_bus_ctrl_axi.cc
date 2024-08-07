@@ -15,7 +15,6 @@
 #include <verilated_vcd_c.h>
 #endif
 
-static bool bus_occupied = false;
 extern pthread_mutex_t cmdserverlock;
 extern std::queue<beethoven::rocc_cmd> cmds;
 extern std::unordered_map<system_core_pair, std::queue<int> *> in_flight;

@@ -28,11 +28,6 @@ size_t dma_len;
 bool dma_write;
 
 #endif
-extern bool kill_sig;
-
-#include "sim/verilator.h"
-#include "verilated_fst_c.h"
-
 #endif
 
 #ifdef FPGA

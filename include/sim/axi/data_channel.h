@@ -44,7 +44,7 @@ public:
   }
 
   uint8_t getReady() const {
-    return ready.get(0);
+    return ready.get();
   }
 
   void setReady(uint8_t ready) {
@@ -52,7 +52,7 @@ public:
   }
 
   uint8_t getValid() const {
-    return valid.get(0);
+    return valid.get();
   }
 
   void setValid(uint8_t valid) {
@@ -85,7 +85,8 @@ public:
 
   bool getStrb(int i) const {
     int chunk = i / 8;
-    return strb.get(chunk) >> (i % 8);
+    auto strbVal = strb.get();
+    return strbVal[i] >> (i % 8);
   }
 };
 
