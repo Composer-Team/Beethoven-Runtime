@@ -104,6 +104,7 @@ public:
   void set(const uint32_t *val) const {
     s_vpi_value value;
     value.format = vpiVectorVal;
+    printf("trying to write %d chunks\n", nchunks);
     auto vec = new s_vpi_vecval[nchunks];
     for (int i = 0; i < nchunks; i++) {
       vec[i].aval = val[i];
@@ -114,15 +115,15 @@ public:
     delete[] vec;
   }
 
-  void set(const uint8_t &payload, uint32_t idx) const {
+  void set(const uint32_t &payload, uint32_t chunk) const {
+    printf("called set with (%d) <- %x\n", chunk, payload); fflush(stdout);
     // first, get the payload
     s_vpi_value value;
     value.format = vpiVectorVal;
     vpi_get_value(handle, &value);
     // then, set the payload inside the correct chunk
-    int chunk = idx / 4;
     int chunkVal = value.value.vector[chunk].aval;
-    value.value.vector[chunk].aval = (chunkVal & ~(0xFF << (idx * 8))) | ((uint32_t)(payload) << (idx * 8));
+    value.value.vector[chunk].aval = payload; 
     // now write back
     vpi_put_value(handle, &value, nullptr, vpiNoDelay);
   }

@@ -86,10 +86,11 @@ static void *cmd_server_f(void *) {
 
   std::vector<std::pair<int, FILE *>> alloc;
   pthread_mutex_lock(&addr.server_mut);
+  std::cout << "Command server started on file " << cmd_server_file_name() << std::endl;
   pthread_mutex_lock(&addr.server_mut);
   while (true) {
-    LOG(std::cerr << "Got Command in Server" << std::endl;
-                auto start = std::chrono::high_resolution_clock::now());
+    std::cerr << "Got Command in Server" << std::endl << std::endl;
+    auto start = std::chrono::high_resolution_clock::now();
     // allocate space for response
     int id;
     // dont' process FLUSH commands on FPGA, they're only used

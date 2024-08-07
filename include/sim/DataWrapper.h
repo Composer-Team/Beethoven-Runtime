@@ -57,9 +57,9 @@ struct GetSetDataWrapper {
     }
   }
   
-  void set(uint8_t payload, uint32_t byte_idx) {
-    uint8_t *dst(ptr);
-    dst[byte_idx] = payload;
+  void set(uint32_t payload, uint32_t idx) {
+    uint32_t *dst(ptr);
+    dst[idx] = payload;
   }
 
   void set(int32_t *value) {

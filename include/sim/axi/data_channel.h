@@ -39,7 +39,7 @@ public:
     data_channel::data.set(data);
   }
 
-  void setData(uint8_t payload, uint32_t idx) {
+  void setData(const uint32_t &payload, uint32_t idx) {
     data.set(payload, idx);
   }
 
