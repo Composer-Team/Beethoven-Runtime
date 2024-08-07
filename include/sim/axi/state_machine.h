@@ -7,6 +7,9 @@
 
 
 #include <cinttypes>
+#include <pthread.h>
+#include <map>
+#include <queue>
 #include "sim/tick.h"
 #include "cmd_server.h"
 #include "sim/DataWrapper.h"
