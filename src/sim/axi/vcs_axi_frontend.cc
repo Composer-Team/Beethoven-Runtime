@@ -2,19 +2,35 @@
 // Created by Christopher Kjellqvist on 8/6/24.
 //
 
-#include "vpi_user.h"
+#include "vcs_vpi_user.h"
 #include "sim/mem_ctrl.h"
 #include "sim/axi/state_machine.h"
 #include "sim/tick.h"
+#include "sim/axi/vcs_handle.h"
+#include "cmd_server.h"
+#include "data_server.h"
+#include <pthread.h>
 
+#include "beethoven_allocator_declaration.h"
+
+#include <cstring>
 #include <vector>
 
 std::vector<vpiHandle> inputs, outputs;
 AXIControlIntf<VCSShortHandle, VCSShortHandle, VCSShortHandle> ctrl;
+uint64_t memory_transacted = 0;
+uint64_t main_time = 0;
+pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
+float ddr_clock_inc;
+bool kill_sig;
+extern "C" PLI_INT32 init_input_signals_calltf(PLI_BYTE8 *user_data);
+extern "C" PLI_INT32 init_output_signals_calltf(PLI_BYTE8 *user_data);
+extern "C" PLI_INT32 init_structures_calltf(PLI_BYTE8 *user_data);
+extern "C" PLI_INT32 tick_calltf(PLI_BYTE8 *user_data);
 
-extern "C" {
 
 PLI_INT32 init_input_signals_calltf(PLI_BYTE8 * /*user_data*/) {
+	std::cout << "init inputs" << std::endl;
   vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, nullptr);
   vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
   // Cache Inputs
@@ -27,6 +43,7 @@ PLI_INT32 init_input_signals_calltf(PLI_BYTE8 * /*user_data*/) {
 }
 
 PLI_INT32 init_output_signals_calltf(PLI_BYTE8 * /*user_data*/) {
+	std::cout << "init outputs" << std::endl;
   vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, nullptr);
   vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
   // Cache Inputs
@@ -52,10 +69,12 @@ vpiHandle getHandle(const std::string &name) {
   return handle;
 }
 
-PLI_INT32 init_structures(PLI_BYTE8 *) {
+PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
+	std::cout << "init structures: " << std::endl;
   // at this point, we have all the inputs and outputs, and we have to tie them into the interfaces
 #if NUM_DDR_CHANNELS >= 1
   mem_ctrl::init("custom_dram_configs/DDR4_8Gb_x8_2400.ini");
+  ddr_clock_inc = (1000.0 / dramsim3config->tCK) / DEFAULT_PL_CLOCK;
   axi4_mems[0].ar.init(VCSShortHandle(getHandle("M00_AXI_arready")),
                        VCSShortHandle(getHandle("M00_AXI_arvalid")),
                        VCSShortHandle(getHandle("M00_AXI_arid")),
@@ -110,68 +129,22 @@ PLI_INT32 init_structures(PLI_BYTE8 *) {
   ctrl.set_b(
           VCSShortHandle(getHandle("S00_AXI_bvalid")),
           VCSShortHandle(getHandle("S00_AXI_bready")));
+
+
+  std::cout << "start servers" << std::endl;
+
+  cmd_server::start();
+  data_server::start();
+
+  std:: cout << "finished init structures" << std::endl;
   return 0;
 }
 
 PLI_INT32 tick_calltf(PLI_BYTE8 * /*user_data*/) {
+	printf(".");
+	fflush(stdout);
+
   tick_signals(&ctrl);
   return 0;
 }
 
-void init_input_signals_register(void)
-{
-  s_vpi_systf_data tf_data;
-
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = "init_input_signals";
-  tf_data.calltf    = init_input_signals_calltf;
-  tf_data.sizetf    = nullptr;
-  tf_data.compiletf = nullptr;
-  vpi_register_systf(&tf_data);
-}
-
-void init_output_signals_register(void)
-{
-  s_vpi_systf_data tf_data;
-
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = "init_output_signals";
-  tf_data.calltf    = init_output_signals_calltf;
-  tf_data.sizetf    = nullptr;
-  tf_data.compiletf = nullptr;
-  vpi_register_systf(&tf_data);
-}
-
-void init_structures_register(void)
-{
-  s_vpi_systf_data tf_data;
-
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = "$init_structures";
-  tf_data.calltf    = init_structures;
-  tf_data.sizetf    = nullptr;
-  tf_data.compiletf = nullptr;
-  vpi_register_systf(&tf_data);
-}
-
-void tick_register(void)
-{
-  s_vpi_systf_data tf_data;
-
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = "$tick";
-  tf_data.calltf    = tick_calltf;
-  tf_data.sizetf    = nullptr;
-  tf_data.compiletf = nullptr;
-  vpi_register_systf(&tf_data);
-}
-
-void (*vlog_startup_routines[])(void) = {
-        init_input_signals_register,
-        init_output_signals_register,
-        init_structures_register,
-        tick_register,
-        nullptr
-};
-
-}

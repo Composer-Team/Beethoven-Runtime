@@ -15,6 +15,7 @@
 #include "sim/verilator.h"
 #include "sim/tick.h"
 #include "trace/trace_read.h"
+#include "cmd_server.h"
 
 #include <beethoven_allocator_declaration.h>
 #include "util.h"

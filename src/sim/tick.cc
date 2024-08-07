@@ -44,6 +44,7 @@ void tick_signals(ControlIntf *ctrl) {
 
   for (auto &axi4_mem: axi4_mems) {
     if (axi4_mem.r.getValid() && axi4_mem.r.getReady()) {
+	    std::cout << "got valid cmd " << int(axi4_mem.r.getValid()) << " " << axi4_mem.r.getReady() << std::endl;
       memory_transacted += (DATA_BUS_WIDTH >> 3);
       RLOCK
       auto tx = axi4_mem.read_transactions.front();

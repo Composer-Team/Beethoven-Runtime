@@ -14,6 +14,7 @@
 #include "cmd_server.h"
 #include "sim/DataWrapper.h"
 #include "sim/mem_ctrl.h"
+#include "util.h"
 
 extern pthread_mutex_t cmdserverlock;
 extern std::queue<beethoven::rocc_cmd> cmds;
@@ -21,6 +22,7 @@ extern std::unordered_map<system_core_pair, std::queue<int> *> in_flight;
 extern pthread_mutex_t main_lock;
 extern uint64_t memory_transacted;
 extern bool kill_sig;
+extern uint64_t main_time;
 extern int cmds_inflight;
 #if NUM_DDR_CHANNELS >= 1
 extern mem_intf_t axi4_mems[NUM_DDR_CHANNELS];
@@ -152,7 +154,6 @@ struct AXIControlIntf : public ControlIntf {
       case CMD_BITS_WRITE_DAT:
         w_valid.set(1);
         w_data.set(ongoing_cmd.cmdbuf[ongoing_cmd.progress]);
-        LOG(printf("Writing %x to %x\n", top.S00_AXI_wdata, CMD_BITS));
         if (w_ready.get(0)) {
           ongoing_cmd.state = CMD_BITS_WRITE_B;
         }
