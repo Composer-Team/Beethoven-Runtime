@@ -393,7 +393,7 @@ void run_verilator(std::optional<std::string> trace_file,
                     addr[off] = src[off];
                   }
 #else
-                    printf("writing addr(%x) dat(%x)\n", addr + off, src[off]);
+//                    printf("writing addr(%x) dat(%x)\n", addr + off, src[off]);
                     mem_set(addr + off, src[off]);
 #endif
                   off += 1;

@@ -86,10 +86,10 @@ static void *cmd_server_f(void *) {
 
   std::vector<std::pair<int, FILE *>> alloc;
   pthread_mutex_lock(&addr.server_mut);
-  std::cout << "Command server started on file " << cmd_server_file_name() << std::endl;
+//  std::cout << "Command server started on file " << cmd_server_file_name() << std::endl;
   pthread_mutex_lock(&addr.server_mut);
   while (true) {
-    std::cerr << "Got Command in Server" << std::endl << std::endl;
+//    std::cerr << "Got Command in Server" << std::endl << std::endl;
     auto start = std::chrono::high_resolution_clock::now();
     // allocate space for response
     int id;

@@ -50,25 +50,19 @@ void with_dramsim3_support::init_dramsim3() {
             for (int i = 0; i < TOTAL_BURST; ++i) {
               tx.ddr_bus_beats_retrieved[int(addr - tx.fpga_addr) / DDR_BUS_WIDTH_BYTES + i] = true;
             }
-            printf("callback read\n"); fflush(stdout);
+//            printf("callback read\n"); fflush(stdout);
 
-            while (tx.dramsim_hasBeatReady()) {
-              bool done = (tx.axi_bus_beats_progress == tx.axi_bus_beats_length() - 1);
-              auto intermediate_tx = mem_ctrl::memory_transaction(
-                              tx.addr, // cpu addr
-                              tx.size, // tx size
-                              1, // len
-                              0, // axi bus beats progress
-                              false, // fixed
-                              tx.id, // id
-                              tx.fpga_addr, // fpga addr
-                              true); // is intermediate
-              tx.addr += tx.size;
-              intermediate_tx.can_be_last = done;
-              tx.axi_bus_beats_progress++;
-	      printf("enqueueing intermediate %d/%d for id %d (done %d)\n",
-			      tx.dram_tx_load_progress,
-			      tx.axi_bus_beats_length(), tx.id, done); fflush(stdout);
+            while (tx->dramsim_hasBeatReady()) {
+              bool done = (tx->axi_bus_beats_progress == tx->axi_bus_beats_length() - 1);
+              auto intermediate_tx = std::make_shared<mem_ctrl::memory_transaction>(tx->addr, tx->size, 1, 0, false,
+                                                                                    tx->id, 0, true);
+              tx->addr += tx->size;
+              intermediate_tx->fpga_addr = tx->fpga_addr;
+              intermediate_tx->can_be_last = done;
+              tx->axi_bus_beats_progress++;
+//	      printf("enqueueing intermediate %d/%d for id %d (done %d)\n",
+//			      tx->dram_tx_load_progress,
+//			      tx->axi_bus_beats_length(), tx->id, done); fflush(stdout);
               enqueue_read(intermediate_tx);
             }
             in_flight_reads[addr]->pop();

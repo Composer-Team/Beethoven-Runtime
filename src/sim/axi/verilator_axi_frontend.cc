@@ -322,12 +322,34 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
       GetSetWrapper(top.S00_AXI_wready),
       GetSetWrapper(top.S00_AXI_wdata));
   ctrl->set_r(
-      GetSetWrapper(top.S00_AXI_rvalid),
       GetSetWrapper(top.S00_AXI_rready),
+      GetSetWrapper(top.S00_AXI_rvalid),
       GetSetWrapper(top.S00_AXI_rdata));
   ctrl->set_b(
       GetSetWrapper(top.S00_AXI_bready),
       GetSetWrapper(top.S00_AXI_bvalid));
+
+  top.S00_AXI_arregion = 0;
+  top.S00_AXI_arqos = 0;
+  top.S00_AXI_arprot = 0;
+  top.S00_AXI_arcache = 0;
+  top.S00_AXI_arlock = 0;
+  top.S00_AXI_arlen = 0;
+  top.S00_AXI_arsize = 2;
+  top.S00_AXI_arburst = 0;
+
+  top.S00_AXI_awregion = 0;
+  top.S00_AXI_awqos = 0;
+  top.S00_AXI_awprot = 0;
+  top.S00_AXI_awcache = 0;
+  top.S00_AXI_awlock = 0;
+  top.S00_AXI_awlen = 0;
+  top.S00_AXI_awsize = 2;
+  top.S00_AXI_awburst = 0;
+
+  top.S00_AXI_wlast = 1;
+  top.S00_AXI_wstrb = 0xF;
+
 
   LOG(printf("main time %lld\n", main_time));
   while (not kill_sig) {
