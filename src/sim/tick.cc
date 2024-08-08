@@ -67,7 +67,6 @@ void tick_signals(ControlIntf *ctrl) {
       auto tx = std::make_shared<mem_ctrl::memory_transaction>((uintptr_t) ad, txsize, txlen, 0, false,
                                                                axi4_mem.ar.getId(), addr, false);
       std::cout << "enqueueing READ REQUEST  id " << axi4_mem.ar.getId() << std::endl;
-      // 64b per DRAM transaction
       RLOCK
       axi4_mem.ddr_read_q.push_back(tx);
       RUNLOCK
@@ -91,7 +90,6 @@ void tick_signals(ControlIntf *ctrl) {
       for (int i = 0; i < tx->size / 4; ++i) {
 	printf("writing %d/%d from %p\n", i, tx->size/4, src); fflush(stdout);
         axi4_mem.r.setData(src[i], i+start);
-	printf("success\n"); fflush(stdout);
       }
       bool am_done = tx->len == (tx->axi_bus_beats_progress + 1);
       axi4_mem.r.setValid(1);
