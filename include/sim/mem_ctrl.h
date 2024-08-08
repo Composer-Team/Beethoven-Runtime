@@ -35,8 +35,6 @@ extern address_translator at;
 extern dramsim3::Config *dramsim3config;
 
 namespace mem_ctrl {
-  uint64_t get_dimm_address(uint64_t addr);
-
   void init(const std::string &dram_ini_file);
 
   // = (DATA_BUS_WIDTH / 8) / DDR_BUS_WIDTH_BYTES

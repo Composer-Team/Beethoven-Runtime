@@ -24,22 +24,6 @@ dramsim3::Config *dramsim3config = nullptr;
 extern uint64_t main_time;
 using namespace mem_ctrl;
 
-uint64_t mem_ctrl::get_dimm_address(uint64_t addr) {
-  uint64_t acc = 0;
-  uint64_t cursor = 1;
-  int real = 0;
-  for (int i = 0; i < 64; ++i) {
-    if (addrMask & cursor) {
-      if (addr & cursor) {
-        acc |= 1 << real;
-      }
-      ++real;
-    }
-    cursor <<= 1;
-  }
-  return acc;
-}
-
 void with_dramsim3_support::init_dramsim3() {
   mem_sys = new dramsim3::JedecDRAMSystem(
           *dramsim3config, "",
