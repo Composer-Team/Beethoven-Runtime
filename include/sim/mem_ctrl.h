@@ -128,8 +128,8 @@ namespace mem_ctrl {
 
     virtual void enqueue_read(const mem_ctrl::memory_transaction &tx) = 0;
 
-    std::map<uint64_t, std::queue<memory_transaction> *> in_flight_reads;
-    std::map<uint64_t, std::queue<memory_transaction> *> in_flight_writes;
+    std::map<uint64_t, std::queue<std::shared_ptr<memory_transaction>> *> in_flight_reads;
+    std::map<uint64_t, std::queue<std::shared_ptr<memory_transaction>> *> in_flight_writes;
     dramsim3::JedecDRAMSystem *mem_sys;
     pthread_mutex_t read_queue_lock = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_t write_queue_lock = PTHREAD_MUTEX_INITIALIZER;
