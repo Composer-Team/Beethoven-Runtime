@@ -48,12 +48,12 @@ void tick_signals(ControlIntf *ctrl) {
       std::cout << "got valid cmd " << int(axi4_mem.r.getValid()) << " " << axi4_mem.r.getReady() << std::endl;
       memory_transacted += (DATA_BUS_WIDTH >> 3);
       RLOCK
-      auto &tx = axi4_mem.read_transactions.front();
-      tx.axi_bus_beats_progress++;
-      if (not tx.fixed) {
-        tx.addr += tx.size;
+      auto tx = axi4_mem.read_transactions.front();
+      tx->axi_bus_beats_progress++;
+      if (not tx->fixed) {
+        tx->addr += tx->size;
       }
-      if (axi4_mem.r.getLast() || !tx.can_be_last) {
+      if (axi4_mem.r.getLast() || !tx->can_be_last) {
         axi4_mem.read_transactions.pop();
       }
       RUNLOCK
@@ -64,7 +64,7 @@ void tick_signals(ControlIntf *ctrl) {
       char *ad = (char *) at.translate(addr);
       auto txsize = (int) 1 << axi4_mem.ar.getSize();
       auto txlen = (int) (axi4_mem.ar.getLen()) + 1;
-      auto tx = mem_ctrl::memory_transaction((uintptr_t) ad, txsize, txlen, 0, false,
+      auto tx = std::make_shared<mem_ctrl::memory_transaction>((uintptr_t) ad, txsize, txlen, 0, false,
                                                                axi4_mem.ar.getId(), addr, false);
       std::cout << "enqueueing READ REQUEST  id " << axi4_mem.ar.getId() << std::endl;
       RLOCK
@@ -84,19 +84,19 @@ void tick_signals(ControlIntf *ctrl) {
 #if DATA_BUS_WIDTH < 32
 #error "Handling the data bus gets much more difficult with tiny data buses so the simulator doesn't account for it. Let me know if you _need_ this."
 #endif
-      auto &tx = axi4_mem.read_transactions.front();
-      int start = ((tx.axi_bus_beats_progress * tx.size) % (DATA_BUS_WIDTH / 8))/4;
-      uint32_t *src = reinterpret_cast<uint32_t*>(tx.addr);
-      for (int i = 0; i < tx.size / 4; ++i) {
-	printf("writing %d/%d from %p\n", i, tx.size/4, src); fflush(stdout);
+      auto tx = axi4_mem.read_transactions.front();
+      int start = ((tx->axi_bus_beats_progress * tx->size) % (DATA_BUS_WIDTH / 8))/4;
+      uint32_t *src = reinterpret_cast<uint32_t*>(tx->addr);
+      for (int i = 0; i < tx->size / 4; ++i) {
+	printf("writing %d/%d from %p\n", i, tx->size/4, src); fflush(stdout);
         axi4_mem.r.setData(src[i], i+start);
       }
-      bool am_done = tx.len == (tx.axi_bus_beats_progress + 1);
+      bool am_done = tx->len == (tx->axi_bus_beats_progress + 1);
       axi4_mem.r.setValid(1);
-      axi4_mem.r.setLast(am_done && tx.can_be_last);
-      axi4_mem.r.setId(tx.id);
+      axi4_mem.r.setLast(am_done && tx->can_be_last);
+      axi4_mem.r.setId(tx->id);
       if (axi4_mem.r.getLast()) {
-        printf("return %d\n", tx.id);
+        printf("return %d\n", tx->id);
       }
     } else {
       axi4_mem.r.setValid(0);
@@ -130,7 +130,7 @@ void tick_signals(ControlIntf *ctrl) {
         bool is_fixed = axi4_mem.aw.getBurst() == 0;
         int id = axi4_mem.aw.getId();
         uint64_t fpga_addr = axi4_mem.aw.getAddr();
-        auto tx = mem_ctrl::memory_transaction(uintptr_t(addr), sz, len, 0, is_fixed, id,
+        auto tx = std::make_shared<mem_ctrl::memory_transaction>(uintptr_t(addr), sz, len, 0, is_fixed, id,
                                                                  fpga_addr, false);
         axi4_mem.write_transactions.push(tx);
         axi4_mem.num_in_flight_writes++;
@@ -146,10 +146,10 @@ void tick_signals(ControlIntf *ctrl) {
     if (not axi4_mem.write_transactions.empty()) {
       if (axi4_mem.w.getValid() && axi4_mem.w.getReady()) {
         memory_transacted += (DATA_BUS_WIDTH >> 3);
-        auto &trans = axi4_mem.write_transactions.front();
+        auto trans = axi4_mem.write_transactions.front();
         // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
         uint32_t off = 0;
-        auto addr = trans.addr;
+        auto addr = trans->addr;
         auto data = axi4_mem.w.getData();
         while (off < sizeof(strobe_width) * 8) {
           if (axi4_mem.w.getStrb(off)) {
@@ -158,16 +158,16 @@ void tick_signals(ControlIntf *ctrl) {
           }
           off += 1;
         }
-        trans.axi_bus_beats_progress++;
+        trans->axi_bus_beats_progress++;
 
-        if (not trans.fixed) {
-          trans.addr += trans.size;
+        if (not trans->fixed) {
+          trans->addr += trans->size;
         }
 
         if (axi4_mem.w.getLast()) {
           axi4_mem.write_transactions.pop();
-          trans.dram_tx_axi_enqueue_progress = 0;
-          trans.axi_bus_beats_progress = 1;
+          trans->dram_tx_axi_enqueue_progress = 0;
+          trans->axi_bus_beats_progress = 1;
           axi4_mem.ddr_write_q.push_back(trans);
           axi4_mem.w.setReady(!axi4_mem.write_transactions.empty() ||
                               axi4_mem.num_in_flight_writes < mem_intf_t::max_in_flight_writes);
