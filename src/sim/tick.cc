@@ -45,7 +45,7 @@ void tick_signals(ControlIntf *ctrl) {
 
   for (auto &axi4_mem: axi4_mems) {
     if (axi4_mem.r.getValid() && axi4_mem.r.getReady()) {
-      //std::cout << "got valid cmd " << int(axi4_mem.r.getValid()) << " " << axi4_mem.r.getReady() << std::endl;
+      std::cout << "got valid cmd " << int(axi4_mem.r.getValid()) << " " << axi4_mem.r.getReady() << std::endl;
       memory_transacted += (DATA_BUS_WIDTH >> 3);
       RLOCK
       auto &tx = axi4_mem.read_transactions.front();
@@ -66,7 +66,7 @@ void tick_signals(ControlIntf *ctrl) {
       auto txlen = (int) (axi4_mem.ar.getLen()) + 1;
       auto tx = mem_ctrl::memory_transaction((uintptr_t) ad, txsize, txlen, 0, false,
                                                                axi4_mem.ar.getId(), addr, false);
-//      std::cout << "enqueueing READ REQUEST  id " << axi4_mem.ar.getId() << std::endl;
+      std::cout << "enqueueing READ REQUEST  id " << axi4_mem.ar.getId() << std::endl;
       RLOCK
       axi4_mem.ddr_read_q.push_back(tx);
       RUNLOCK
@@ -84,17 +84,20 @@ void tick_signals(ControlIntf *ctrl) {
 #if DATA_BUS_WIDTH < 32
 #error "Handling the data bus gets much more difficult with tiny data buses so the simulator doesn't account for it. Let me know if you _need_ this."
 #endif
-      auto tx = axi4_mem.read_transactions.front();
-      int start = ((tx->axi_bus_beats_progress * tx->size) % (DATA_BUS_WIDTH / 8))/4;
-      uint32_t *src = reinterpret_cast<uint32_t*>(tx->addr);
-      for (int i = 0; i < tx->size / 4; ++i) {
-	//printf("writing %d/%d from %p\n", i, tx->size/4, src); fflush(stdout);
+      auto &tx = axi4_mem.read_transactions.front();
+      int start = ((tx.axi_bus_beats_progress * tx.size) % (DATA_BUS_WIDTH / 8))/4;
+      uint32_t *src = reinterpret_cast<uint32_t*>(tx.addr);
+      for (int i = 0; i < tx.size / 4; ++i) {
+	printf("writing %d/%d from %p\n", i, tx.size/4, src); fflush(stdout);
         axi4_mem.r.setData(src[i], i+start);
       }
       bool am_done = tx.len == (tx.axi_bus_beats_progress + 1);
       axi4_mem.r.setValid(1);
       axi4_mem.r.setLast(am_done && tx.can_be_last);
       axi4_mem.r.setId(tx.id);
+      if (axi4_mem.r.getLast()) {
+        printf("return %d\n", tx.id);
+      }
     } else {
       axi4_mem.r.setValid(0);
       axi4_mem.r.setLast(false);
