@@ -33,6 +33,7 @@ public:
     data_channel::last = last;
     data_channel::id = id;
     data_channel::strb = strb;
+    data_channel::data = data;
   }
 
   void setData(uint8_t *data) {
@@ -84,9 +85,10 @@ public:
   }
 
   bool getStrb(int i) const {
-    int chunk = i / 8;
-    auto strbVal = strb.get();
-    return strbVal[i] >> (i % 8);
+    return i < sizeof(strb_t) * 8;
+//    int chunk = i / 8;
+//    auto strbVal = strb.get();
+//    return strbVal[i] >> (i % 8);
   }
 };
 

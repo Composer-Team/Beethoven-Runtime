@@ -229,7 +229,7 @@ struct AXIControlIntf : public ControlIntf {
             (ongoing_update == UPDATE_IDLE_CMD || ongoing_update == UPDATE_IDLE_RESP)) {
           pthread_mutex_lock(&cmdserverlock);
           if (not cmds.empty()) {
-            printf("enqueueing command\n");
+//            printf("enqueueing command\n");
             bus_occupied = true;
             ongoing_cmd.state = CMD_BITS_WRITE_ADDR;
             if (cmds.front().getXd()) {
