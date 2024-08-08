@@ -2,9 +2,8 @@
 // Created by Christopher Kjellqvist on 8/6/24.
 //
 
-//#include "vcs_vpi_user.h"
-//#include "sv_vpi_user.h"
-
+#include "vcs_vpi_user.h"
+#include "sv_vpi_user.h"
 #include "sim/mem_ctrl.h"
 #include "sim/axi/state_machine.h"
 #include "sim/tick.h"
