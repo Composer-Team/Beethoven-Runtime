@@ -20,11 +20,11 @@ struct GetSetWrapper {
     return this->get(0);
   }
 
-  void set(int64_t value) {
-    if (sizeof(T) >= 8) {
+  void set(uint32_t value) {
+    if (sizeof(T) > 4) {
       memcpy(ptr, &value, 8);
     } else {
-      memcpy(ptr, &value, l);
+      *ptr = value;
     }
   }
 };
@@ -33,9 +33,7 @@ template <typename T, int l>
 struct GetSetDataWrapper {
   T* ptr = nullptr;
 
-
-  template <typename G>
-  explicit GetSetDataWrapper(G *v) {
+  explicit GetSetDataWrapper(void *v) {
     ptr = (T*)v;
   }
   GetSetDataWrapper() = default;
@@ -44,26 +42,19 @@ struct GetSetDataWrapper {
     return ptr[idx];
   }
 
-  std::unique_ptr<uint8_t[]> get() const {
-    std::unique_ptr<uint8_t[]> alloc(new uint8_t[l]);
+  std::unique_ptr<uint32_t[]> get() const {
+    std::unique_ptr<uint32_t[]> alloc(new uint32_t[l]);
     memcpy(alloc.get(), ptr, l);
     return std::move(alloc);
   }
-  void set(uint64_t value) {
-    if (l >= 8) {
-      memcpy(ptr, &value, 8);
-    } else {
-      memcpy(ptr, &value, l);
-    }
-  }
-  
+
   void set(uint32_t payload, uint32_t idx) {
-    uint32_t *dst(ptr);
+    uint32_t *dst = (uint32_t*)ptr;
     dst[idx] = payload;
   }
 
   void set(int32_t *value) {
-    memcpy(ptr, value, l);
+    memcpy(ptr, value, l*4);
   }
 };
 

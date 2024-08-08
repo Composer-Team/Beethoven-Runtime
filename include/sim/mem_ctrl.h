@@ -35,11 +35,9 @@ extern address_translator at;
 extern dramsim3::Config *dramsim3config;
 
 namespace mem_ctrl {
-  uint64_t get_dimm_address(uint64_t addr);
 
   void init(const std::string &dram_ini_file);
 
-  // = (DATA_BUS_WIDTH / 8) / DDR_BUS_WIDTH_BYTES
   struct memory_transaction {
     uintptr_t addr;
     int size;
@@ -73,13 +71,6 @@ namespace mem_ctrl {
                                                fpga_addr(fpga_addr),
                                                is_intermediate(is_intermediate) {
       dram_tx_n_enqueues = (len * size) / DDR_ENQUEUE_SIZE_BYTES;
-      if (!is_intermediate) {
-//        printf("Transaction of size %d, len %d, n_enqueues %d\n\n", size, len, dram_tx_n_enqueues);
-      }
-      if (dram_tx_n_enqueues == 32) {
-        printf("");
-      }
-//      fflush(stdout);
       if (dram_tx_n_enqueues == 0) dram_tx_n_enqueues = 1;
       for (int i = 0; i < dram_tx_n_enqueues * TOTAL_BURST; ++i) {
         ddr_bus_beats_retrieved.emplace_back(false);
@@ -185,7 +176,7 @@ using mem_intf_t = mem_ctrl::mem_interface<
         GetSetWrapper<prep(BeethovenTop::M00_AXI_arlen)>,
         GetSetWrapper<prep(BeethovenTop::M00_AXI_wstrb)>,
         GetSetWrapper<uint8_t>,
-        GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH/8>>;
+        GetSetDataWrapper<uint32_t, DATA_BUS_WIDTH/32>>;
 #else
 typedef mem_ctrl::mem_interface<VCSShortHandle,
         VCSShortHandle,

@@ -24,21 +24,6 @@ dramsim3::Config *dramsim3config = nullptr;
 extern uint64_t main_time;
 using namespace mem_ctrl;
 
-uint64_t mem_ctrl::get_dimm_address(uint64_t addr) {
-  uint64_t acc = 0;
-  uint64_t cursor = 1;
-  int real = 0;
-  for (int i = 0; i < 64; ++i) {
-    if (addrMask & cursor) {
-      if (addr & cursor) {
-        acc |= 1 << real;
-      }
-      ++real;
-    }
-    cursor <<= 1;
-  }
-  return acc;
-}
 
 void with_dramsim3_support::init_dramsim3() {
   mem_sys = new dramsim3::JedecDRAMSystem(
@@ -50,8 +35,6 @@ void with_dramsim3_support::init_dramsim3() {
             for (int i = 0; i < TOTAL_BURST; ++i) {
               tx->ddr_bus_beats_retrieved[int(addr - tx->fpga_addr) / DDR_BUS_WIDTH_BYTES + i] = true;
             }
-            printf("callback read\n"); fflush(stdout);
-
             while (tx->dramsim_hasBeatReady()) {
               bool done = (tx->axi_bus_beats_progress == tx->axi_bus_beats_length() - 1);
               auto intermediate_tx = std::make_shared<mem_ctrl::memory_transaction>(tx->addr, tx->size, 1, 0, false,
@@ -60,9 +43,9 @@ void with_dramsim3_support::init_dramsim3() {
               intermediate_tx->fpga_addr = tx->fpga_addr;
               intermediate_tx->can_be_last = done;
               tx->axi_bus_beats_progress++;
-	      printf("enqueueing intermediate %d/%d for id %d (done %d)\n",
-			      tx->dram_tx_load_progress,
-			      tx->axi_bus_beats_length(), tx->id, done); fflush(stdout);
+//	      printf("enqueueing intermediate %d/%d for id %d (done %d)\n",
+//			      tx->dram_tx_load_progress,
+//			      tx->axi_bus_beats_length(), tx->id, done); fflush(stdout);
               enqueue_read(intermediate_tx);
             }
             in_flight_reads[addr]->pop();
