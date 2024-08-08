@@ -55,6 +55,20 @@ namespace mem_ctrl {
 
     bool is_intermediate;
 
+    bool operator==(const memory_transaction &rhs) const {
+      return addr == rhs.addr &&
+             size == rhs.size &&
+             len == rhs.len &&
+             axi_bus_beats_progress == rhs.axi_bus_beats_progress &&
+             fixed == rhs.fixed &&
+             id == rhs.id &&
+             fpga_addr == rhs.fpga_addr &&
+             dram_tx_n_enqueues == rhs.dram_tx_n_enqueues &&
+             dram_tx_axi_enqueue_progress == rhs.dram_tx_axi_enqueue_progress &&
+             dram_tx_load_progress == rhs.dram_tx_load_progress &&
+             can_be_last == rhs.can_be_last;
+    }
+
     std::vector<bool> ddr_bus_beats_retrieved;
 
     memory_transaction(uintptr_t addr,
@@ -112,17 +126,17 @@ namespace mem_ctrl {
 
   struct with_dramsim3_support {
 
-    virtual void enqueue_read(std::shared_ptr<mem_ctrl::memory_transaction> &tx) = 0;
+    virtual void enqueue_read(const mem_ctrl::memory_transaction &tx) = 0;
 
-    std::map<uint64_t, std::queue<std::shared_ptr<memory_transaction>> *> in_flight_reads;
-    std::map<uint64_t, std::queue<std::shared_ptr<memory_transaction>> *> in_flight_writes;
+    std::map<uint64_t, std::queue<memory_transaction> *> in_flight_reads;
+    std::map<uint64_t, std::queue<memory_transaction> *> in_flight_writes;
     dramsim3::JedecDRAMSystem *mem_sys;
     pthread_mutex_t read_queue_lock = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_t write_queue_lock = PTHREAD_MUTEX_INITIALIZER;
 
     const static int max_q_length = 40;
-    std::vector<std::shared_ptr<memory_transaction>> ddr_read_q;
-    std::vector<std::shared_ptr<memory_transaction>> ddr_write_q;
+    std::vector<memory_transaction> ddr_read_q;
+    std::vector<memory_transaction> ddr_write_q;
 
     //  std::set<int> bank2tx;
     bool can_accept_write() {
@@ -152,8 +166,8 @@ namespace mem_ctrl {
     data_channel<byte_t, strb_t, byte_t, data_t> w;
     data_channel<id_t, byte_t, byte_t, data_t> r;
     response_channel<id_t, byte_t> b;
-    std::queue<std::shared_ptr<memory_transaction>> write_transactions;
-    std::queue<std::shared_ptr<memory_transaction>> read_transactions;
+    std::queue<memory_transaction> write_transactions;
+    std::queue<memory_transaction> read_transactions;
 
     ~mem_interface() = default;
 
@@ -161,7 +175,7 @@ namespace mem_ctrl {
     static const int max_in_flight_writes = 32;
     int id;
 
-    void enqueue_read(std::shared_ptr<mem_ctrl::memory_transaction> &tx) override {
+    void enqueue_read(const mem_ctrl::memory_transaction &tx) override {
       read_transactions.push(tx);
     }
 
