@@ -124,6 +124,7 @@ public:
     // then, set the payload inside the correct chunk
     int chunkVal = value.value.vector[chunk].aval;
     value.value.vector[chunk].aval = payload; 
+    value.value.vector[chunk].bval = 0;
     // now write back
     vpi_put_value(handle, &value, nullptr, vpiNoDelay);
   }

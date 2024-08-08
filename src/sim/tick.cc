@@ -45,7 +45,6 @@ void tick_signals(ControlIntf *ctrl) {
 
   for (auto &axi4_mem: axi4_mems) {
     if (axi4_mem.r.getValid() && axi4_mem.r.getReady()) {
-      std::cout << "got valid cmd " << int(axi4_mem.r.getValid()) << " " << axi4_mem.r.getReady() << std::endl;
       memory_transacted += (DATA_BUS_WIDTH >> 3);
       RLOCK
       auto tx = axi4_mem.read_transactions.front();
@@ -66,7 +65,6 @@ void tick_signals(ControlIntf *ctrl) {
       auto txlen = (int) (axi4_mem.ar.getLen()) + 1;
       auto tx = std::make_shared<mem_ctrl::memory_transaction>((uintptr_t) ad, txsize, txlen, 0, false,
                                                                axi4_mem.ar.getId(), addr, false);
-      std::cout << "enqueueing READ REQUEST  id " << axi4_mem.ar.getId() << std::endl;
       RLOCK
       axi4_mem.ddr_read_q.push_back(tx);
       RUNLOCK
@@ -95,9 +93,6 @@ void tick_signals(ControlIntf *ctrl) {
       axi4_mem.r.setValid(1);
       axi4_mem.r.setLast(am_done && tx->can_be_last);
       axi4_mem.r.setId(tx->id);
-      if (axi4_mem.r.getLast()) {
-        printf("return %d\n", tx->id);
-      }
     } else {
       axi4_mem.r.setValid(0);
       axi4_mem.r.setLast(false);
@@ -151,6 +146,7 @@ void tick_signals(ControlIntf *ctrl) {
         uint32_t off = 0;
         auto addr = trans->addr;
         auto data = axi4_mem.w.getData();
+        std::cout << "enter" << std::endl;
         while (off < sizeof(strobe_width) * 8) {
           if (axi4_mem.w.getStrb(off)) {
             reinterpret_cast<uint8_t *>(addr)[off] = data.get()[off];
@@ -158,6 +154,7 @@ void tick_signals(ControlIntf *ctrl) {
           }
           off += 1;
         }
+        std::cout << "exit" << std::endl;
         trans->axi_bus_beats_progress++;
 
         if (not trans->fixed) {
