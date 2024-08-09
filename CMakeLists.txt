@@ -68,8 +68,11 @@ if ("${TARGET}" STREQUAL "sim")
         set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
         add_subdirectory(DRAMsim3)
+        message(${CMAKE_CURRENT_SOURCE_DIR})
         install(TARGETS dramsim3
           DESTINATION $ENV{BEETHOVEN_ROOT}/lib/)
+        install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/scripts/tab.tab
+          DESTINATION $ENV{BEETHOVEN_ROOT}/inc/)
         add_library(BeethovenRuntime STATIC ${SRC})
         add_compile_definitions(VCS=1)
         target_include_directories(BeethovenRuntime PUBLIC $ENV{VCS_HOME}/include )
@@ -157,3 +160,6 @@ if (${BUILD_SIM} AND ("${SIMULATOR}" STREQUAL "verilator"))
             -Wno-moddup -Wno-unoptflat
     )
 endif ()
+
+add_executable(brt-kill src/kill.cc)
+target_link_libraries(brt-kill PUBLIC APEX::beethoven)
