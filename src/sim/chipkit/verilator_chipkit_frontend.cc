@@ -12,6 +12,7 @@
 #include "sim/mem_ctrl.h"
 #include "sim/verilator.h"
 #include "trace/trace_read.h"
+#include "sim/chipkit/state_machine.h"
 
 #include "util.h"
 #include <beethoven_allocator_declaration.h>
@@ -29,7 +30,6 @@ bool active_reset = true;
 
 extern std::queue<beethoven::rocc_cmd> cmds;
 extern std::unordered_map<system_core_pair, std::queue<int> *> in_flight;
-mem_ctrl::mem_interface<BeethovenMemIDDtype> axi4_mems[NUM_DDR_CHANNELS];
 
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -144,8 +144,7 @@ void run_verilator(std::optional<std::string> trace_file,
 #endif
 
   mem_ctrl::init(dram_config_file);
-  std::queue<unsigned char> program, stdout_strm;
-  readMemFile2ChipkitDMA(program, *trace_file);
+  std::queue<unsigned char> stdout_strm;
   const float DDR_CLOCK = 1000.0 / dramsim3config->tCK;// NOLINT
   auto fpga_clock_inc = 500000 / FPGA_CLOCK;
   float ddr_clock_inc = DDR_CLOCK / FPGA_CLOCK;// NOLINT
@@ -191,21 +190,46 @@ void run_verilator(std::optional<std::string> trace_file,
     axi4_mem.init_dramsim3();
   }
 
-#if NUM_DDR_CHANNELS >= 1
-  init_ddr_interface(0)
-  axi4_mems[0].w->setData((char *) &top.M00_AXI_wdata);
-  axi4_mems[0].r->setData((char *) &top.M00_AXI_rdata);
-#if NUM_DDR_CHANNELS >= 2
-  init_ddr_interface(1)
-#if NUM_DDR_CHANNELS >= 4
-      init_ddr_interface(2)
-          init_ddr_interface(3)
-#endif
-#endif
-#endif
-
+  uint8_t dummy;
+  axi4_mems[0].ar.init(GetSetWrapper(top.M00_AXI_arready),
+                       GetSetWrapper(top.M00_AXI_arvalid),
+                       GetSetWrapper(top.M00_AXI_arid),
+                       GetSetWrapper(top.M00_AXI_arsize),
+                       GetSetWrapper(top.M00_AXI_arburst),
+                       GetSetWrapper(top.M00_AXI_araddr),
+                       GetSetWrapper(top.M00_AXI_arlen));
+  axi4_mems[0].aw.init(GetSetWrapper(top.M00_AXI_awready),
+                       GetSetWrapper(top.M00_AXI_awvalid),
+                       GetSetWrapper(top.M00_AXI_awid),
+                       GetSetWrapper(top.M00_AXI_awsize),
+                       GetSetWrapper(top.M00_AXI_awburst),
+                       GetSetWrapper(top.M00_AXI_awaddr),
+                       GetSetWrapper(top.M00_AXI_awlen));
+  axi4_mems[0].w.init(GetSetWrapper(top.M00_AXI_wready),
+                      GetSetWrapper(top.M00_AXI_wvalid),
+                      GetSetWrapper(top.M00_AXI_wlast),
+                      GetSetWrapper(dummy),
+                      GetSetWrapper(top.M00_AXI_wstrb),
+                      GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH / 8>((uint8_t * ) & top.M00_AXI_wdata));
+  axi4_mems[0].r.init(GetSetWrapper(top.M00_AXI_rready),
+                      GetSetWrapper(top.M00_AXI_rvalid),
+                      GetSetWrapper(top.M00_AXI_rlast),
+                      GetSetWrapper(top.M00_AXI_rid),
+                      GetSetWrapper(dummy),
+                      GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH / 8>((uint8_t * ) & top.M00_AXI_rdata));
+  axi4_mems[0].b.init(GetSetWrapper(top.M00_AXI_bready),
+                      GetSetWrapper(top.M00_AXI_bvalid),
+                      GetSetWrapper(top.M00_AXI_bid));
   // reset circuit
   top.reset = active_reset;
+
+  ChipkitControlIntf<GetSetWrapper<uint8_t>> uart_stdfront(
+          GetSetWrapper<uint8_t>(top.STDUART_uart_txd),
+          GetSetWrapper<uint8_t>(top.STDUART_uart_rxd));
+  ChipkitControlIntf<GetSetWrapper<uint8_t>> uart_chipfront(
+          GetSetWrapper<uint8_t>(top.CHIP_UART_M_TXD),
+          GetSetWrapper<uint8_t>(top.CHIP_UART_M_RXD));
+
   top.CHIP_UART_M_RXD = 1;
   top.CHIP_UART_M_CTS = 0; // clear to send
   // DO NOT MESS WITH THIS
@@ -216,9 +240,9 @@ void run_verilator(std::optional<std::string> trace_file,
   top.CHIP_SCLK1 = top.CHIP_SCLK2 = top.CHIP_SHIFTIN = top.CHIP_SHIFTOUT = 0;
 
   for (auto &mem: axi4_mems) {
-    mem.r->setValid(0);
-    mem.b->setValid(0);
-    mem.aw->setReady(1);
+    mem.r.setValid(0);
+    mem.b.setValid(0);
+    mem.aw.setReady(1);
   }
 #ifdef BEETHOVEN_HAS_DMA
   dma.b->setReady(0);
@@ -263,15 +287,15 @@ void run_verilator(std::optional<std::string> trace_file,
 
   if (dma_file.has_value()) {
     printf("memory contents\n");
-    std::queue<unsigned char> dma_program;
-    readMemFile2ChipkitDMA(dma_program, *dma_file);
+    readMemFile2ChipkitDMA(uart_chipfront.in_stream, *dma_file);
     top.CHIP_ASPSEL = 0;
-    auto dma_last = dma_program.size();
-    while (!dma_program.empty() || top.CHIP_UART_M_RXD == 0) {
-      if (dma_last != dma_program.size() && (dma_program.size() % 100 == 0)) {
-        printf("\r%d %zu %llu", loops, program.size(), main_time);
+    auto dma_last = uart_chipfront.in_stream.size();
+
+    while (!uart_chipfront.in_stream.empty() || top.CHIP_UART_M_RXD == 0) {
+      if (dma_last != uart_chipfront.in_stream.size() && (uart_chipfront.in_stream.size() % 100 == 0)) {
+        printf("\r%d %zu %llu", loops, uart_chipfront.in_stream.size(), main_time);
         fflush(stdout);
-        dma_last = dma_program.size();
+        dma_last = uart_chipfront.in_stream.size();
       }
 
       top.clock = 1;
@@ -282,166 +306,20 @@ void run_verilator(std::optional<std::string> trace_file,
       main_time += fpga_clock_inc;
       tick(&top);
       tfp->dump(main_time);
-      queue_uart(dma_program, stdout_strm, top.CHIP_UART_M_RXD, top.STDUART_uart_txd);
-
-      {
-        // approx clock diff
-        ddr_acc += ddr_clock_inc;
-
-        while (ddr_acc >= 1) {
-          for (auto &axi4_mem: axi4_mems) {
-            axi4_mem.mem_sys->ClockTick();
-            try_to_enqueue_ddr(axi4_mem);
-          }
-          ddr_acc -= 1;
-        }
-
-        for (auto &axi4_mem: axi4_mems) {
-          if (axi4_mem.r->getValid() && axi4_mem.r->getReady()) {
-            RLOCK
-            auto tx = axi4_mem.read_transactions.front();
-            tx->axi_bus_beats_progress++;
-            if (not tx->fixed) {
-              tx->addr += tx->size;
-            }
-            if (axi4_mem.r->getLast() || !tx->can_be_last) {
-              axi4_mem.read_transactions.pop();
-            }
-            RUNLOCK
-          }
-
-          if (axi4_mem.ar->getReady() && axi4_mem.ar->getValid()) {
-            uint64_t addr = axi4_mem.ar->getAddr();
-            char *ad = (char *) at.translate(addr);
-            auto txsize = (int) 1 << axi4_mem.ar->getSize();
-            auto txlen = axi4_mem.ar->getLen() + 1;
-            auto tx = std::make_shared<mem_ctrl::memory_transaction>(uintptr_t(ad), txsize, txlen, 0, false,
-                                                                     axi4_mem.ar->getId(), addr);
-            // 64b per DRAM transaction
-            RLOCK
-            axi4_mem.ddr_read_q.push_back(tx);
-            RUNLOCK
-          }
-        }
-
-        // ------------ HANDLE MEMORY INTERFACES ----------------
-        for (mem_ctrl::mem_interface<BeethovenMemIDDtype> &axi4_mem: axi4_mems) {
-          if (axi4_mem.b->getReady() && axi4_mem.b->getValid()) {
-            axi4_mem.b->send_ids.pop();
-          }
-
-          RLOCK
-          if (not axi4_mem.read_transactions.empty()) {
-            auto tx = axi4_mem.read_transactions.front();
-            int start = (tx->axi_bus_beats_progress * tx->size) % (DATA_BUS_WIDTH / 8);
-            char *dest = (char *) axi4_mem.r->getData() + start;
-            for (int i = 0; i < tx->size; ++i) {
-              dest[i] = mem_get(tx->addr + i);
-            }
-            bool am_done = tx->len == (tx->axi_bus_beats_progress + 1);
-            axi4_mem.r->setValid(1);
-            axi4_mem.r->setLast(am_done && tx->can_be_last);
-            axi4_mem.r->setId(tx->id);
-          } else {
-            axi4_mem.r->setValid(0);
-            axi4_mem.r->setLast(false);
-          }
-          RUNLOCK
-
-          WLOCK
-          // update all channels with new information now that we've updated states
-          if (not axi4_mem.b->send_ids.empty()) {
-            axi4_mem.b->setValid(1);
-            axi4_mem.b->setId(axi4_mem.b->send_ids.front());
-          } else {
-            axi4_mem.b->setValid(0);
-          }
-
-          if (!axi4_mem.b->to_enqueue.empty()) {
-            axi4_mem.b->send_ids.push(axi4_mem.b->to_enqueue.front());
-            axi4_mem.b->to_enqueue.pop();
-          }
-
-          mem_ctrl::enqueue_transaction(*axi4_mem.aw, axi4_mem.write_transactions);
-
-
-          if (not axi4_mem.write_transactions.empty()) {
-            if (axi4_mem.w->getValid() && axi4_mem.w->getReady()) {
-              auto trans = axi4_mem.write_transactions.front();
-              // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
-              char *src = axi4_mem.w->getData();
-              //BeethovenStrobeSimDtype strobe = axi4_mem.w->getStrobe();
-
-              uint32_t off = 0;
-              // for writes, we need to account for alignment and strobe,so we're re-aligning address here
-              // align to 64B - zero out bottom 6b
-              auto addr = trans->addr;
-              for (int i = 0; i < DATA_BUS_WIDTH; ++i) {
-#ifdef BEETHOVEN_HAS_DMA
-                    auto curr_ptr = uintptr_t(addr + off);
-                  auto base_ptr = uintptr_t(dma_ptr);
-                  auto end_ptr = uintptr_t(dma_ptr + dma_len);
-                  if (dma_in_progress and dma_write and curr_ptr < end_ptr and curr_ptr >= base_ptr) {
-                    // we're performing a DMA into the same address space so just make sure that the values match up...
-                    if (addr[off] != src[off]) {
-                      std::cerr << "DMA write was not a no-op. " << off << " " << int(addr[off]) << " " << int(src[off])
-                                << std::endl;
-                      tfp->close();
-                      throw std::exception();
-                    }
-                  } else {
-                    addr[off] = src[off];
-                  }
-#else
-                    printf("writing addr(%x) dat(%x)\n", addr + off, src[off]);
-                    mem_set(addr + off, src[off]);
-#endif
-                  off += 1;
-                }
-              trans->axi_bus_beats_progress++;
-
-              if (not trans->fixed) {
-                trans->addr += trans->size;
-              }
-
-              if (axi4_mem.w->getLast()) {
-                axi4_mem.write_transactions.pop();
-                trans->dram_tx_axi_enqueue_progress = 0;
-                trans->dram_tx_len_bus_beats = trans->len * trans->size >> 3;
-                trans->axi_bus_beats_progress = 1;
-                axi4_mem.ddr_write_q.push_back(trans);
-              }
-            }
-          } else {
-            axi4_mem.w->setReady(0);
-          }
-          WUNLOCK
-
-          RLOCK
-          // to signify that the AXI4 DDR Controller is busy enqueueing another transaction in the DRAM
-          axi4_mem.ar->setReady(axi4_mem.can_accept_read());
-          RUNLOCK
-
-          WLOCK
-
-          axi4_mem.w->setReady(axi4_mem.can_accept_write());
-          axi4_mem.aw->setReady(axi4_mem.can_accept_write());
-          WUNLOCK
-        }
-      }
-
+      uart_chipfront.tick();
     }
   }
 
+  readMemFile2ChipkitDMA(uart_chipfront.in_stream, *trace_file);
   top.CHIP_ASPSEL = 1;
   printf("loading program\n\n");
-  auto last = program.size();
-  while (!program.empty() || top.CHIP_UART_M_RXD == 0) {
+  auto last = uart_chipfront.in_stream.size();
+  while (!uart_chipfront.in_stream.empty() || top.CHIP_UART_M_RXD == 0) {
     loops++;
-    if (last != program.size() && (program.size() % 100 == 0)) {
-      printf("\r%d %zu %llu", loops, program.size(), main_time);
+    if (last != uart_chipfront.in_stream.size() && (uart_chipfront.in_stream.size() % 100 == 0)) {
+      printf("\r%d %zu %llu", loops, uart_chipfront.in_stream.size(), main_time);
       fflush(stdout);
-      last = program.size();
+      last = uart_chipfront.in_stream.size();
     }
     top.clock = 1;
     main_time += fpga_clock_inc;
@@ -451,7 +329,7 @@ void run_verilator(std::optional<std::string> trace_file,
     top.clock = 0;
     main_time += fpga_clock_inc;
     tick(&top);
-    queue_uart(program, stdout_strm, top.CHIP_UART_M_RXD, top.CHIP_UART_M_TXD);
+    uart_chipfront.tick();
     tfp->dump(main_time);
   }
   printf("--program written--\n\n");
@@ -512,187 +390,16 @@ void run_verilator(std::optional<std::string> trace_file,
     top.clock = 1;// posedge
     main_time += fpga_clock_inc;
     // ------------ HANDLE COMMAND INTERFACE ----------------
-    assert(program.empty());
-    queue_uart(program, stdout_strm, top.CHIP_UART_M_RXD, top.STDUART_uart_txd);
-    queue_uart(program, stdout_strm, top.STDUART_uart_rxd, top.STDUART_uart_txd, 1);
+//    assert(program.empty());
+//    queue_uart(program, stdout_strm, top.CHIP_UART_M_RXD, top.STDUART_uart_txd);
+//    queue_uart(program, stdout_strm, top.STDUART_uart_rxd, top.STDUART_uart_txd, 1);
+    tick_signals(&uart_stdfront);
     if (last_size != stdout_strm.size()) {
       printf("%c", stdout_strm.back());
       last_size = stdout_strm.size();
       if (stdout_strm.back() == 0x4) {
-        // this is the kill signal defined by the arm sourdce (see uart_stdout.h)
+        // this is the kill signal defined by the arm source (see uart_stdout.h)
         kill_sig = true;
-      }
-    }
-    {
-      // approx clock diff
-      ddr_acc += ddr_clock_inc;
-
-      while (ddr_acc >= 1) {
-        for (auto &axi4_mem: axi4_mems) {
-          axi4_mem.mem_sys->ClockTick();
-          try_to_enqueue_ddr(axi4_mem);
-        }
-        ddr_acc -= 1;
-      }
-
-      for (auto &axi4_mem: axi4_mems) {
-        if (axi4_mem.r->getValid() && axi4_mem.r->getReady()) {
-          RLOCK
-          auto tx = axi4_mem.read_transactions.front();
-          tx->axi_bus_beats_progress++;
-          if (not tx->fixed) {
-            tx->addr += tx->size;
-          }
-          if (axi4_mem.r->getLast() || !tx->can_be_last) {
-            axi4_mem.read_transactions.pop();
-          }
-          RUNLOCK
-        }
-
-        if (axi4_mem.ar->getReady() && axi4_mem.ar->getValid()) {
-          uint64_t addr = axi4_mem.ar->getAddr();
-          char *ad = (char *) at.translate(addr);
-          auto txsize = (int) 1 << axi4_mem.ar->getSize();
-          auto txlen = axi4_mem.ar->getLen() + 1;
-          auto tx = std::make_shared<mem_ctrl::memory_transaction>(uintptr_t(ad), txsize, txlen, 0, false,
-                                                                   axi4_mem.ar->getId(), addr);
-          // 64b per DRAM transaction
-          RLOCK
-          axi4_mem.ddr_read_q.push_back(tx);
-          RUNLOCK
-        }
-      }
-
-      // ------------ HANDLE MEMORY INTERFACES ----------------
-      for (mem_ctrl::mem_interface<BeethovenMemIDDtype> &axi4_mem: axi4_mems) {
-        if (axi4_mem.b->getReady() && axi4_mem.b->getValid()) {
-          axi4_mem.b->send_ids.pop();
-          axi4_mem.num_in_flight_writes--;
-        }
-
-        RLOCK
-        if (not axi4_mem.read_transactions.empty()) {
-          auto tx = axi4_mem.read_transactions.front();
-          int start = (tx->axi_bus_beats_progress * tx->size) % (DATA_BUS_WIDTH / 8);
-          char *dest = (char *) axi4_mem.r->getData() + start;
-          for (int i = 0; i < tx->size; ++i) {
-            dest[i] = mem_get(tx->addr + i);
-          }
-          bool am_done = tx->len == (tx->axi_bus_beats_progress + 1);
-          axi4_mem.r->setValid(1);
-          axi4_mem.r->setLast(am_done && tx->can_be_last);
-          axi4_mem.r->setId(tx->id);
-        } else {
-          axi4_mem.r->setValid(0);
-          axi4_mem.r->setLast(false);
-        }
-        RUNLOCK
-
-        WLOCK
-        // update all channels with new information now that we've updated states
-        if (not axi4_mem.b->send_ids.empty()) {
-          axi4_mem.b->setValid(1);
-          axi4_mem.b->setId(axi4_mem.b->send_ids.front());
-        } else {
-          axi4_mem.b->setValid(0);
-        }
-
-        if (!axi4_mem.b->to_enqueue.empty()) {
-          axi4_mem.b->send_ids.push(axi4_mem.b->to_enqueue.front());
-          axi4_mem.b->to_enqueue.pop();
-        }
-
-        if (axi4_mem.aw->getValid() && axi4_mem.aw->getReady()) {
-          try {
-#ifdef BAREMETAL_RUNTIME
-            uintptr_t addr = axi4_mem.aw->getAddr();
-#else
-            char *addr = (char *) at.translate(axi4_mem.aw->getAddr());
-#endif
-            int sz = 1 << axi4_mem.aw->getSize();
-            int len = 1 + axi4_mem.aw->getLen();// per axi
-            bool is_fixed = axi4_mem.aw->getBurst() == 0;
-            int id = axi4_mem.aw->getId();
-            uint64_t fpga_addr = axi4_mem.aw->getAddr();
-            auto tx = std::make_shared<mem_ctrl::memory_transaction>(uintptr_t(addr), sz, len, 0, is_fixed, id,
-                                                                     fpga_addr);
-            axi4_mem.write_transactions.push(tx);
-            axi4_mem.num_in_flight_writes++;
-          } catch (std::exception &e) {
-            tfp->dump(main_time);
-            tfp->close();
-            throw e;
-          }
-        }
-
-
-        if (not axi4_mem.write_transactions.empty()) {
-          if (axi4_mem.w->getValid() && axi4_mem.w->getReady()) {
-            auto trans = axi4_mem.write_transactions.front();
-            // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
-            char *src = axi4_mem.w->getData();
-            BeethovenStrobeSimDtype strobe = axi4_mem.w->getStrobe();
-            uint32_t off = 0;
-            // for writes, we need to account for alignment and strobe,so we're re-aligning address here
-            // align to 64B - zero out bottom 6b
-            auto addr = trans->addr;
-            while (strobe != 0) {
-              if (strobe & 1) {
-#ifdef BEETHOVEN_HAS_DMA
-                auto curr_ptr = uintptr_t(addr + off);
-                auto base_ptr = uintptr_t(dma_ptr);
-                auto end_ptr = uintptr_t(dma_ptr + dma_len);
-                if (dma_in_progress and dma_write and curr_ptr < end_ptr and curr_ptr >= base_ptr) {
-                  // we're performing a DMA into the same address space so just make sure that the values match up...
-                  if (addr[off] != src[off]) {
-                    std::cerr << "DMA write was not a no-op. " << off << " " << int(addr[off]) << " " << int(src[off])
-                              << std::endl;
-                    tfp->close();
-                    throw std::exception();
-                  }
-                } else {
-                  addr[off] = src[off];
-                }
-#else
-                printf("writing addr(%x) dat(%x)\n", addr + off, src[off]);
-                mem_set(addr + off, src[off]);
-#endif
-              }
-              off += 1;
-              strobe >>= 1;
-            }
-            trans->axi_bus_beats_progress++;
-
-            if (not trans->fixed) {
-              trans->addr += trans->size;
-            }
-
-            if (axi4_mem.w->getLast()) {
-              axi4_mem.write_transactions.pop();
-              trans->dram_tx_axi_enqueue_progress = 0;
-              trans->dram_tx_len_bus_beats = trans->len * trans->size >> 3;
-              trans->axi_bus_beats_progress = 1;
-              axi4_mem.ddr_write_q.push_back(trans);
-              axi4_mem.w->setReady(!axi4_mem.write_transactions.empty() ||
-                                   axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
-            } else {
-              axi4_mem.w->setReady(1);
-            }
-          }
-        } else {
-          axi4_mem.w->setReady(axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
-        }
-        WUNLOCK
-
-        RLOCK
-        // to signify that the AXI4 DDR Controller is busy enqueueing another transaction in the DRAM
-        axi4_mem.ar->setReady(axi4_mem.can_accept_read());
-        RUNLOCK
-
-        WLOCK
-
-        axi4_mem.aw->setReady(axi4_mem.num_in_flight_writes < axi4_mem.max_in_flight_writes);
-        WUNLOCK
       }
     }
     tick(&top);

@@ -9,13 +9,9 @@
 #include <queue>
 #include <verilated.h>
 
-#include "sim/ddr_macros.h"
-#include "sim/axi/front_bus_ctrl_axi.h"
 #include "sim/mem_ctrl.h"
 #include "sim/verilator.h"
 #include "sim/tick.h"
-#include "trace/trace_read.h"
-#include "cmd_server.h"
 
 #include <beethoven_allocator_declaration.h>
 #include "util.h"
@@ -64,62 +60,7 @@ void tick(BeethovenTop *top) {
     throw e;
   }
 }
-
-//
-// Created by Christopher Kjellqvist on 2/2/24.
-//
-
-#include "trace/trace_read.h"
-#include "sim/verilator.h"
 #include "sim/axi/state_machine.h"
-
-/*
-void init_trace(const std::string &fname) {
-  FILE *f = fopen(fname.c_str(), "r");
-  // read f line by line
-  if (f == nullptr) throw std::runtime_error("Could not open file");
-
-  trace = new Trace{};
-
-  char *line = nullptr;
-  size_t huh;
-  int nchar = getline(&line, &huh, f);
-  // valid operations
-  // read <address> <comparison_value>
-  //    read should return true if you want the trace to continue
-  // write <address> <value>
-  uint32_t payloads[4];
-  int payload_id;
-  std::optional<TraceType> mode;
-  while (nchar != -1) {
-    line = strtok(line, " ");
-    payload_id = 0;
-    mode = {};
-    bool comment = false;
-    while (line && !comment) {
-      if (strcmp(line, "read") == 0) {
-        mode = ReadConditionType;
-      } else if (strcmp(line, "write") == 0) {
-        mode = WriteType;
-      } else if (strcmp(line, "#") == 0) {
-        comment = true;
-      } else {
-        payloads[payload_id] = std::strtol(line, nullptr, 0);
-        payload_id++;
-      }
-      line = strtok(nullptr, " ");
-    }
-    if (mode.has_value()) {
-      assert(payload_id == 2);
-      trace->push(TraceUnit(*mode, payloads[0], payloads[1]));
-    }
-    nchar = getline(&line, &huh, f);
-  }
-  return;
-}
-*/
-
-TraceUnit::TraceUnit(TraceType ty, uint64_t address, uint32_t payload) : ty(ty), address(address), payload(payload) {}
 
 #if NUM_DDR_CHANNELS >= 1
 extern int writes_emitted;
@@ -179,7 +120,7 @@ uint64_t memory_transacted = 0;
 bool use_trace = false;
 float ddr_clock_inc;
 
-void run_verilator(std::optional<std::string> trace_file, const std::string &dram_config_file) {
+void run_verilator(const std::string &dram_config_file) {
 #if 500000 % FPGA_CLOCK != 0
   fprintf(stderr, "Provided FPGA clock rate (%d MHz) does not evenly divide 500. This may result in some inaccuracies in precise simulation measurements.", FPGA_CLOCK);
 #endif
@@ -272,9 +213,37 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
                       GetSetWrapper(top.M00_AXI_bvalid),
                       GetSetWrapper(top.M00_AXI_bid));
 #if NUM_DDR_CHANNELS >= 2
-#error "Can't do 2 yet"
+  axi4_mems[1].ar.init(GetSetWrapper(top.M01_AXI_arready),
+                       GetSetWrapper(top.M01_AXI_arvalid),
+                       GetSetWrapper(top.M01_AXI_arid),
+                       GetSetWrapper(top.M01_AXI_arsize),
+                       GetSetWrapper(top.M01_AXI_arburst),
+                       GetSetWrapper(top.M01_AXI_araddr),
+                       GetSetWrapper(top.M01_AXI_arlen));
+  axi4_mems[1].aw.init(GetSetWrapper(top.M01_AXI_awready),
+                       GetSetWrapper(top.M01_AXI_awvalid),
+                       GetSetWrapper(top.M01_AXI_awid),
+                       GetSetWrapper(top.M01_AXI_awsize),
+                       GetSetWrapper(top.M01_AXI_awburst),
+                       GetSetWrapper(top.M01_AXI_awaddr),
+                       GetSetWrapper(top.M01_AXI_awlen));
+  axi4_mems[1].w.init(GetSetWrapper(top.M01_AXI_wready),
+                      GetSetWrapper(top.M01_AXI_wvalid),
+                      GetSetWrapper(top.M01_AXI_wlast),
+                      GetSetWrapper(dummy),
+                      GetSetWrapper(top.M01_AXI_wstrb),
+                      GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH / 8>(&top.M01_AXI_wdata.at(0)));
+  axi4_mems[1].r.init(GetSetWrapper(top.M01_AXI_rready),
+                      GetSetWrapper(top.M01_AXI_rvalid),
+                      GetSetWrapper(top.M01_AXI_rlast),
+                      GetSetWrapper(top.M01_AXI_rid),
+                      GetSetWrapper(dummy),
+                      GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH / 8>(&top.M01_AXI_rdata.at(0)));
+  axi4_mems[1].b.init(GetSetWrapper(top.M01_AXI_bready),
+                      GetSetWrapper(top.M01_AXI_bvalid),
+                      GetSetWrapper(top.M01_AXI_bid));
 #if NUM_DDR_CHANNELS >= 4
-#error "Can't do other
+#error "Can't do more than 2. just copy it out if you need"
 #endif
 #endif
   // reset circuit
@@ -367,7 +336,6 @@ void run_verilator(std::optional<std::string> trace_file, const std::string &dra
     if ((cycle_count & 1024) == 0 && std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::high_resolution_clock::now() - time_last_print).count() > 500) {
       time_last_print = std::chrono::high_resolution_clock::now();
-      print_state(memory_transacted, main_time, main_time - time_last_command);
       fflush(stdout);
     }
     tick_signals(ctrl);
@@ -405,14 +373,11 @@ int main(int argc, char **argv) {
   signal(SIGKILL, sig_handle);
 
   std::optional<std::string> dram_file = {};
-  std::optional<std::string> trace_file = {};
   for (int i = 1; i < argc; ++i) {
     assert(argv[i][0] == '-');
     if (strcmp(argv[i] + 1, "dramconfig") == 0) {
       dram_file = std::string(argv[i + 1]);
       std::cerr << "dramconfig is " << *dram_file << std::endl;
-    } else if (strcmp(argv[i] + 1, "tracefile") == 0) {
-      trace_file = std::string(argv[i + 1]);
     }
     ++i;
   }
@@ -425,7 +390,7 @@ int main(int argc, char **argv) {
   cmd_server::start();
   LOG(printf("Entering verilator\n"));
   try {
-    run_verilator(trace_file, *dram_file);
+    run_verilator(*dram_file);
     pthread_mutex_lock(&main_lock);
     pthread_mutex_lock(&main_lock);
     LOG(printf("Main thread exiting\n"));

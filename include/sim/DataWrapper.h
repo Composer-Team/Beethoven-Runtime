@@ -33,7 +33,6 @@ template <typename T, int l>
 struct GetSetDataWrapper {
   T* ptr = nullptr;
 
-
   template <typename G>
   explicit GetSetDataWrapper(G *v) {
     ptr = (T*)v;
