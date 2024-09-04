@@ -86,7 +86,6 @@ void tick_signals(ControlIntf *ctrl) {
       int start = ((tx->axi_bus_beats_progress * tx->size) % (DATA_BUS_WIDTH / 8))/4;
       uint32_t *src = reinterpret_cast<uint32_t*>(tx->addr);
       for (int i = 0; i < tx->size / 4; ++i) {
-//	printf("writing %d/%d from %p\n", i, tx->size/4, src); fflush(stdout);
         axi4_mem.r.setData(src[i], i+start);
       }
       bool am_done = tx->len == (tx->axi_bus_beats_progress + 1);
@@ -146,7 +145,6 @@ void tick_signals(ControlIntf *ctrl) {
         uint32_t off = 0;
         auto addr = trans->addr;
         auto data = axi4_mem.w.getData();
-//        std::cout << "enter" << std::endl;
         while (off < sizeof(strobe_width) * 8) {
           if (axi4_mem.w.getStrb(off)) {
             reinterpret_cast<uint8_t *>(addr)[off] = data.get()[off];
@@ -154,7 +152,6 @@ void tick_signals(ControlIntf *ctrl) {
           }
           off += 1;
         }
-//        std::cout << "exit" << std::endl;
         trans->axi_bus_beats_progress++;
 
         if (not trans->fixed) {
