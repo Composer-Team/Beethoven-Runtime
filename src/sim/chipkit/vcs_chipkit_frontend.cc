@@ -2,8 +2,8 @@
 // Created by Christopher Kjellqvist on 8/6/24.
 //
 
-#include "vcs_vpi_user.h"
-#include "sv_vpi_user.h"
+//#include "vcs_vpi_user.h"
+//#include "sv_vpi_user.h"
 #include "sim/mem_ctrl.h"
 #include "sim/chipkit/state_machine.h"
 #include "sim/tick.h"
@@ -11,14 +11,21 @@
 #include "cmd_server.h"
 #include "data_server.h"
 #include <pthread.h>
-
+#include "sim/chipkit/tick.h"
 #include "beethoven_allocator_declaration.h"
+#include "sim/front_bus_ctrl_uart.h"
 
 #include <cstring>
 #include <vector>
 
+bool active_reset = 1;
+
+ChipkitControlIntf<VCSShortHandle> uart_chipfront;
+ChipkitControlIntf<VCSShortHandle> uart_stdfront;
+vpiHandle reset;
+vpiHandle aspsel;
+
 std::vector<vpiHandle> inputs, outputs;
-ChipkitControlIntf<VCSShortHandle> ctrl;
 uint64_t memory_transacted = 0;
 #if NUM_DDR_CHANNELS >= 1
 extern int writes_emitted;
@@ -82,7 +89,7 @@ void print_state(uint64_t mem, uint64_t time) {
 }
 
 PLI_INT32 init_input_signals_calltf(PLI_BYTE8 * /*user_data*/) {
-	std::cout << "init inputs" << std::endl;
+  std::cout << "init inputs" << std::endl;
   vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, nullptr);
   vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
   // Cache Inputs
@@ -95,7 +102,7 @@ PLI_INT32 init_input_signals_calltf(PLI_BYTE8 * /*user_data*/) {
 }
 
 PLI_INT32 init_output_signals_calltf(PLI_BYTE8 * /*user_data*/) {
-	std::cout << "init outputs" << std::endl;
+  std::cout << "init outputs" << std::endl;
   vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, nullptr);
   vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
   // Cache Inputs
@@ -115,7 +122,7 @@ vpiHandle getHandle(const std::string &name) {
       return arg;
     }
   }
-  
+
   for (const auto &arg: outputs) {
     // get the name of each signal and return the handle to it if the argument matches
     auto nm = vpi_get_str(vpiName, arg);
@@ -174,76 +181,46 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
 #endif
 
   // initialize the unused fields (e.g., ID)
-  
-  auto aw_id_handle = getHandle("S00_AXI_awid");
-  auto ar_id_handle = getHandle("S00_AXI_arid");
+
+  uart_chipfront.rxd = getHandle("CHIP_UART_M_RXD");
+  uart_chipfront.txd = getHandle("CHIP_UART_M_TXD");
+  uart_stdfront.rxd = getHandle("STDUART_uart_rxd");
+  uart_stdfront.txd = getHandle("STDUART_uart_txd");
+
+  reset = getHandle("reset");
+  aspsel = getHandle("CHIP_ASPSEL");
   s_vpi_value value;
   value.format = vpiIntVal;
   value.value.integer = 0;
-  vpi_put_value(getHandle("S00_AXI_arburst"), &value, nullptr, vpiNoDelay);
-  vpi_put_value(getHandle("S00_AXI_arcache"), &value, nullptr, vpiNoDelay);
-  vpi_put_value(getHandle("S00_AXI_arid"), &value, nullptr, vpiNoDelay);
-  vpi_put_value(getHandle("S00_AXI_arlen"), &value, nullptr, vpiNoDelay);
-  vpi_put_value(getHandle("S00_AXI_arlock"), &value, nullptr, vpiNoDelay);
-  vpi_put_value(getHandle("S00_AXI_arprot"), &value, nullptr, vpiNoDelay);
-  vpi_put_value(getHandle("S00_AXI_arqos"), &value, nullptr, vpiNoDelay);
-  vpi_put_value(getHandle("S00_AXI_arregion"), &value, nullptr, vpiNoDelay);
-  value.value.integer = 2;
-  vpi_put_value(getHandle("S00_AXI_arsize"), &value, nullptr, vpiNoDelay);
-  value.value.integer = 0;
-  vpi_put_value(getHandle("S00_AXI_awburst"), &value, nullptr, vpiNoDelay);
-  vpi_put_value(getHandle("S00_AXI_awcache"), &value, nullptr, vpiNoDelay);
-  vpi_put_value(getHandle("S00_AXI_awid"), &value, nullptr, vpiNoDelay);
-  vpi_put_value(getHandle("S00_AXI_awlen"), &value, nullptr, vpiNoDelay);
-  vpi_put_value(getHandle("S00_AXI_awlock"), &value, nullptr, vpiNoDelay);
-  vpi_put_value(getHandle("S00_AXI_awprot"), &value, nullptr, vpiNoDelay);
-  vpi_put_value(getHandle("S00_AXI_awqos"), &value, nullptr, vpiNoDelay);
-  vpi_put_value(getHandle("S00_AXI_awregion"), &value, nullptr, vpiNoDelay);
-  value.value.integer = 2;
-  vpi_put_value(getHandle("S00_AXI_awsize"), &value, nullptr, vpiNoDelay);
+  vpi_put_value(aspsel, &value, nullptr, vpiNoDelay);
+  vpi_put_value(getHandle("CHIP_SCLK1"), &value, nullptr, vpiNoDelay);
+  vpi_put_value(getHandle("CHIP_SCLK2"), &value, nullptr, vpiNoDelay);
+  vpi_put_value(getHandle("CHIP_SHIFTIN"), &value, nullptr, vpiNoDelay);
+  vpi_put_value(getHandle("CHIP_SHIFTOUT"), &value, nullptr, vpiNoDelay);
+  vpi_put_value(getHandle("CHIP_FESEL"), &value, nullptr, vpiNoDelay);
+  vpi_put_value(getHandle("CHIP_UART_M_CTS"), &value, nullptr, vpiNoDelay);
+  value.value.integer = get_baud_sel();
+  vpi_put_value(getHandle("CHIP_UART_M_CTS"), &value, nullptr, vpiNoDelay);
   value.value.integer = 1;
-  vpi_put_value(getHandle("S00_AXI_wlast"), &value, nullptr, vpiNoDelay);
-  value.value.integer = 0xF;
-  vpi_put_value(getHandle("S00_AXI_wstrb"), &value, nullptr, vpiNoDelay);
+  vpi_put_value(getHandle("CHIP_UART_M_RXD"), &value, nullptr, vpiNoDelay);
+  vpi_put_value(getHandle("STDUART_uart_rxd"), &value, nullptr, vpiNoDelay);
 
-
-
-  ctrl.set_ar(
-          VCSShortHandle(getHandle("S00_AXI_arvalid")),
-          VCSShortHandle(getHandle("S00_AXI_arready")),
-          VCSShortHandle(getHandle("S00_AXI_araddr")));
-  ctrl.set_aw(
-          VCSShortHandle(getHandle("S00_AXI_awvalid")),
-          VCSShortHandle(getHandle("S00_AXI_awready")),
-          VCSShortHandle(getHandle("S00_AXI_awaddr")));
-  ctrl.set_w(
-          VCSShortHandle(getHandle("S00_AXI_wvalid")),
-          VCSShortHandle(getHandle("S00_AXI_wready")),
-          VCSShortHandle(getHandle("S00_AXI_wdata")));
-  ctrl.set_r(
-          VCSShortHandle(getHandle("S00_AXI_rready")),
-          VCSShortHandle(getHandle("S00_AXI_rvalid")),
-          VCSShortHandle(getHandle("S00_AXI_rdata")));
-  ctrl.set_b(
-          VCSShortHandle(getHandle("S00_AXI_bready")),
-          VCSShortHandle(getHandle("S00_AXI_bvalid")));
-
-
-  std::cout << "start servers" << std::endl;
-
-  cmd_server::start();
-  data_server::start();
-
-  std:: cout << "finished init structures" << std::endl;
+  std::cout << "finished init structures" << std::endl;
   return 0;
 }
 
+#include "sim/chipkit/util.h"
+
 PLI_INT32 tick_calltf(PLI_BYTE8 * /*user_data*/) {
-  main_time+= fpga_clock_inc;;
+  main_time += fpga_clock_inc;;
   if (main_time % 1000 == 0) {
     print_state(memory_transacted, main_time);
   }
-  tick_signals(&ctrl);
+
+  VCSShortHandle asp(aspsel);
+  VCSShortHandle res(reset);
+
+  tick_chip(uart_stdfront, uart_chipfront, asp, res);
   return 0;
 }
 

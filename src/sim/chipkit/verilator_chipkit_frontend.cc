@@ -7,22 +7,17 @@
 #include <queue>
 #include <verilated.h>
 
-#include "sim/ddr_macros.h"
 #include "sim/front_bus_ctrl_uart.h"
 #include "sim/mem_ctrl.h"
 #include "sim/verilator.h"
-#include "trace/trace_read.h"
 #include "sim/chipkit/state_machine.h"
 
 #include "util.h"
 #include <beethoven_allocator_declaration.h>
 
-
-#ifndef DEFAULT_PL_CLOCK
-#define FPGA_CLOCK 100
-#else
-#define FPGA_CLOCK DEFAULT_PL_CLOCK
-#endif
+#include "sim/chipkit/tick.h"
+#include "sim/tick.h"
+#include "sim/chipkit/util.h"
 
 uint64_t main_time = 0;
 
@@ -34,6 +29,9 @@ extern std::unordered_map<system_core_pair, std::queue<int> *> in_flight;
 pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 
 waveTrace *tfp;
+
+float ddr_clock_inc;
+uint64_t memory_transacted = 0;
 
 
 void sig_handle(int sig) {
@@ -54,60 +52,7 @@ void tick(BeethovenTop *top) {
   }
 }
 
-void push_val(const char buf[4], std::queue<unsigned char> &vec) {
-  for (int i = 0; i < 4; ++i) {
-    vec.push(buf[i]);
-  }
-}
 
-void push_val(const uint32_t val, std::queue<unsigned char> &vec) {
-  auto buf = (uint8_t * ) & val;
-  for (int i = 0; i < 4; ++i) {
-    vec.push(buf[i]);
-  }
-}
-
-static void readMemFile2ChipkitDMA(std::queue<unsigned char> &vec, const std::string &fname) {
-  FILE *f = fopen(fname.c_str(), "r");
-  char buf[256];
-  char c;
-  int32_t addr = 0;
-
-  char inst_buf[4];
-  char inst_idx = 0;
-  while ((c = getc(f)) != EOF) {
-    if (isspace(c)) while (isspace(c = getc(f)));
-    if (c != '@') ungetc(c, f);
-    if (c == EOF) break;
-    if (c == -1) break;
-    switch (c) {
-      case '@':
-        fscanf(f, "%s", buf);
-        addr = strtol(buf, nullptr, 16);
-        break;
-      default: {
-        auto q = getc(f);
-        ungetc(q, f);
-        if (q == '@') continue;
-        fscanf(f, "%s", buf);
-        inst_buf[inst_idx] = (char) strtol(buf, nullptr, 16);
-        if (++inst_idx == 4) {
-          vec.push('w');
-          push_val(addr, vec);
-          push_val(inst_buf, vec);
-
-          printf("pushing %x %02x %02x %02x %02x\n", addr, (char) inst_buf[0], (char) inst_buf[1], (char) inst_buf[2],
-                 (char) inst_buf[3]);
-          vec.push(0xa);
-          inst_idx = 0;
-          addr += 4;
-        }
-        break;
-      }
-    }
-  }
-  assert(inst_idx == 0);
-}
 
 bool kill_sig = false;
 
@@ -136,9 +81,7 @@ static void mem_set(uintptr_t addr, char val) {
   memory_array[addr] = val;
 }
 
-void run_verilator(std::optional<std::string> trace_file,
-                   const std::string &dram_config_file,
-                   std::optional<std::string> dma_file) {
+void run_verilator(const std::string &dram_config_file) {
 #if 500000 % FPGA_CLOCK != 0
   fprintf(stderr, "Provided FPGA clock rate (%d MHz) does not evenly divide 500. This may result in some inaccuracies in precise simulation measurements.", FPGA_CLOCK);
 #endif
@@ -147,7 +90,7 @@ void run_verilator(std::optional<std::string> trace_file,
   std::queue<unsigned char> stdout_strm;
   const float DDR_CLOCK = 1000.0 / dramsim3config->tCK;// NOLINT
   auto fpga_clock_inc = 500000 / FPGA_CLOCK;
-  float ddr_clock_inc = DDR_CLOCK / FPGA_CLOCK;// NOLINT
+  ddr_clock_inc = DDR_CLOCK / FPGA_CLOCK;// NOLINT
   float ddr_acc = 0;
 
   // 0 is the slowest, 14 is the fastest. For whatever reason, 15 isn't working
@@ -449,7 +392,7 @@ int main(int argc, char **argv) {
 
   LOG(printf("Entering verilator\n"));
   try {
-    run_verilator(trace_file, *dram_file, dma_file);
+    run_verilator(*dram_file);
     pthread_mutex_lock(&main_lock);
     pthread_mutex_lock(&main_lock);
     LOG(printf("Main thread exiting\n"));

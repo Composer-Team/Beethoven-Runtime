@@ -21,9 +21,7 @@ using waveTrace = VerilatedFstC;
 
 extern waveTrace *tfp;
 
-void run_verilator(std::optional<std::string> trace_file,
-                   const std::string &dram_config_file,
-                   std::optional<std::string> dma_file);
+void run_verilator(const std::string &dram_config_file);
 
 void sig_handle(int sig);
 

@@ -41,8 +41,11 @@ if ("${TARGET}" STREQUAL "sim")
         endif ()
     endif ()
     if ("${FRONTEND}" STREQUAL "chipkit")
+        set(SRC ${SRC} src/sim/chipkit/util.cc)
         if ("${SIMULATOR}" STREQUAL "verilator")
-            set(SRC ${SRC} src/sim/chipkit/verilator_chipkit_frontend.cc)
+            set(SRC ${SRC}
+                    src/sim/chipkit/verilator_chipkit_frontend.cc
+                    src/sim/chipkit/front_bus_ctrl_chipkit.cc)
         elseif ("${SIMULATOR}" STREQUAL "vcs")
             set(SRC ${SRC} src/sim/chipkit/vcs_chipkit_frontend.cc)
         endif ()

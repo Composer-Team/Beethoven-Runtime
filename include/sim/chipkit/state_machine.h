@@ -9,9 +9,8 @@
 #include "sim/DataWrapper.h"
 
 const int baud_table[] = {1302, 217, 108, 54, 27, 22, 20, 19, 16, 15, 10, 8, 6, 5, 4, 2};
-static unsigned int baud_sel = 14;
-static int baud_div = baud_table[baud_sel]*4;
-
+extern unsigned int baud_sel;
+extern int baud_div;
 
 template<typename byte_t>
 struct ChipkitControlIntf : public ControlIntf {
@@ -24,6 +23,7 @@ struct ChipkitControlIntf : public ControlIntf {
   byte_t rxd;
 
   ChipkitControlIntf(byte_t txd, byte_t rxd) : txd(txd), rxd(rxd) {}
+  ChipkitControlIntf() = default;
 
   unsigned char out_byte = 0;
 
@@ -32,9 +32,8 @@ struct ChipkitControlIntf : public ControlIntf {
   int baud_count_in = 0;
   int baud_count_out = 0;
 
-  static int in_byte_progress;
-  static int out_byte_progress;
-  static int stop_progress;
+  int in_byte_progress = 0;
+  int out_byte_progress = 0;
 
   static bool test(unsigned char q, int idx) {
     return q & (1 << idx);
@@ -66,16 +65,6 @@ struct ChipkitControlIntf : public ControlIntf {
 //| 4'd13|    5|      |      |1.250M|1.500M|2.000M|      |3.000M|      |      |      |      |      |
 //| 4'd14|    4|      |1.250M|1.500M|      |      |3.000M|      |      |      |      |      |      |
 //| 4'd15|    2|1.250M|      |3.000M|      |      |      |      |      |      |      |      |      |
-
-  void set_baud(unsigned int baud_flag) {
-    assert(baud_flag != 15 && baud_flag >= 0);
-    baud_sel = baud_flag;
-    baud_div = baud_table[baud_sel]*4;
-  }
-
-  unsigned int get_baud_sel() {
-    return baud_sel;
-  }
 
   std::queue<unsigned char> in_stream;
   std::queue<unsigned char> out_stream;
