@@ -28,6 +28,7 @@ void tick_signals(ControlIntf *ctrl) {
 // ------------ HANDLE COMMAND INTERFACE ----------------
 // start queueing up a new command if one is available
 
+  ctrl->tick();
 
 #if NUM_DDR_CHANNELS >= 1
 // ------------ HANDLE MEMORY INTERFACES ----------------
@@ -41,7 +42,6 @@ void tick_signals(ControlIntf *ctrl) {
     ddr_acc -= 1;
   }
   
-  ctrl->tick();
 
   for (auto &axi4_mem: axi4_mems) {
     if (axi4_mem.r.getValid() && axi4_mem.r.getReady()) {
