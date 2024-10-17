@@ -5,4 +5,4 @@ make install
 SDIR=${SDIR:-$BEETHOVEN_ROOT/Beethoven-Hardware/vsim/generated-src/beethoven.build}
 SLIST=${SLIST:-$BEETHOVEN_ROOT/Beethoven-Hardware/vsim/generated-src/vcs_srcs.in}
 
-vcs +v2k -kdb -debug_access -P $VERDI_HOME/share/PLI/VCS/LINUX64/novas.tab $VERDI_HOME/share/PLI/VCS/LINUX64/pli.a -sverilog +incdir+$SDIR -full64 +vpi+1 -CFLAGS -std=c++17 -P tab.tab  +define+CLOCK_PERIOD=1 -f $SLIST libBeethovenRuntime.a $BEETHOVEN_ROOT/lib/libdramsim3.so -lrt -L/usr/local/lib64 -lbeethoven -CFLAGS -I$BEETHOVEN_ROOT/Beethoven-Hardware/vsim/generated-src/ $BEETHOVEN_ROOT/Beethoven-Hardware/vsim/generated-src/beethoven.build/BeethovenTopVCSHarness.v -o BeethovenTop
+vcs +v2k -kdb -debug_access $VERDI_HOME/share/PLI/VCS/LINUX64/pli.a -sverilog +incdir+$SDIR -full64 +vpi+1 -CFLAGS -std=c++17 -P tab.tab  +define+CLOCK_PERIOD=1 -f $SLIST libBeethovenRuntime.a $BEETHOVEN_ROOT/lib/libdramsim3.so -lrt -L/usr/local/lib64 -lbeethoven -CFLAGS -I$BEETHOVEN_ROOT/Beethoven-Hardware/vsim/generated-src/ $BEETHOVEN_ROOT/Beethoven-Hardware/vsim/generated-src/beethoven.build/BeethovenTopVCSHarness.v -o BeethovenTop
