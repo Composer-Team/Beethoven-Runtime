@@ -35,6 +35,8 @@ bool kill_sig = false;
 
 waveTrace *tfp;
 
+extern int strobe_width;
+
 
 void sig_handle(int sig) {
 #if NUM_DDR_CHANNELS >= 1
@@ -115,7 +117,6 @@ void print_state(uint64_t mem, uint64_t time, uint64_t time_since) {
 #endif
 }
 
-uint64_t time_last_command = 0;
 uint64_t memory_transacted = 0;
 bool use_trace = false;
 float ddr_clock_inc;
@@ -202,13 +203,21 @@ void run_verilator(const std::string &dram_config_file) {
                       GetSetWrapper(top.M00_AXI_wlast),
                       GetSetWrapper(dummy),
                       GetSetWrapper(top.M00_AXI_wstrb),
+#ifdef SIM_SMALL_MEM
+                      GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH / 8>(&top.M00_AXI_wdata));
+#else
                       GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH / 8>(&top.M00_AXI_wdata.at(0)));
+#endif
   axi4_mems[0].r.init(GetSetWrapper(top.M00_AXI_rready),
                       GetSetWrapper(top.M00_AXI_rvalid),
                       GetSetWrapper(top.M00_AXI_rlast),
                       GetSetWrapper(top.M00_AXI_rid),
                       GetSetWrapper(dummy),
+#ifdef SIM_SMALL_MEM
+                      GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH / 8>(&top.M00_AXI_rdata));
+#else
                       GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH / 8>(&top.M00_AXI_rdata.at(0)));
+#endif
   axi4_mems[0].b.init(GetSetWrapper(top.M00_AXI_bready),
                       GetSetWrapper(top.M00_AXI_bvalid),
                       GetSetWrapper(top.M00_AXI_bid));
@@ -332,9 +341,10 @@ void run_verilator(const std::string &dram_config_file) {
     top.clock = 1;// posedge
     main_time += fpga_clock_inc;
     cycle_count++;
-
-    if ((cycle_count & 1024) == 0 && std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::high_resolution_clock::now() - time_last_print).count() > 500) {
+//    printf("\rCycle count: %lld", cycle_count); fflush(stdout);
+    if ((cycle_count & 1000) == 0 &&
+    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time_last_print).count() > 500) {
+      print_state(memory_transacted, main_time, main_time - ctrl->time_last_command);
       time_last_print = std::chrono::high_resolution_clock::now();
       fflush(stdout);
     }

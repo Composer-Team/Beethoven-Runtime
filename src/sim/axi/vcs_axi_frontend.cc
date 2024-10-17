@@ -131,7 +131,12 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
   std::cout << "init structures: " << std::endl;
   // at this point, we have all the inputs and outputs, and we have to tie them into the interfaces
 #if NUM_DDR_CHANNELS >= 1
+#ifdef DRAMSIM_CONFIG
+#define str(x) #x
+  mem_ctrl::init( str(DRAMSIM_CONFIG) );
+#else
   mem_ctrl::init("custom_dram_configs/DDR4_8Gb_x16_3200.ini");
+#endif
 
   for (auto &axi4_mem: axi4_mems) {
     axi4_mem.init_dramsim3();

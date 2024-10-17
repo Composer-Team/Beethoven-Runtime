@@ -229,7 +229,7 @@ struct AXIControlIntf : public ControlIntf {
             (ongoing_update == UPDATE_IDLE_CMD || ongoing_update == UPDATE_IDLE_RESP)) {
           pthread_mutex_lock(&cmdserverlock);
           if (not cmds.empty()) {
-            printf("enqueueing command\n");
+//            printf("enqueueing command\n");
             bus_occupied = true;
             ongoing_cmd.state = CMD_BITS_WRITE_ADDR;
             if (cmds.front().getXd()) {
@@ -351,8 +351,7 @@ struct AXIControlIntf : public ControlIntf {
         if (r_valid.get(0)) {
           ongoing_rsp.progress = 0;
           if (r_data.get()) {
-            LOG(printf("Found valid response on cycle %lu!!! %d %d\n", main_time, top.S00_AXI_rvalid,
-                       top.S00_AXI_rdata));
+            LOG(printf("Found valid response on cycle %lu!!!\n", main_time));
             ongoing_rsp.state = RESPT_BITS_ADDR;
           } else {
             bus_occupied = false;

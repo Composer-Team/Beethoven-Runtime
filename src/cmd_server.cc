@@ -61,7 +61,7 @@ static void *cmd_server_f(void *) {
     printf("Failed to initialize cmd_file\n%s\n", strerror(errno));
     exit(errno);
   } else {
-    LOG(printf("Successfully intialized cmd_file at %s\n", cmd_server_file_name.c_str()));
+    LOG(printf("Successfully intialized cmd_file at %s\n", cmd_server_file_name().c_str()));
   }
   // check the file size. It might already exist in which case we don't need to truncate it again
   struct stat shm_stats{};
@@ -89,7 +89,7 @@ static void *cmd_server_f(void *) {
   std::cout << "Command server started on file " << cmd_server_file_name() << std::endl;
   pthread_mutex_lock(&addr.server_mut);
   while (true) {
-    std::cerr << "Got Command in Server" << std::endl << std::endl;
+//    std::cerr << "Got Command in Server" << std::endl << std::endl;
     auto start = std::chrono::high_resolution_clock::now();
     // allocate space for response
     int id;

@@ -185,7 +185,7 @@ static data_server_file *dsf;
         at.add_mapping(fpga_addr, addr.op_argument, naddr);
         // return fpga address
         addr.op_argument = fpga_addr;
-        LOG(printf("Allocated %llu bytes at %p. FPGA addr %llx\n", nBytes, naddr, fpga_addr.getFpgaAddr()));
+        LOG(printf("Allocated %llu bytes at %p. FPGA addr %llx\n", nBytes, naddr, fpga_addr));
 #else
         auto fpga_addr = (uint64_t) naddr;
         at.add_mapping(fpga_addr, addr.op_argument, naddr);

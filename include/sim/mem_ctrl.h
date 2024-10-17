@@ -175,6 +175,7 @@ namespace mem_ctrl {
 #ifdef VERILATOR
 #include "BeethovenTop.h"
 #include "sim/DataWrapper.h"
+
 using mem_intf_t = mem_ctrl::mem_interface<
         GetSetWrapper<prep(BeethovenTop::M00_AXI_arid)>,
         GetSetWrapper<prep(BeethovenTop::M00_AXI_arsize)>,

@@ -69,6 +69,9 @@ if ("${TARGET}" STREQUAL "sim")
         target_link_libraries(BeethovenRuntime PRIVATE dramsim3 args)
         add_compile_definitions(VERILATOR=1)
     elseif ("${SIMULATOR}" STREQUAL "vcs")
+        if (NOT "${DRAMSIM_CONFIG}" STREQUAL "")
+            add_compile_definitions(DRAMSIM_CONFIG="${DRAMSIM_CONFIG}")
+        endif ()
         # NOTE: YOU ARE RESPONSIBLE FOR BUILDING AND LINKING DRAMSIM3
         add_subdirectory(DRAMsim3)
         install(TARGETS dramsim3

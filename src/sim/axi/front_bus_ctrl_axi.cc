@@ -19,6 +19,7 @@ extern pthread_mutex_t cmdserverlock;
 extern std::queue<beethoven::rocc_cmd> cmds;
 extern std::unordered_map<system_core_pair, std::queue<int> *> in_flight;
 extern uint64_t main_time;
+extern uint64_t time_last_command;
 int cmds_inflight = 0;
 extern bool kill_sig;
 
