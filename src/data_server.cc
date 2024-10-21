@@ -52,6 +52,11 @@ address_translator at;
 static std::vector<uint16_t> available_ids;
 #endif
 
+#ifdef BEETHOVEN_USE_CUSTOM_ALLOC
+#include "beethoven/allocator/device_allocator.h"
+#endif
+
+
 static data_server_file *dsf;
 
 [[noreturn]] static void *data_server_f(void *) {
@@ -78,7 +83,7 @@ static data_server_file *dsf;
 
 #ifdef BEETHOVEN_USE_CUSTOM_ALLOC
   LOG(std::cerr << "Constructing allocator" << std::endl);
-  auto allocator = new device_allocator();
+  auto allocator = new device_allocator<ALLOCATOR_SIZE_BYTES>();
   LOG(std::cerr << "Allocator constructed - data server ready" << std::endl);
 #endif
   data_server_file::init(addr);
