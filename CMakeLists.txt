@@ -7,17 +7,17 @@ find_package(beethoven REQUIRED)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(SRC src/data_server.cc src/cmd_server.cc src/mmio.cc)
-if ("$ENV{BEETHOVEN_ROOT}" STREQUAL "")
+if ("$ENV{BEETHOVEN_PATH}" STREQUAL "")
     message(FATAL_ERROR "Environment variable $BEETHOVEN_ROOT is not defined")
 endif ()
 
-set(BEETHOVEN_DIR "$ENV{BEETHOVEN_ROOT}/Beethoven-Hardware/vsim/generated-src")
+set(BEETHOVEN_DIR "$ENV{BEETHOVEN_PATH}/Beethoven-Hardware/vsim/generated-src")
 
 if (NOT EXISTS ${BEETHOVEN_DIR}/beethoven_allocator_declaration.h)
     message(FATAL_ERROR "${BEETHOVEN_DIR}/beethoven_allocator_declaration.h does not exist. Try building your project or moving this file into the directory.")
 endif ()
 
-set(AWS_SDK "$ENV{BEETHOVEN_ROOT}/aws-fpga")
+set(AWS_SDK "$ENV{BEETHOVEN_PATH/buil}/aws-fpga")
 include_directories(include)
 
 if ("${SIMULATOR}" STREQUAL "")
@@ -75,9 +75,9 @@ if ("${TARGET}" STREQUAL "sim")
         # NOTE: YOU ARE RESPONSIBLE FOR BUILDING AND LINKING DRAMSIM3
         add_subdirectory(DRAMsim3)
         install(TARGETS dramsim3
-                DESTINATION $ENV{BEETHOVEN_ROOT}/lib/)
+                DESTINATION $ENV{BEETHOVEN_PATH}/lib/)
         install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/scripts/tab.tab
-          DESTINATION $ENV{BEETHOVEN_ROOT}/inc/)
+          DESTINATION $ENV{BEETHOVEN_PATH}/inc/)
         add_library(BeethovenRuntime STATIC ${SRC})
         add_compile_definitions(VCS=1)
         target_include_directories(BeethovenRuntime PUBLIC $ENV{VCS_HOME}/include)
@@ -118,7 +118,7 @@ target_link_libraries(BeethovenRuntime PUBLIC APEX::beethoven)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 
 
-set(BEETHOVEN_HWDIR $ENV{BEETHOVEN_ROOT}/Beethoven-Hardware)
+set(BEETHOVEN_HWDIR $ENV{BEETHOVEN_PATH}/build/)
 
 if (APPLE)
     message("Building for Apple")
@@ -130,14 +130,14 @@ else ()
     message(FATAL_ERROR "Unsupported platform")
 endif ()
 
-include_directories($ENV{BEETHOVEN_ROOT}/Beethoven-Hardware/vsim/generated-src)
+include_directories(${BEETHOVEN_HWDIR}/)
 
 if ("${VERBOSE}" STREQUAL "1")
     target_compile_definitions(BeethovenRuntime PUBLIC VERBOSE)
 endif ()
 
 if ("${VTOP}" STREQUAL "")
-    set(VTOP ${BEETHOVEN_DIR}/beethoven.build/BeethovenTop.v)
+    set(VTOP ${BEETHOVEN_HWIR}/hw/BeethovenTop.v)
 endif ()
 
 if ("${TOP}" STREQUAL "")
@@ -161,9 +161,9 @@ if (${BUILD_SIM} AND ("${SIMULATOR}" STREQUAL "verilator"))
             TOP_MODULE ${TOP}
             PREFIX ${TOP}
             TRACE_FST
-            VERILATOR_ARGS --timescale 1ps/1ps --x-assign fast
+            VERILATOR_ARGS --timescale 1ps/1ps --x-assign fast --no-timing
             -Wno-context -Wno-lint -Wno-style -Wno-symrsvdword -Wno-multidriven -Wno-combdly -Wno-zerodly
-            -Wno-moddup -Wno-unoptflat
+            -Wno-moddup -Wno-unoptflat -Wno-stmtdly
     )
 endif ()
 

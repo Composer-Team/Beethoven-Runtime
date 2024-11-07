@@ -206,7 +206,8 @@ GetSetWrapper<prep(BeethovenTop::dma_arid)>,
   GetSetWrapper<prep(BeethovenTop::dma_arlen)>,
   GetSetWrapper<prep(BeethovenTop::dma_wstrb)>,
   GetSetWrapper<uint8_t>,
-  GetSetWrapper<uint8_t, DATA_BUS_WIDTH/8>> mem_intf_t;#else
+  GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH/8>> dma_intf_t;
+#else
   typedef mem_ctrl::mem_interface<VCSHandle, VCSHandle, VCSHandle, VCSHandle, VCSHandle, VCSHandle, VCSHandle> dma_intf_t;
 #endif
 #endif
