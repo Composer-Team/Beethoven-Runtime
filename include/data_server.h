@@ -6,7 +6,7 @@
 #define BEETHOVEN_VERILATOR_DATA_SERVER_H
 
 #include <cmath>
-#include <beethoven_allocator_declaration.h>
+#include <beethoven_hardware.h>
 #include <queue>
 #include <set>
 #include "util.h"

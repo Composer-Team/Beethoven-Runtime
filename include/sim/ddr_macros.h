@@ -5,7 +5,7 @@
 #ifndef BEETHOVEN_VERILATOR_DDR_MACROS_H
 #define BEETHOVEN_VERILATOR_DDR_MACROS_H
 
-#include <beethoven_allocator_declaration.h>
+#include <beethoven_hardware.h>
 
 #if DATA_BUS_WIDTH > 64
 #define access_w(dnum) ((char*)top.M0 ## dnum ## _AXI_wdata.m_storage)

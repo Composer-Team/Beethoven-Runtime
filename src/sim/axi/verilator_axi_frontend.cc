@@ -13,7 +13,7 @@
 #include "sim/verilator.h"
 #include "sim/tick.h"
 
-#include <beethoven_allocator_declaration.h>
+#include <beethoven_hardware.h>
 #include "util.h"
 
 

@@ -5,7 +5,7 @@
 #ifndef BEETHOVENRUNTIME_MEM_CTRL_H
 #define BEETHOVENRUNTIME_MEM_CTRL_H
 
-#include "beethoven_allocator_declaration.h"
+#include "beethoven_hardware.h"
 
 #if NUM_DDR_CHANNELS >= 1
 

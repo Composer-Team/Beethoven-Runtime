@@ -10,7 +10,7 @@
 
 #include "util.h"
 #include <beethoven/verilator_server.h>
-#include <beethoven_allocator_declaration.h>
+#include <beethoven_hardware.h>
 
 #include "../include/data_server.h"
 
@@ -42,7 +42,7 @@ bool dma_write;
 #include <unistd.h>
 #endif
 
-#include <beethoven_allocator_declaration.h>
+#include <beethoven_hardware.h>
 
 using namespace beethoven;
 

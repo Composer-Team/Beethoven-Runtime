@@ -5,7 +5,7 @@
 #ifndef BEETHOVEN_VERILATOR_MMIO_H
 #define BEETHOVEN_VERILATOR_MMIO_H
 
-#include <beethoven_allocator_declaration.h>
+#include <beethoven_hardware.h>
 #include <cinttypes>
 
 

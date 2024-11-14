@@ -7,7 +7,7 @@
 #include "fpga_utils.h"
 #include "mmio.h"
 #include <beethoven/verilator_server.h>
-#include <beethoven_allocator_declaration.h>
+#include <beethoven_hardware.h>
 #include <sys/stat.h>
 
 #include <cassert>

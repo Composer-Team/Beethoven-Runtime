@@ -5,7 +5,7 @@
 #ifndef BEETHOVEN_VERILATOR_VERILATOR_H
 #define BEETHOVEN_VERILATOR_VERILATOR_H
 #include "dram_system.h"
-#include <beethoven_allocator_declaration.h>
+#include <beethoven_hardware.h>
 #include <verilated.h>
 #include <optional>
 

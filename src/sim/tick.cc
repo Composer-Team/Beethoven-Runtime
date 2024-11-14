@@ -2,7 +2,7 @@
 // Created by Christopher Kjellqvist on 8/5/24.
 //
 #include "sim/tick.h"
-#include "beethoven_allocator_declaration.h"
+#include "beethoven_hardware.h"
 #include "sim/mem_ctrl.h"
 
 #ifdef VERILATOR
