@@ -177,6 +177,44 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
 #endif
 #endif
 
+#ifdef BEETHOVEN_HAS_DMA
+  dma.ar.init(VCSShortHandle(getHandle("dma_arready")),
+              VCSShortHandle(getHandle("dma_arvalid")),
+              VCSShortHandle(getHandle("dma_arid")),
+              VCSShortHandle(getHandle("dma_arsize")),
+              VCSShortHandle(getHandle("dma_arburst")),
+              VCSShortHandle(getHandle("dma_araddr")),
+              VCSShortHandle(getHandle("dma_arlen")));
+  dma.aw.init(VCSShortHandle(getHandle("dma_awready")),
+              VCSShortHandle(getHandle("dma_awvalid")),
+              VCSShortHandle(getHandle("dma_awid")),
+              VCSShortHandle(getHandle("dma_awsize")),
+              VCSShortHandle(getHandle("dma_awburst")),
+              VCSShortHandle(getHandle("dma_awaddr")),
+              VCSShortHandle(getHandle("dma_awlen")));
+  dma.w.init(VCSShortHandle(getHandle("dma_wready")),
+             VCSShortHandle(getHandle("dma_wvalid")),
+             VCSShortHandle(getHandle("dma_wlast")),
+             dummy,
+             VCSLongHandle(getHandle("dma_wstrb")),
+             VCSLongHandle(getHandle("dma_wdata")));
+  dma.r.init(VCSShortHandle(getHandle("dma_rready")),
+             VCSShortHandle(getHandle("dma_rvalid")),
+             VCSShortHandle(getHandle("dma_rlast")),
+             VCSShortHandle(getHandle("dma_rid")),
+             dummy,
+             VCSLongHandle(getHandle("dma_rdata")));
+  dma.b.init(VCSShortHandle(getHandle("dma_bready")),
+             VCSShortHandle(getHandle("dma_bvalid")),
+             VCSShortHandle(getHandle("dma_bid")));
+
+  dma.ar.setValid(false);
+  dma.aw.setValid(false);
+  dma.b.setReady(false);
+  dma.r.setValid(false);
+  dma.w.setValid(false);
+#endif
+
   // initialize the unused fields (e.g., ID)
   
   auto aw_id_handle = getHandle("S00_AXI_awid");
