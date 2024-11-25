@@ -208,7 +208,14 @@ GetSetWrapper<prep(BeethovenTop::dma_arid)>,
   GetSetWrapper<uint8_t>,
   GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH/8>> dma_intf_t;
 #else
-  typedef mem_intf_t dma_intf_t;
+typedef mem_ctrl::mem_interface<VCSShortHandle,
+        VCSShortHandle,
+        VCSShortHandle,
+        VCSShortHandle,
+        VCSShortHandle,
+        VCSLongHandle,
+        VCSShortHandle,
+        VCSLongHandle> dma_intf_t;
 #endif
   extern dma_intf_t dma;
   extern int dma_txprogress;
