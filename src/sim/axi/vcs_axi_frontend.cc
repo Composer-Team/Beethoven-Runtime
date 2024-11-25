@@ -12,7 +12,7 @@
 #include "data_server.h"
 #include <pthread.h>
 
-#include "beethoven_allocator_declaration.h"
+#include "beethoven_hardware.h"
 
 #include <cstring>
 #include <vector>

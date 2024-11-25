@@ -7,6 +7,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <vector>
+#include <algorithm>
 
 #include "util.h"
 #include <beethoven/verilator_server.h>
