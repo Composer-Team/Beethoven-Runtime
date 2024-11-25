@@ -228,9 +228,9 @@ void tick_signals(ControlIntf *ctrl) {
     if (dma_write) {
       if (dma_txprogress < dma_txlength) {
         dma.w.setValid(1);
-        for (int i = 0; i < dma.w.data.len/4; ++i) {
+        for (int i = 0; i < DATA_BUS_WIDTH / 8; ++i) {
           unsigned char data = *(dma_ptr+i+64*dma_txprogress);
-          dma.w.setData(*(uint32_t*)(dma_ptr+i*4+64*dma_txprogress), i);
+          dma.w.setData(*(uint32_t*)(dma_ptr+i+(DATA_BUS_WIDTH/8)*dma_txprogress), i);
 //          dma.w.setData((uint8_t*)(dma_ptr+dma_txprogress*64));
 //          dma.w.getData()[i] = data;
 //          printf("\n%d %d\t%x\t%x", dma_txprogress, i, dma.w.getData()[i], data);
