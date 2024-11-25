@@ -10,6 +10,7 @@
 #include <queue>
 #include <set>
 #include "util.h"
+#include <beethoven/verilator_server.h>
 
 #if defined(SIM)
 #if defined(BEETHOVEN_HAS_DMA)
@@ -17,7 +18,7 @@
 extern pthread_mutex_t dma_lock;
 extern pthread_mutex_t dma_wait_lock;
 extern bool dma_valid;
-extern char *dma_ptr;
+extern unsigned char *dma_ptr;
 extern uint64_t dma_fpga_addr;
 extern size_t dma_len;
 extern bool dma_write;
@@ -30,6 +31,8 @@ struct data_server {
   static void start();
   ~data_server();
 };
+
+extern beethoven::data_server_file *dsf;
 
 struct address_translator {
   struct addr_pair {

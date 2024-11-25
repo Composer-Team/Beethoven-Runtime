@@ -24,6 +24,15 @@ dramsim3::Config *dramsim3config = nullptr;
 extern uint64_t main_time;
 using namespace mem_ctrl;
 
+#if NUM_DDR_CHANNELS >= 1
+mem_intf_t axi4_mems[NUM_DDR_CHANNELS];
+#endif
+#ifdef BEETHOVEN_HAS_DMA
+dma_intf_t dma;
+int dma_txprogress = 0;
+int dma_txlength = 0;
+#endif
+
 void with_dramsim3_support::init_dramsim3() {
   mem_sys = new dramsim3::JedecDRAMSystem(
           *dramsim3config, "",
@@ -137,9 +146,6 @@ void try_to_enqueue_ddr(mem_intf_t &axi4_mem) {
 }
 
 
-#if NUM_DDR_CHANNELS >= 1
-mem_intf_t axi4_mems[NUM_DDR_CHANNELS];
-#endif
 
 void mem_ctrl::init(const std::string &dram_ini_file) {
   dramsim3config = new dramsim3::Config(dram_ini_file, "./");

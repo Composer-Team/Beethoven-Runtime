@@ -19,6 +19,8 @@ float ddr_acc = 0;
 int strobe_width;
 extern float ddr_clock_inc;
 extern uint64_t memory_transacted;
+int dma_wait = 50;
+int id1, id2;
 #if NUM_DDR_CHANNELS >=1
 extern mem_intf_t axi4_mems[NUM_DDR_CHANNELS];
 #endif
@@ -201,9 +203,10 @@ void tick_signals(ControlIntf *ctrl) {
     if (dma_write) {
       dma.aw.setValid(1);
       dma.aw.setAddr(dma_fpga_addr);
-      dma.aw.setId(0);
+      dma.aw.setId(id1 = rand() % 16);
       dma.aw.setSize(6);
       dma.aw.setLen((dma_len / 64) - 1);
+      std::cout << "STARTING TXLEN: " << std::hex << (dma_len/64 - 1) << std::endl;
       dma.aw.setBurst(1);
       if (dma.aw.fire()) {
         dma_in_progress = true;
@@ -211,7 +214,7 @@ void tick_signals(ControlIntf *ctrl) {
     } else {
       dma.ar.setValid(1);
       dma.ar.setAddr(dma_fpga_addr);
-      dma.ar.setId(0);
+      dma.ar.setId(id2 = rand() % 16);
       dma.ar.setSize(6);
       dma.ar.setLen((dma_len / 64) - 1);
       dma.ar.setBurst(1);
@@ -225,7 +228,13 @@ void tick_signals(ControlIntf *ctrl) {
     if (dma_write) {
       if (dma_txprogress < dma_txlength) {
         dma.w.setValid(1);
-        memcpy(dma.w.getData(), dma_ptr + 64 * dma_txprogress, 64);
+        for (int i = 0; i < dma.w.data.len/4; ++i) {
+          unsigned char data = *(dma_ptr+i+64*dma_txprogress);
+          dma.w.setData(*(uint32_t*)(dma_ptr+i*4+64*dma_txprogress), i);
+//          dma.w.setData((uint8_t*)(dma_ptr+dma_txprogress*64));
+//          dma.w.getData()[i] = data;
+//          printf("\n%d %d\t%x\t%x", dma_txprogress, i, dma.w.getData()[i], data);
+        }
         dma.w.setLast(dma_txprogress + 1 == dma_txlength);
 //            dma.w.setStrobe(0xFFFFFFFFFFFFFFFFL);
         if (dma.w.getReady()) {
@@ -234,6 +243,9 @@ void tick_signals(ControlIntf *ctrl) {
       } else {
         dma.b.setReady(1);
         if (dma.b.fire()) {
+          if (dma.b.getId() != id1) {
+            printf("Huh! %d != %d\n", dma.b.getId(), id1);
+          }
           dma_valid = false;
           dma_in_progress = false;
           pthread_mutex_unlock(&dma_wait_lock);
@@ -242,8 +254,8 @@ void tick_signals(ControlIntf *ctrl) {
     } else {
       dma.r.setReady(1);
       if (dma.r.fire()) {
-        uint8_t *rval = dma.r.getData();
-        char *src_val = dma_ptr + 64 * dma_txprogress;
+        auto rval = dma.r.getData();
+        unsigned char *src_val = dma_ptr + 64 * dma_txprogress;
         for (int i = 0; i < 64; ++i) {
           if (rval[i] != src_val[i]) {
             std::cerr << "Got an unexpected value from the DMA... " << i << " " << dma_txprogress << " " << rval[i]

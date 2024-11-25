@@ -62,6 +62,7 @@ void tick(BeethovenTop *top) {
     throw e;
   }
 }
+
 #include "sim/axi/state_machine.h"
 
 #if NUM_DDR_CHANNELS >= 1
@@ -167,14 +168,20 @@ void run_verilator(const std::string &dram_config_file) {
 
 #if defined(BEETHOVEN_HAS_DMA)
 
-  dma_intf_t dma;
-  int dma_txprogress = 0;
-  int dma_txlength = 0;
-  dma.aw.init(top.dma_awready, top.dma_awvalid, top.dma_awid, top.dma_awsize, top.dma_awburst, top.dma_awaddr, top.dma_awlen);
-  dma.ar.init(top.dma_arready, top.dma_arvalid, top.dma_arid, top.dma_arsize, top.dma_arburst, top.dma_araddr, top.dma_arlen);
-  dma.w.init(top.dma_wready, top.dma_wvalid, top.dma_wlast, nullptr, &top.dma_wstrb);
-  dma.r.init(top.dma_rready, top.dma_rvalid, top.dma_rlast, &top.dma_rlast, nullptr);
-  dma.b.init(top.dma_bready, top.dma_bvalid, &top.dma_bid);
+  dma.aw.init(top.dma_awready,
+              top.dma_awvalid, top.dma_awid, top.dma_awsize, top.dma_awburst, top.dma_awaddr, top.dma_awlen);
+  dma.ar.init(top.dma_arready, top.dma_arvalid, top.dma_arid, top.dma_arsize, top.dma_arburst, top.dma_araddr,
+              top.dma_arlen);
+//  dma.w.init(top.dma_wready, top.dma_wvalid, top.dma_wlast, nullptr, &top.dma_wstrb);
+  dma.w.init(top.dma_wready, top.dma_wvalid, top.dma_wlast, dummy, top.dma_wstrb,
+             GetSetDataWrapper<unsigned char, 64>(&top.dma_wdata.at(0)));
+  dma.r.init(top.dma_rready,
+             top.dma_rvalid,
+             top.dma_rlast,
+             top.dma_rid,
+             dummy,
+             GetSetDataWrapper<unsigned char, 64>(&top.dma_rdata.at(0)));
+  dma.b.init(top.dma_bready, top.dma_bvalid, top.dma_bid);
 #endif
   for (auto &axi4_mem: axi4_mems) {
     axi4_mem.init_dramsim3();
@@ -204,7 +211,7 @@ void run_verilator(const std::string &dram_config_file) {
                       GetSetWrapper(dummy),
                       GetSetWrapper(top.M00_AXI_wstrb),
 #ifdef SIM_SMALL_MEM
-                      GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH / 8>(&top.M00_AXI_wdata));
+          GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH / 8>(&top.M00_AXI_wdata));
 #else
                       GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH / 8>(&top.M00_AXI_wdata.at(0)));
 #endif
@@ -214,7 +221,7 @@ void run_verilator(const std::string &dram_config_file) {
                       GetSetWrapper(top.M00_AXI_rid),
                       GetSetWrapper(dummy),
 #ifdef SIM_SMALL_MEM
-                      GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH / 8>(&top.M00_AXI_rdata));
+          GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH / 8>(&top.M00_AXI_rdata));
 #else
                       GetSetDataWrapper<uint8_t, DATA_BUS_WIDTH / 8>(&top.M00_AXI_rdata.at(0)));
 #endif
@@ -343,7 +350,8 @@ void run_verilator(const std::string &dram_config_file) {
     cycle_count++;
 //    printf("\rCycle count: %lld", cycle_count); fflush(stdout);
     if ((cycle_count & 1000) == 0 &&
-    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time_last_print).count() > 500) {
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::high_resolution_clock::now() - time_last_print).count() > 500) {
       print_state(memory_transacted, main_time, main_time - ctrl->time_last_command);
       time_last_print = std::chrono::high_resolution_clock::now();
       fflush(stdout);

@@ -23,7 +23,7 @@ pthread_mutex_t dma_wait_lock = PTHREAD_MUTEX_INITIALIZER;
 bool dma_in_progress = false;
 uint64_t dma_fpga_addr;
 bool dma_valid = false;
-char *dma_ptr;
+unsigned char *dma_ptr;
 size_t dma_len;
 bool dma_write;
 
@@ -57,7 +57,7 @@ static std::vector<uint16_t> available_ids;
 #endif
 
 
-static data_server_file *dsf;
+data_server_file *dsf;
 
 [[noreturn]] static void *data_server_f(void *) {
   int fd_beethoven = shm_open(data_server_file_name().c_str(), O_CREAT | O_RDWR, file_access_flags);
@@ -212,22 +212,28 @@ static data_server_file *dsf;
       case data_server_op::MOVE_TO_FPGA: {
         std::cerr << at.get_mapping(addr.op_argument).first << std::endl;
 #if defined(BEETHOVEN_HAS_DMA) and defined(SIM)
-        //        for (int i = 0; i < addr.op3_argument; i += 256*64) {
-        //          pthread_mutex_lock(&dma_lock);
-        //          auto remaining = addr.op3_argument - i;
-        //          if (remaining >= 256 * 64) {
-        //            dma_len = 256 * 64;
-        //          } else {
-        //            dma_len = remaining;
-        //          }
-        //          dma_ptr = ((char *) at.translate(addr.op_argument)) + i;
-        //          dma_fpga_addr = addr.op_argument + i;
-        //          dma_valid = true;
-        //          dma_write = true;
-        //          dma_in_progress = false;
-        //          pthread_mutex_unlock(&dma_lock);
-        //          pthread_mutex_lock(&dma_wait_lock);
-        //        }
+        auto amt_left = addr.op3_argument;
+        auto ptr1 = (unsigned char*)at.translate(addr.op_argument);
+        auto ptr2 = addr.op_argument;
+        if (amt_left % 64 != 0) {
+          printf("NOT ALIGNED OOF DATA\n");
+        }
+        while (amt_left > 0) {
+          pthread_mutex_lock(&dma_lock);
+          auto n_beats_here = std::max(1ULL, rand() % std::min(64ULL, amt_left >> 6));
+          dma_len = 64 * n_beats_here;
+          printf("REMAINING %d - %x\n", amt_left, dma_len);
+          dma_ptr = ptr1;
+          amt_left -= n_beats_here * 64;
+          dma_fpga_addr = ptr2;
+          dma_valid = true;
+          dma_write = true;
+          dma_in_progress = false;
+          pthread_mutex_unlock(&dma_lock);
+          pthread_mutex_lock(&dma_wait_lock);
+          ptr1 += 64 * n_beats_here;
+          ptr2 += 64 * n_beats_here;
+        }
 #endif
         //        std::cerr << "finish DMA " << std::endl;
         break;
@@ -235,28 +241,25 @@ static data_server_file *dsf;
       case data_server_op::MOVE_FROM_FPGA: {
         std::cerr << at.get_mapping(addr.op2_argument).first << std::endl;
 #if defined(BEETHOVEN_HAS_DMA) and defined(SIM)
-        //        auto info = at.get_mapping(addr.op2_argument);
-        //        if (addr.op3_argument != info.second) {
-        //          throw std::exception();
-        //        }
-        //        for (int i = 0; i < addr.op3_argument; i += 256 * 64) {
-        //          pthread_mutex_lock(&dma_lock);
-        //          auto remaining = addr.op3_argument - i;
-        //          if (remaining >= 256 * 64) {
-        //            dma_len = 256 * 64;
-        //          } else {
-        //            dma_len = remaining;
-        //          }
-        //          dma_ptr = ((char *)std::get<0>(info)) + i;
-        //          dma_fpga_addr = addr.op2_argument + i;
-        //          dma_valid = true;
-        //          dma_write = true;
-        //          dma_in_progress = false;
-        //
-        //
-        //          pthread_mutex_unlock(&dma_lock);
-        //          pthread_mutex_lock(&dma_wait_lock);
-        //        }
+        auto ptr1 = (unsigned char*)at.translate(addr.op2_argument);
+        auto ptr2 = addr.op2_argument;
+        auto amt_left = addr.op3_argument;
+        uint64_t i;
+        while (amt_left > 0) {
+          auto n_beats_here = std::max(1ULL, rand() % std::min(64ULL, amt_left >> 6));
+          pthread_mutex_lock(&dma_lock);
+          dma_len = 64 * n_beats_here;
+          amt_left -= n_beats_here * 64;
+          dma_ptr = ptr1;
+          dma_fpga_addr = ptr2;
+          dma_valid = true;
+          dma_write = false;
+          dma_in_progress = false;
+          pthread_mutex_unlock(&dma_lock);
+          pthread_mutex_lock(&dma_wait_lock);
+          ptr1 += 64 * n_beats_here;
+          ptr2 += 64 * n_beats_here;
+        }
 #endif
         break;
       }

@@ -7,9 +7,13 @@
 
 #include <pthread.h>
 
+#ifdef __cplusplus
 extern "C" {
+#endif
 extern pthread_mutex_t main_lock;
+#ifdef __cplusplus
 };
+#endif
 #if defined(F1) || defined(Kria)
 extern pthread_mutex_t bus_lock;
 #endif

@@ -210,6 +210,10 @@ GetSetWrapper<prep(BeethovenTop::dma_arid)>,
 #else
   typedef mem_ctrl::mem_interface<VCSHandle, VCSHandle, VCSHandle, VCSHandle, VCSHandle, VCSHandle, VCSHandle> dma_intf_t;
 #endif
+  extern dma_intf_t dma;
+  extern int dma_txprogress;
+  extern int dma_txlength;
+
 #endif
 
 void try_to_enqueue_ddr(mem_intf_t &);

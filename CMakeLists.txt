@@ -11,10 +11,10 @@ if ("$ENV{BEETHOVEN_PATH}" STREQUAL "")
     message(FATAL_ERROR "Environment variable $BEETHOVEN_ROOT is not defined")
 endif ()
 
-set(BEETHOVEN_DIR "$ENV{BEETHOVEN_PATH}/Beethoven-Hardware/vsim/generated-src")
+set(BEETHOVEN_DIR "$ENV{BEETHOVEN_PATH}/build/")
 
-if (NOT EXISTS ${BEETHOVEN_DIR}/hardware.h)
-    message(FATAL_ERROR "${BEETHOVEN_DIR}/hardware.h does not exist. Try building your project or moving this file into the directory.")
+if (NOT EXISTS ${BEETHOVEN_DIR}/beethoven_hardware.h)
+    message(FATAL_ERROR "${BEETHOVEN_DIR}/beethoven_hardware.h does not exist. Try building your project or moving this file into the directory.")
 endif ()
 
 set(AWS_SDK "$ENV{BEETHOVEN_PATH/buil}/aws-fpga")

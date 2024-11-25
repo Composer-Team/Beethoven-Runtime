@@ -6,7 +6,7 @@ struct GetSetWrapper {
   T* ptr = nullptr;
   size_t l = sizeof(T);
 
-  explicit GetSetWrapper(T &v) {
+  GetSetWrapper(T &v) {
     ptr = &v;
   }
 
@@ -32,6 +32,7 @@ struct GetSetWrapper {
 template <typename T, int l>
 struct GetSetDataWrapper {
   T* ptr = nullptr;
+  int len = l;
 
   template <typename G>
   explicit GetSetDataWrapper(G *v) {

@@ -45,7 +45,7 @@ public:
     valid_field.set(valid);
   }
 
-  id_t getId() const {
+  uint8_t getId() const {
     return id_field.get();
   }
 
