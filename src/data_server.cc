@@ -221,7 +221,7 @@ data_server_file *dsf;
         }
         while (amt_left > 0) {
           pthread_mutex_lock(&dma_lock);
-          auto n_beats_here = std::max(1ULL, rand() % std::min(64ULL, amt_left >> 6));
+          auto n_beats_here = std::max(uint64_t(1), rand() % std::min(uint64_t(64), amt_left >> 6));
           dma_len = 64 * n_beats_here;
           printf("REMAINING %d - %x\n", amt_left, dma_len);
           dma_ptr = ptr1;
@@ -247,7 +247,7 @@ data_server_file *dsf;
         auto amt_left = addr.op3_argument;
         uint64_t i;
         while (amt_left > 0) {
-          auto n_beats_here = std::max(1ULL, rand() % std::min(64ULL, amt_left >> 6));
+          auto n_beats_here = std::max(uint64_t(1), rand() % std::min(uint64_t(64), amt_left >> 6));
           pthread_mutex_lock(&dma_lock);
           dma_len = 64 * n_beats_here;
           amt_left -= n_beats_here * 64;
