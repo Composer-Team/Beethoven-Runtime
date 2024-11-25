@@ -132,8 +132,7 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
   // at this point, we have all the inputs and outputs, and we have to tie them into the interfaces
 #if NUM_DDR_CHANNELS >= 1
 #ifdef DRAMSIM_CONFIG
-#define str(x) #x
-  mem_ctrl::init( str(DRAMSIM_CONFIG) );
+  mem_ctrl::init( DRAMSIM_CONFIG );
 #else
   mem_ctrl::init("custom_dram_configs/DDR4_8Gb_x16_3200.ini");
 #endif
@@ -211,8 +210,6 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
   value.value.integer = 0xF;
   vpi_put_value(getHandle("S00_AXI_wstrb"), &value, nullptr, vpiNoDelay);
 
-
-
   ctrl.set_ar(
           VCSShortHandle(getHandle("S00_AXI_arvalid")),
           VCSShortHandle(getHandle("S00_AXI_arready")),
@@ -245,10 +242,12 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
 
 PLI_INT32 tick_calltf(PLI_BYTE8 * /*user_data*/) {
   main_time+= fpga_clock_inc;;
-  if (main_time % 1000 == 0) {
-    print_state(memory_transacted, main_time);
+  if (main_time % 10000 == 0) {
+     print_state(memory_transacted, main_time);
   }
-  tick_signals(&ctrl);
+  if (main_time > 100000) {
+     tick_signals(&ctrl);
+  }
   return 0;
 }
 

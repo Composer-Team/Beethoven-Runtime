@@ -116,7 +116,7 @@ public:
   }
 
   void set(const uint32_t &payload, uint32_t chunk) const {
-    printf("called set with (%d) <- %x\n", chunk, payload); fflush(stdout);
+    //printf("called set with (%d) <- %x\n", chunk, payload); fflush(stdout);
     // first, get the payload
     s_vpi_value value;
     value.format = vpiVectorVal;

@@ -70,6 +70,7 @@ if ("${TARGET}" STREQUAL "sim")
         add_compile_definitions(VERILATOR=1)
     elseif ("${SIMULATOR}" STREQUAL "vcs")
         if (NOT "${DRAMSIM_CONFIG}" STREQUAL "")
+            message("SET TO ${DRAMSIM_CONFIG}")
             add_compile_definitions(DRAMSIM_CONFIG="${DRAMSIM_CONFIG}")
         endif ()
         # NOTE: YOU ARE RESPONSIBLE FOR BUILDING AND LINKING DRAMSIM3
