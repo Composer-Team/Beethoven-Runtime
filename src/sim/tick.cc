@@ -126,9 +126,9 @@ void tick_signals(ControlIntf *ctrl) {
         bool is_fixed = axi4_mem.aw.getBurst() == 0;
         int id = axi4_mem.aw.getId();
         uint64_t fpga_addr = axi4_mem.aw.getAddr();
-        auto tx = std::make_shared<mem_ctrl::memory_transaction>(uintptr_t(addr), sz, len, 0, is_fixed, id,
-                                                                 fpga_addr, false);
-        axi4_mem.write_transactions.push(tx);
+//        auto tx = std::make_shared<mem_ctrl::memory_transaction>();
+        axi4_mem.write_transactions.emplace(uintptr_t(addr), sz, len, 0, is_fixed, id,
+                                            fpga_addr, false);
         axi4_mem.num_in_flight_writes++;
       } catch (std::exception &e) {
 #ifdef VERILATOR
