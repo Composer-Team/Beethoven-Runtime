@@ -63,10 +63,11 @@ void with_dramsim3_support::init_dramsim3() {
           },
           [this](uint64_t addr) {
             pthread_mutex_lock(&write_queue_lock);
-            auto tx = in_flight_writes[addr]->front();
-            tx->axi_bus_beats_progress--;
-            if (tx->axi_bus_beats_progress == 0) {
-              enqueue_response(tx->id);
+//            auto tx = in_flight_writes[addr]->front();
+//            tx->axi_bus_beats_progress--;
+            std::cout << "n writes left: " << in_flight_writes[addr]->front()->axi_bus_beats_progress << std::endl;
+            if ((--(in_flight_writes[addr]->front()->axi_bus_beats_progress)) == 0) {
+              enqueue_response(in_flight_writes[addr]->front()->id);
             }
             in_flight_writes[addr]->pop();
             pthread_mutex_unlock(&write_queue_lock);

@@ -66,8 +66,8 @@ namespace mem_ctrl {
                                                size(size),
                                                len(len),
                                                axi_bus_beats_progress(progress),
-                                               fixed(fixed),
                                                id(id),
+                                               fixed(fixed),
                                                fpga_addr(fpga_addr),
                                                is_intermediate(is_intermediate) {
       dram_tx_n_enqueues = (len * size) / DDR_ENQUEUE_SIZE_BYTES;

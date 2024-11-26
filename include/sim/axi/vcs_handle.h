@@ -90,7 +90,7 @@ public:
         ret.get()[i * 4 + j] = (payload >> (j * 8)) & 0xFF;
       }
     }
-    return std::move(ret);
+    return ret;
 
   }
 

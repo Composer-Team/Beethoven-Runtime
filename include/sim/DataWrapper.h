@@ -47,7 +47,7 @@ struct GetSetDataWrapper {
   std::unique_ptr<uint8_t[]> get() const {
     std::unique_ptr<uint8_t[]> alloc(new uint8_t[l]);
     memcpy(alloc.get(), ptr, l);
-    return std::move(alloc);
+    return alloc;
   }
   void set(uint64_t value) {
     if (l >= 8) {
