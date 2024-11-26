@@ -245,7 +245,6 @@ data_server_file *dsf;
         auto ptr1 = (unsigned char*)at.translate(addr.op2_argument);
         auto ptr2 = addr.op2_argument;
         auto amt_left = addr.op3_argument;
-        uint64_t i;
         while (amt_left > 0) {
           auto n_beats_here = std::max(uint64_t(1), rand() % std::min(uint64_t(64), amt_left >> 6));
           pthread_mutex_lock(&dma_lock);

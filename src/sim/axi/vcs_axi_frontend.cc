@@ -207,12 +207,6 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
   dma.b.init(VCSShortHandle(getHandle("dma_bready")),
              VCSShortHandle(getHandle("dma_bvalid")),
              VCSShortHandle(getHandle("dma_bid")));
-
-  dma.ar.setValid(false);
-  dma.aw.setValid(false);
-  dma.b.setReady(false);
-  dma.r.setValid(false);
-  dma.w.setValid(false);
 #endif
 
   // initialize the unused fields (e.g., ID)
