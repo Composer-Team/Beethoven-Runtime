@@ -85,10 +85,11 @@ public:
   }
 
   bool getStrb(int i) const {
-    return i < sizeof(strb_t) * 8;
-//    int chunk = i / 8;
-//    auto strbVal = strb.get();
-//    return strbVal[i] >> (i % 8);
+    int chunk32 = i / 32;
+    int subbit32 = i % 32;
+    uint32_t payload = strb.get(chunk32);
+    payload >>= subbit32;
+    return (payload & 1);
   }
 };
 
