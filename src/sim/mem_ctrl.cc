@@ -43,7 +43,6 @@ void with_dramsim3_support::init_dramsim3() {
             for (int i = 0; i < TOTAL_BURST; ++i) {
               tx->ddr_bus_beats_retrieved[int(addr - tx->fpga_addr) / DDR_BUS_WIDTH_BYTES + i] = true;
             }
-//            printf("callback read\n"); fflush(stdout);
 
             while (tx->dramsim_hasBeatReady()) {
               bool done = (tx->axi_bus_beats_progress == tx->axi_bus_beats_length() - 1);
@@ -53,9 +52,6 @@ void with_dramsim3_support::init_dramsim3() {
               intermediate_tx->fpga_addr = tx->fpga_addr;
               intermediate_tx->can_be_last = done;
               tx->axi_bus_beats_progress++;
-//	      printf("enqueueing intermediate %d/%d for id %d (done %d)\n",
-//			      tx->dram_tx_load_progress,
-//			      tx->axi_bus_beats_length(), tx->id, done); fflush(stdout);
               enqueue_read(intermediate_tx);
             }
             in_flight_reads[addr]->pop();
@@ -63,11 +59,10 @@ void with_dramsim3_support::init_dramsim3() {
           },
           [this](uint64_t addr) {
             pthread_mutex_lock(&write_queue_lock);
-//            auto tx = in_flight_writes[addr]->front();
-//            tx->axi_bus_beats_progress--;
-            std::cout << "n writes left: " << in_flight_writes[addr]->front()->axi_bus_beats_progress << std::endl;
-            if ((--(in_flight_writes[addr]->front()->axi_bus_beats_progress)) == 0) {
-              enqueue_response(in_flight_writes[addr]->front()->id);
+            auto tx = in_flight_writes[addr]->front();
+            tx->axi_bus_beats_progress--;
+            if (tx->axi_bus_beats_progress == 0) {
+              enqueue_response(tx->id);
             }
             in_flight_writes[addr]->pop();
             pthread_mutex_unlock(&write_queue_lock);

@@ -35,6 +35,7 @@ extern "C" PLI_INT32 init_structures_calltf(PLI_BYTE8 *user_data);
 extern "C" PLI_INT32 tick_calltf(PLI_BYTE8 *user_data);
 
 void print_state(uint64_t mem, uint64_t time) {
+  return;
   std::string time_string;
   // in seconds
   if (time < 1000 * 1000 * 1000) {

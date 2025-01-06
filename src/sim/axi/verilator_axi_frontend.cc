@@ -72,6 +72,7 @@ uint8_t dummy;
 #endif
 
 void print_state(uint64_t mem, uint64_t time, uint64_t time_since) {
+  return;
   std::string time_string;
   // in seconds
   if (time < 1000 * 1000 * 1000) {

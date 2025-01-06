@@ -27,6 +27,7 @@ extern int cmds_inflight;
 #if NUM_DDR_CHANNELS >= 1
 extern mem_intf_t axi4_mems[NUM_DDR_CHANNELS];
 #endif
+static int cmd_ctr = 0;
 
 enum cmd_transfer_state {
   CMD_INACTIVE,
@@ -229,7 +230,7 @@ struct AXIControlIntf : public ControlIntf {
             (ongoing_update == UPDATE_IDLE_CMD || ongoing_update == UPDATE_IDLE_RESP)) {
           pthread_mutex_lock(&cmdserverlock);
           if (not cmds.empty()) {
-            printf("\nenqueueing command\n\n");
+            printf("enqueueing command: %d\n", cmd_ctr++);
             bus_occupied = true;
             ongoing_cmd.state = CMD_BITS_WRITE_ADDR;
             if (cmds.front().getXd()) {

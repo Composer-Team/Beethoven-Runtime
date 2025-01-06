@@ -147,11 +147,9 @@ void tick_signals(ControlIntf *ctrl) {
         uint32_t off = 0;
         auto addr = trans->addr;
         auto data = axi4_mem.w.getData();
-//        printf("data/%d is %x%x%x%x\n", DATA_BUS_WIDTH/8, data.get()[0], data.get()[1], data.get()[2], data.get()[3]);
         while (off < DATA_BUS_WIDTH / 8) {
           if (axi4_mem.w.getStrb(off)) {
             reinterpret_cast<uint8_t *>(addr)[off] = data.get()[off];
-//            printf("Writing 0x%x to %p\n", data.get()[off], ((char *) addr)+off);
             memory_transacted++;
           }
           off += 1;
