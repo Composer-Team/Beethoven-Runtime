@@ -24,12 +24,15 @@
 #include "util.h"
 #include <cmath>
 #include <fcntl.h>
+#ifdef USE_VCS
+#include <sv_vpi_user.h>
+#endif
 
 #ifdef FPGA
 
 #include <semaphore.h>
-
 #include <chrono>
+#include "vcs_vpi_user.h"
 
 #endif
 #ifdef SIM
@@ -113,6 +116,9 @@ static void *cmd_server_f(void *) {
       pthread_mutex_unlock(&main_lock);
 #ifdef SIM
       kill_sig = true;
+#ifdef USE_VCS
+      vpi_control(vpiFinish);
+#endif
 #endif
       return nullptr;
     }

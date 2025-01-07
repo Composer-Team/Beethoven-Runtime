@@ -144,7 +144,7 @@ void tick_signals(ControlIntf *ctrl) {
         memory_transacted += (DATA_BUS_WIDTH >> 3);
         auto trans = axi4_mem.write_transactions.front();
         // refer to https://developer.arm.com/documentation/ihi0022/e/AMBA-AXI3-and-AXI4-Protocol-Specification/Single-Interface-Requirements/Transaction-structure/Data-read-and-write-structure?lang=en#CIHIJFAF
-        uint32_t off = 0;
+        int off = 0;
         auto addr = trans->addr;
         auto data = axi4_mem.w.getData();
         while (off < DATA_BUS_WIDTH / 8) {
