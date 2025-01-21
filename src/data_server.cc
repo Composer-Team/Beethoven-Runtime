@@ -406,6 +406,7 @@ void *address_translator::translate(uint64_t fp_addr) const {
 #endif
 #ifdef USE_VCS
     vpi_control(vpiFinish);
+    return nullptr;
 #else
     throw std::exception();
 #endif

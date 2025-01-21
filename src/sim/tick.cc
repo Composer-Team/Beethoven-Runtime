@@ -63,6 +63,7 @@ void tick_signals(ControlIntf *ctrl) {
     if (axi4_mem.ar.getReady() && axi4_mem.ar.getValid()) {
       uint64_t addr = axi4_mem.ar.getAddr();
       char *ad = (char *) at.translate(addr);
+      if (ad == nullptr) return;
       auto txsize = (int) 1 << axi4_mem.ar.getSize();
       auto txlen = (int) (axi4_mem.ar.getLen()) + 1;
       auto tx = std::make_shared<mem_ctrl::memory_transaction>((uintptr_t) ad, txsize, txlen, 0, false,
@@ -120,6 +121,7 @@ void tick_signals(ControlIntf *ctrl) {
         uintptr_t addr = axi4_mem.aw.getAddr();
 #else
         char *addr = (char *) at.translate(axi4_mem.aw.getAddr());
+        if (addr == nullptr) return;
 #endif
         int sz = 1 << axi4_mem.aw.getSize();
         int len = 1 + int(axi4_mem.aw.getLen());// per axi
