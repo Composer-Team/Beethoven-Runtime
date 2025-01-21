@@ -3,6 +3,9 @@
 //
 
 #include <algorithm>
+#ifdef USE_VCS
+#include <vpi_user.h>
+#endif
 #include <cstring>
 #include <string>
 #include <sys/mman.h>
@@ -44,9 +47,6 @@ bool dma_write;
 #endif
 
 #include <beethoven_hardware.h>
-#if defined(SIM) && defined(USE_VCS)
-#include <vpi_user.h>
-#endif
 
 using namespace beethoven;
 
@@ -404,7 +404,11 @@ void *address_translator::translate(uint64_t fp_addr) const {
 
     tfp->close();
 #endif
+#ifdef USE_VCS
+    vpi_control(vpiFinish);
+#else
     throw std::exception();
+#endif
   }
   if (it->fpga_addr + it->mapping_length <= fp_addr) {
     std::cerr << "ADDRESS IS OUT OF BOUNDS FROM FPGA -> CPU\n"
