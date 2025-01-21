@@ -2,12 +2,12 @@
 // Created by Chris Kjellqvist on 9/27/22.
 //
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <vector>
-#include <algorithm>
 
 #include "util.h"
 #include <beethoven/verilator_server.h>
@@ -44,6 +44,9 @@ bool dma_write;
 #endif
 
 #include <beethoven_hardware.h>
+#if defined(SIM) && defined(USE_VCS)
+#include <vpi_user.h>
+#endif
 
 using namespace beethoven;
 
@@ -67,7 +70,7 @@ data_server_file *dsf;
     throw std::exception();
   }
 
-  struct stat shm_stats {};
+  struct stat shm_stats{};
   fstat(fd_beethoven, &shm_stats);
   LOG(std::cerr << shm_stats.st_size << std::endl;
       std::cerr << sizeof(data_server_file) << std::endl);
@@ -214,7 +217,7 @@ data_server_file *dsf;
         std::cerr << at.get_mapping(addr.op_argument).first << std::endl;
 #if defined(BEETHOVEN_HAS_DMA) and defined(SIM)
         auto amt_left = addr.op3_argument;
-        auto ptr1 = (unsigned char*)at.translate(addr.op_argument);
+        auto ptr1 = (unsigned char *) at.translate(addr.op_argument);
         auto ptr2 = addr.op_argument;
         if (amt_left % 64 != 0) {
           printf("NOT ALIGNED OOF DATA\n");
@@ -242,7 +245,7 @@ data_server_file *dsf;
       case data_server_op::MOVE_FROM_FPGA: {
         std::cerr << at.get_mapping(addr.op2_argument).first << std::endl;
 #if defined(BEETHOVEN_HAS_DMA) and defined(SIM)
-        auto ptr1 = (unsigned char*)at.translate(addr.op2_argument);
+        auto ptr1 = (unsigned char *) at.translate(addr.op2_argument);
         auto ptr2 = addr.op2_argument;
         auto amt_left = addr.op3_argument;
         while (amt_left > 0) {
@@ -394,7 +397,7 @@ void *address_translator::translate(uint64_t fp_addr) const {
   if (it == mappings.end()) {
     std::cerr << "BAD ADDRESS IN TRANSLATION FROM FPGA -> CPU: " << std::hex << fp_addr << ". You might be running outside of your allocated segment... " << std::endl;
     std::cerr << "Existing Mappings:" << std::endl;
-    for(auto q: mappings) {
+    for (auto q: mappings) {
       std::cerr << q.fpga_addr << "\t" << q.mapping_length << std::endl;
     }
 #if defined(SIM) && defined(TRACE)
@@ -406,6 +409,9 @@ void *address_translator::translate(uint64_t fp_addr) const {
   if (it->fpga_addr + it->mapping_length <= fp_addr) {
     std::cerr << "ADDRESS IS OUT OF BOUNDS FROM FPGA -> CPU\n"
               << std::endl;
+#if defined(SIM) && defined(USE_VCS)
+      vpi_control(vpiFinish);
+#endif
     throw std::exception();
   }
   return (char *) it->cpu_addr + (fp_addr - it->fpga_addr);
