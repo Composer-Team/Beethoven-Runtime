@@ -2,12 +2,12 @@
 // Created by Christopher Kjellqvist on 8/6/24.
 //
 
-#include "vcs_vpi_user.h"
-#include "sv_vpi_user.h"
+//#include "vcs_vpi_user.h"
+//#include "sv_vpi_user.h"
 #include "sim/mem_ctrl.h"
 #include "sim/axi/state_machine.h"
 #include "sim/tick.h"
-#include "sim/axi/vcs_handle.h"
+#include "sim/axi/vpi_handle.h"
 #include "cmd_server.h"
 #include "data_server.h"
 #include <pthread.h>
@@ -284,3 +284,61 @@ PLI_INT32 tick_calltf(PLI_BYTE8 * /*user_data*/) {
   return 0;
 }
 
+
+void tick_register(void)
+{
+  s_vpi_systf_data tf_data;
+
+  tf_data.type      = vpiSysTask;
+  tf_data.tfname    = "$tick";
+  tf_data.calltf    = tick_calltf;
+  tf_data.compiletf = 0;
+  tf_data.sizetf    = 0;
+  tf_data.user_data = 0;
+  vpi_register_systf(&tf_data);
+}
+
+void init_input_signals_register(void)
+{
+  s_vpi_systf_data tf_data;
+
+  tf_data.type      = vpiSysTask;
+  tf_data.tfname    = "$init_input_signals";
+  tf_data.calltf    = init_input_signals_calltf;
+  tf_data.compiletf = 0;
+  tf_data.sizetf    = 0;
+  tf_data.user_data = 0;
+  vpi_register_systf(&tf_data);
+}
+void init_output_signals_register(void)
+{
+  s_vpi_systf_data tf_data;
+
+  tf_data.type      = vpiSysTask;
+  tf_data.tfname    = "$init_output_signals";
+  tf_data.calltf    = init_output_signals_calltf;
+  tf_data.compiletf = 0;
+  tf_data.sizetf    = 0;
+  tf_data.user_data = 0;
+  vpi_register_systf(&tf_data);
+}
+void init_structures_register(void)
+{
+  s_vpi_systf_data tf_data;
+
+  tf_data.type      = vpiSysTask;
+  tf_data.tfname    = "$init_structures";
+  tf_data.calltf    = init_structures_calltf;
+  tf_data.compiletf = 0;
+  tf_data.sizetf    = 0;
+  tf_data.user_data = 0;
+  vpi_register_systf(&tf_data);
+}
+
+void (*vlog_startup_routines[])(void) = {
+    tick_register,
+    init_input_signals_register,
+    init_output_signals_register,
+    init_structures_register,
+  0
+};

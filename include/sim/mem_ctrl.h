@@ -21,7 +21,7 @@
 
 extern uint64_t main_time;
 
-#include "sim/axi/vcs_handle.h"
+#include "sim/axi/vpi_handle.h"
 
 #define RLOCK pthread_mutex_lock(&axi4_mem.read_queue_lock);
 #define WLOCK pthread_mutex_lock(&axi4_mem.write_queue_lock);

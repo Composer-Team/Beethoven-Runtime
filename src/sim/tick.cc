@@ -43,7 +43,7 @@ void tick_signals(ControlIntf *ctrl) {
     }
     ddr_acc -= 1;
   }
-  
+
 
   for (auto &axi4_mem: axi4_mems) {
     if (axi4_mem.r.getValid() && axi4_mem.r.getReady()) {
@@ -229,7 +229,8 @@ void tick_signals(ControlIntf *ctrl) {
       if (dma_txprogress < dma_txlength) {
         dma.w.setValid(1);
         for (int i = 0; i < DATA_BUS_WIDTH / 32; ++i) {
-          dma.w.setData(*((uint32_t*)(dma_ptr)+i+(DATA_BUS_WIDTH/32)*dma_txprogress), i);
+          auto data = *((uint32_t*)(dma_ptr)+i+(DATA_BUS_WIDTH/32)*dma_txprogress);
+          dma.w.setData(data, i);
         }
         dma.w.setLast(dma_txprogress + 1 == dma_txlength);
 //            dma.w.setStrobe(0xFFFFFFFFFFFFFFFFL);
@@ -254,9 +255,10 @@ void tick_signals(ControlIntf *ctrl) {
         unsigned char *src_val = dma_ptr + 64 * dma_txprogress;
         for (int i = 0; i < 64; ++i) {
           if (rval[i] != src_val[i]) {
-            std::cerr << "Got an unexpected value from the DMA... " << i << " " << dma_txprogress << " " << rval[i]
-                      << " " << src_val[i] << std::endl;
-            throw std::exception();
+            int q = src_val[i];
+            std::cerr << "Got an unexpected value from the DMA... " << std::hex << i << " " << dma_txprogress << " " << rval[i]
+                      << " " << std::hex << q << std::endl;
+            exit(1);
           }
         }
         dma_txprogress++;

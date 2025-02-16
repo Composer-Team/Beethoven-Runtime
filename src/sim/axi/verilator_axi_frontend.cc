@@ -25,8 +25,13 @@
 
 uint64_t main_time = 0;
 
+#if HW_IS_RESET_ACTIVE_HIGH
 bool active_reset = true;
-
+#define RESET_NAME top.reset
+#else
+bool active_reset = false;
+#define RESET_NAME top.RESETn
+#endif
 
 BeethovenTop top;
 
@@ -160,7 +165,8 @@ void run_verilator(const std::string &dram_config_file) {
   tfp->open("trace" TRACE_FILE_ENDING);
 
   std::cout << "Tracing!" << std::endl;
-  top.reset = active_reset;
+
+  RESET_NAME = active_reset;
 
 #if NUM_DDR_CHANNELS >= 1
   for (int i = 0; i < NUM_DDR_CHANNELS; ++i) {
@@ -291,7 +297,7 @@ void run_verilator(const std::string &dram_config_file) {
     tfp->dump(main_time);
     main_time += fpga_clock_inc;
   }
-  top.reset = !active_reset;
+  RESET_NAME = !active_reset;
   top.clock = 0;
 
   auto ctrl = new AXIControlIntf<GetSetWrapper<uint8_t>, GetSetWrapper<BeethovenFrontBusAddr_t>, GetSetWrapper<uint32_t>>();

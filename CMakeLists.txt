@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 find_package(beethoven REQUIRED)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+
 set(SRC src/data_server.cc src/cmd_server.cc src/mmio.cc)
 if ("$ENV{BEETHOVEN_PATH}" STREQUAL "")
     message(FATAL_ERROR "Environment variable $BEETHOVEN_ROOT is not defined")
@@ -35,10 +36,10 @@ if ("${TARGET}" STREQUAL "sim")
             set(SRC ${SRC} src/sim/axi/verilator_axi_frontend.cc)
             find_package(verilator REQUIRED VERSION 5.0.0)
             add_compile_definitions(USE_VERILATOR=1)
-#            add_link_options(-latomic)
+            #            add_link_options(-latomic)
         elseif ("${SIMULATOR}" STREQUAL "vcs")
             message("BUILDING FOR VCS")
-            set(SRC ${SRC} src/sim/axi/vcs_axi_frontend.cc)
+            set(SRC ${SRC} src/sim/axi/vpi_axi_frontend.cc)
             add_compile_definitions(USE_VCS=1)
         endif ()
     endif ()
@@ -71,7 +72,7 @@ if ("${TARGET}" STREQUAL "sim")
 
         target_link_libraries(BeethovenRuntime PRIVATE dramsim3 args)
         add_compile_definitions(VERILATOR=1)
-    elseif ("${SIMULATOR}" STREQUAL "vcs")
+    elseif ("${SIMULATOR}" STREQUAL "vcs" OR "${SIMULATOR}" STREQUAL "icarus")
         if (NOT "${DRAMSIM_CONFIG}" STREQUAL "")
             message("SET TO ${DRAMSIM_CONFIG}")
             add_compile_definitions(DRAMSIM_CONFIG="${DRAMSIM_CONFIG}")
@@ -81,8 +82,12 @@ if ("${TARGET}" STREQUAL "sim")
         install(TARGETS dramsim3
                 DESTINATION $ENV{BEETHOVEN_PATH}/lib/)
         install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/scripts/tab.tab
-          DESTINATION $ENV{BEETHOVEN_PATH}/inc/)
-        add_library(BeethovenRuntime STATIC ${SRC})
+                DESTINATION $ENV{BEETHOVEN_PATH}/inc/)
+        add_library(BeethovenRuntime SHARED ${SRC})
+        if ("${SIMULATOR}" STREQUAL "icarus")
+            set_target_properties(BeethovenRuntime PROPERTIES SUFFIX ".vpi")
+        endif ()
+
         add_compile_definitions(VCS=1)
         target_include_directories(BeethovenRuntime PUBLIC $ENV{VCS_HOME}/include)
         target_link_libraries(BeethovenRuntime PRIVATE dramsim3 args)
@@ -158,18 +163,36 @@ if ("${FRONTEND}" STREQUAL "chipkit")
     message("Building for chipkit")
 endif ()
 
-if (${BUILD_SIM} AND ("${SIMULATOR}" STREQUAL "verilator"))
+if (${BUILD_SIM})
     include(${BEETHOVEN_DIR}/cmake_srcs.cmake)
-    verilate(BeethovenRuntime
-            SOURCES ${SRCS}
-            INCLUDE_DIRS ${BEETHOVEN_DIR} $ENV{BEETHOVEN_ROOT}/Beethoven-Runtime/verilog_resources/ ${BEETHOVEN_DIR}/beethoven.build/ ${ADDITIONAL_SEARCH}
-            TOP_MODULE ${TOP}
-            PREFIX ${TOP}
-            TRACE_FST
-            VERILATOR_ARGS --timescale 1ps/1ps --x-assign fast --no-timing
-            -Wno-context -Wno-lint -Wno-style -Wno-symrsvdword -Wno-multidriven -Wno-combdly -Wno-zerodly
-            -Wno-moddup -Wno-unoptflat -Wno-stmtdly
-    )
+    if ("${SIMULATOR}" STREQUAL "verilator")
+        verilate(BeethovenRuntime
+                SOURCES ${SRCS}
+                INCLUDE_DIRS ${BEETHOVEN_DIR} $ENV{BEETHOVEN_PATH}/build/ ${BEETHOVEN_DIR}/beethoven.build/ ${ADDITIONAL_SEARCH}
+                TOP_MODULE ${TOP}
+                PREFIX ${TOP}
+                TRACE_FST
+                VERILATOR_ARGS --timescale 1ps/1ps --x-assign fast
+                -Wno-context -Wno-lint -Wno-style -Wno-symrsvdword -Wno-multidriven -Wno-combdly
+                -Wno-moddup -Wno-unoptflat -Wno-stmtdly
+        )
+    elseif ("${SIMULATOR}" STREQUAL "vcs" OR "${SIMULATOR}" STREQUAL "icarus")
+        if ("${SIMULATOR}" STREQUAL "icarus")
+#            target_sources(BeethovenRuntime PUBLIC /)
+#            target_link_libraries(BeethovenRuntime PRIVATE vpi)
+            target_include_directories(BeethovenRuntime PUBLIC /usr/local/include/iverilog)
+            set(CMAKE_CXX_FLAGS "-flat_namespace -undefined suppress")
+#            set(CMAKE_CXX_LINK_EXECUTABLE iverilog-vpi)
+#            set(CMAKE_CXX_COMPILER_LINKER iverilog-vpi)
+#            add_link_options("-fuse-ld=lld")
+#            set(CMAKE_CXX_FLAGS -fuse-ld=iverilog-vpi)
+        endif ()
+        add_custom_target(BeethovenTop
+                ALL
+                DEPENDS BeethovenRuntime
+                COMMAND iverilog -m${CMAKE_CURRENT_BINARY_DIR}/libBeethovenRuntime.vpi -D CLOCK_PERIOD=500 ${SRCS} $ENV{BEETHOVEN_PATH}/build/hw/BeethovenTopVCSHarness.v
+        )
+    endif ()
 endif ()
 
 add_executable(brt-kill src/kill.cc)
