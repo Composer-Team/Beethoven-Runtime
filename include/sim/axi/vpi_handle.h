@@ -59,7 +59,7 @@ class VCSLongHandle {
 public:
   VCSLongHandle(vpiHandle handle) {
     this->handle = handle;
-    nchunks = vpi_get(vpiSize, handle) >> 5; // number of 32-bit chunks
+    nchunks = vpi_get(vpiSize, handle);
   }
 
   VCSLongHandle() = default;
@@ -84,10 +84,13 @@ public:
     value.format = vpiVectorVal;
     vpi_get_value(handle, &value);
     std::unique_ptr<uint8_t[]> ret(new uint8_t[nchunks]);
-    for (int i = 0; i < nchunks; i++) {
-      uint32_t payload = value.value.vector[i].aval;
-      for (int j = 0; j < 4; ++j) {
-        ret.get()[i * 4 + j] = (payload >> (j * 8)) & 0xFF;
+    for (int idx = 0; idx < nchunks / 4; idx++) {
+      for (int off = 0; off < 4; off++) {
+        int i = idx * 4 + off;
+        uint32_t payload = value.value.vector[idx].aval;
+        uint32_t mask = 0xFF << (off*8);
+        ret.get()[i] = (payload & mask) >> (off*8);
+        printf("[%d]: PAYLOAD: %08x\tMASK: %08x\tresult: %02x\n", i, payload, mask, ret.get()[i]);
       }
     }
     return ret;

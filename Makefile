@@ -51,7 +51,7 @@ beethoven.vvp: $(VERILOG_SRCS)
 
 .PHONY: sim_icarus
 sim_icarus: sim_BeethovenRuntime.vpi beethoven.vvp
-	lldb -- vvp -M. -msim_BeethovenRuntime beethoven.vvp -lDRAMsim3/libdramsim3.dylib
+	vvp -M. -msim_BeethovenRuntime beethoven.vvp -lDRAMsim3/libdramsim3.dylib
 
 .PHONY: clean
 clean:

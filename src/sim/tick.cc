@@ -79,7 +79,6 @@ void tick_signals(ControlIntf *ctrl) {
       axi4_mem.b.send_ids.pop();
       axi4_mem.num_in_flight_writes--;
     }
-
     RLOCK
     if (not axi4_mem.read_transactions.empty()) {
 #if DATA_BUS_WIDTH < 32
