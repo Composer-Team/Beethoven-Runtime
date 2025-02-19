@@ -76,6 +76,7 @@ if ("${TARGET}" STREQUAL "sim")
         if (NOT "${DRAMSIM_CONFIG}" STREQUAL "")
             message("SET TO ${DRAMSIM_CONFIG}")
             add_compile_definitions(DRAMSIM_CONFIG="${DRAMSIM_CONFIG}")
+            add_compile_definitions(USE_VCS=1)
         endif ()
         # NOTE: YOU ARE RESPONSIBLE FOR BUILDING AND LINKING DRAMSIM3
         add_subdirectory(DRAMsim3)

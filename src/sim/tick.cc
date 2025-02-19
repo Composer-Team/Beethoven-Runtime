@@ -206,7 +206,7 @@ void tick_signals(ControlIntf *ctrl) {
       dma.aw.setId(id1 = rand() % 16);
       dma.aw.setSize(6);
       dma.aw.setLen((dma_len / 64) - 1);
-      std::cout << "STARTING TXLEN: " << std::hex << (dma_len/64 - 1) << std::endl;
+//      std::cout << "STARTING TXLEN: " << std::hex << (dma_len/64 - 1) << std::endl;
       dma.aw.setBurst(1);
       if (dma.aw.fire()) {
         dma_in_progress = true;

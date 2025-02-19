@@ -18,6 +18,10 @@
 
 #include "../include/data_server.h"
 
+#ifdef USE_VCS
+#include <vpi_user.h>
+#endif
+
 #include <fcntl.h>
 
 #ifdef SIM
@@ -226,7 +230,7 @@ data_server_file *dsf;
           pthread_mutex_lock(&dma_lock);
           auto n_beats_here = std::max(uint64_t(1), rand() % std::min(uint64_t(64), amt_left >> 6));
           dma_len = 64 * n_beats_here;
-          printf("REMAINING %d - %x\n", amt_left, dma_len);
+//          printf("REMAINING %d - %x\n", amt_left, dma_len);
           dma_ptr = ptr1;
           amt_left -= n_beats_here * 64;
           dma_fpga_addr = ptr2;
