@@ -15,7 +15,7 @@ volatile char *devmem_map;
 
 #endif
 
-#ifdef F1
+#if AWS
 #include <fpga_utils.h>
 #endif
 
@@ -38,7 +38,7 @@ void setup_mmio() {
 
 
 void poke_mmio(uint64_t addr, uint32_t val) {
-#ifdef F1
+#if AWS
   int rc = fpga_pci_poke(pci_bar_handle, addr, val);
   if (rc) {
     std::cerr << "Failed to peek PCI " << rc << std::endl;
@@ -51,7 +51,7 @@ void poke_mmio(uint64_t addr, uint32_t val) {
 
 
 uint32_t peek_mmio(uint32_t addr) {
-#ifdef F1
+#if AWS
   uint32_t v;
   int rc = fpga_pci_peek(pci_bar_handle, addr, &v);
   if (rc) {

@@ -26,13 +26,13 @@
 #include <fcntl.h>
 #ifdef USE_VCS
 // #include <sv_vpi_user.h>
+#include "vcs_vpi_user.h"
 #endif
 
 #ifdef FPGA
 
 #include <semaphore.h>
 #include <chrono>
-#include "vcs_vpi_user.h"
 
 #endif
 #ifdef SIM
@@ -123,7 +123,7 @@ static void *cmd_server_f(void *) {
       return nullptr;
     }
 #if defined(FPGA) || defined(VSIM)
-#if defined(F1) or defined(Kria)
+#if AWS or defined(Kria)
       // wake up response poller if this command expects a response
       if (addr.cmd.getXd()) sem_post(&addr.processes_waiting);
       pthread_mutex_lock(&bus_lock);
@@ -142,7 +142,7 @@ static void *cmd_server_f(void *) {
 #endif
     LOG(std::cerr << "Successfully delivered command\n"
                   << std::endl);
-#if defined(F1) or defined(Kria)
+#if AWS or defined(Kria)
     pthread_mutex_unlock(&bus_lock);
 #else
     // sim only

@@ -14,13 +14,26 @@ extern pthread_mutex_t main_lock;
 #ifdef __cplusplus
 };
 #endif
-#if defined(F1) || defined(Kria)
+
+#if defined(F1) || defined(F2)
+#define AWS 1
+#if defined(F1)
+#define USE_XDMA 1
+#else
+#define USE_XDMA 0
+#endif
+#else
+#define AWS 0
+#define USE_XDMA 0
+#endif
+
+#if AWS || defined(Kria)
 extern pthread_mutex_t bus_lock;
 #endif
-#ifdef F1
+#ifdef AWS
 #if defined(VSIM)
 #include "fpga_pci_sv.h"
-#elif defined(FPGA)
+#else
 #include "fpga_mgmt.h"
 #include "fpga_pci.h"
 #endif

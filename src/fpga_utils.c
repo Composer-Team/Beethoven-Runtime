@@ -1,12 +1,12 @@
 //
 // Created by Chris Kjellqvist on 10/29/22.
 //
-#if defined(F1) || defined(Kria)
+#include "fpga_utils.h"
+#if AWS || defined(Kria)
 #include <pthread.h>
 pthread_mutex_t bus_lock;
 #endif
-#ifdef F1
-#include "fpga_utils.h"
+#ifdef AWS
 #ifndef VSIM
 #include "fpga_dma.h"
 #endif
@@ -29,7 +29,7 @@ void check_rc(int rc, const char *message) {
 void fpga_setup(int slot_id) {
   int rc = fpga_mgmt_init();
   check_rc(rc, "fpga_mgmt_init FAILED");
-#ifndef VSIM
+#if AWS
   /* check AFI status */
   struct fpga_mgmt_image_info info = {0};
 
@@ -52,6 +52,7 @@ void fpga_setup(int slot_id) {
   rc = fpga_pci_attach(slot_id, FPGA_APP_PF, APP_PF_BAR0, 0, &pci_bar_handle);
   check_rc(rc, "fpga_pci_attach FAILED");
 
+#if USE_XDMA
 
   xdma_read_fd = fpga_dma_open_queue(FPGA_DMA_XDMA, slot_id, 0, true);
   if (xdma_read_fd < 0) {
@@ -64,6 +65,7 @@ void fpga_setup(int slot_id) {
     exit(1);
   }
 #endif
+#endif
 }
 
 
@@ -75,16 +77,15 @@ void fpga_shutdown() {
 
 int wrapper_fpga_dma_burst_write(int fd, uint8_t *buffer, size_t xfer_sz,
                                  size_t address) {
-#ifndef VSIM
+#if USE_XDMA
   return fpga_dma_burst_write(fd, buffer, xfer_sz, address);
-#else
-  return 0;
 #endif
+  return 0;
 }
 
 int wrapper_fpga_dma_burst_read(int fd, uint8_t *buffer, size_t xfer_sz,
                                 size_t address) {
-#ifndef VSIM
+#if USE_XDMA
   return fpga_dma_burst_read(fd, buffer, xfer_sz, address);
 #else
   return 0;

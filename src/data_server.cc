@@ -97,7 +97,7 @@ data_server_file *dsf;
   data_server_file::init(addr);
   LOG(std::cerr << "Data server file constructed" << std::endl);
 
-#if defined(FPGA) && defined(F1)
+#if defined(FPGA) && USE_XDMA
   std::cerr << "Running FPGA MemCpy Sanity Checks..." << std::endl;
   auto sanity_alloc = (uint8_t *) malloc(1024);
   auto sanity_int = (uint32_t *) sanity_alloc;
