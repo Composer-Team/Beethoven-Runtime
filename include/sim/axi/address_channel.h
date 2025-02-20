@@ -83,7 +83,8 @@ public:
   }
 
   [[nodiscard]] uint64_t getAddr() const {
-    return addr_field.get();
+    // this may cause problems if we need address to be a full 64 bits in simulation
+    return addr_field.get(0);
   }
 
   void setAddr(uint64_t addr) {

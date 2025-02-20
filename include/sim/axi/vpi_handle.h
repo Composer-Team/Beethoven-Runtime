@@ -12,8 +12,9 @@ class VCSShortHandle {
 public:
   VCSShortHandle(vpiHandle handle) {
     this->handle = handle;
-    if ((vpi_get(vpiSize, handle) >> 5) > 1) {
-      std::cerr << "value is too big, quitting";
+    int size = vpi_get(vpiSize, handle);
+    if ((size >> 5) > 1) {
+      std::cerr << "value is too big, quitting " << size << std::endl;
       exit(1);
     }
   }

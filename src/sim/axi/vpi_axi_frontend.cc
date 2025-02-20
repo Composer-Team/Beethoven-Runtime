@@ -18,7 +18,7 @@
 #include <vector>
 
 std::vector<vpiHandle> inputs, outputs;
-AXIControlIntf<VCSShortHandle, VCSShortHandle, VCSShortHandle> ctrl;
+AXIControlIntf<VCSShortHandle, VCSLongHandle, VCSShortHandle> ctrl;
 uint64_t memory_transacted = 0;
 #if NUM_DDR_CHANNELS >= 1
 extern int writes_emitted;
@@ -148,14 +148,14 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
                        VCSShortHandle(getHandle("M00_AXI_arid")),
                        VCSShortHandle(getHandle("M00_AXI_arsize")),
                        VCSShortHandle(getHandle("M00_AXI_arburst")),
-                       VCSShortHandle(getHandle("M00_AXI_araddr")),
+                       VCSLongHandle(getHandle("M00_AXI_araddr")),
                        VCSShortHandle(getHandle("M00_AXI_arlen")));
   axi4_mems[0].aw.init(VCSShortHandle(getHandle("M00_AXI_awready")),
                        VCSShortHandle(getHandle("M00_AXI_awvalid")),
                        VCSShortHandle(getHandle("M00_AXI_awid")),
                        VCSShortHandle(getHandle("M00_AXI_awsize")),
                        VCSShortHandle(getHandle("M00_AXI_awburst")),
-                       VCSShortHandle(getHandle("M00_AXI_awaddr")),
+                       VCSLongHandle(getHandle("M00_AXI_awaddr")),
                        VCSShortHandle(getHandle("M00_AXI_awlen")));
   VCSShortHandle dummy;
   axi4_mems[0].w.init(VCSShortHandle(getHandle("M00_AXI_wready")),
@@ -184,14 +184,14 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
               VCSShortHandle(getHandle("dma_arid")),
               VCSShortHandle(getHandle("dma_arsize")),
               VCSShortHandle(getHandle("dma_arburst")),
-              VCSShortHandle(getHandle("dma_araddr")),
+              VCSLongHandle(getHandle("dma_araddr")),
               VCSShortHandle(getHandle("dma_arlen")));
   dma.aw.init(VCSShortHandle(getHandle("dma_awready")),
               VCSShortHandle(getHandle("dma_awvalid")),
               VCSShortHandle(getHandle("dma_awid")),
               VCSShortHandle(getHandle("dma_awsize")),
               VCSShortHandle(getHandle("dma_awburst")),
-              VCSShortHandle(getHandle("dma_awaddr")),
+              VCSLongHandle(getHandle("dma_awaddr")),
               VCSShortHandle(getHandle("dma_awlen")));
   dma.w.init(VCSShortHandle(getHandle("dma_wready")),
              VCSShortHandle(getHandle("dma_wvalid")),
@@ -246,11 +246,11 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
   ctrl.set_ar(
           VCSShortHandle(getHandle("S00_AXI_arvalid")),
           VCSShortHandle(getHandle("S00_AXI_arready")),
-          VCSShortHandle(getHandle("S00_AXI_araddr")));
+          VCSLongHandle(getHandle("S00_AXI_araddr")));
   ctrl.set_aw(
           VCSShortHandle(getHandle("S00_AXI_awvalid")),
           VCSShortHandle(getHandle("S00_AXI_awready")),
-          VCSShortHandle(getHandle("S00_AXI_awaddr")));
+          VCSLongHandle(getHandle("S00_AXI_awaddr")));
   ctrl.set_w(
           VCSShortHandle(getHandle("S00_AXI_wvalid")),
           VCSShortHandle(getHandle("S00_AXI_wready")),

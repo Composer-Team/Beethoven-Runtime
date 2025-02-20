@@ -189,7 +189,7 @@ using mem_intf_t = mem_ctrl::mem_interface<
 typedef mem_ctrl::mem_interface<VCSShortHandle,
         VCSShortHandle,
         VCSShortHandle,
-        VCSShortHandle,
+        VCSLongHandle,
         VCSShortHandle,
         VCSLongHandle,
         VCSShortHandle,
