@@ -2,6 +2,7 @@
 // Created by Chris Kjellqvist on 12/2/22.
 //
 
+#include "fpga_utils.h"
 #include "mmio.h"
 #include <iostream>
 
@@ -13,10 +14,6 @@
 int devmem_fd;
 volatile char *devmem_map;
 
-#endif
-
-#if AWS
-#include <fpga_utils.h>
 #endif
 
 void setup_mmio() {
