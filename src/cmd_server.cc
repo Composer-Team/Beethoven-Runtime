@@ -25,7 +25,6 @@
 #include <cmath>
 #include <fcntl.h>
 #ifdef USE_VCS
-// #include <sv_vpi_user.h>
 #include "vcs_vpi_user.h"
 #endif
 
