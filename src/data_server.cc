@@ -70,7 +70,7 @@ data_server_file *dsf;
 [[noreturn]] static void *data_server_f(void *) {
   int fd_beethoven = shm_open(data_server_file_name().c_str(), O_CREAT | O_RDWR, file_access_flags);
   if (fd_beethoven < 0) {
-    std::cerr << "Failed to open data_server file" << std::endl;
+    std::cerr << "Failed to open data_server file: '" << data_server_file_name << "'" << std::endl;
     throw std::exception();
   }
 

@@ -60,7 +60,7 @@ static void *cmd_server_f(void *) {
   // map in the shared file
   int fd_beethoven = shm_open(cmd_server_file_name().c_str(), O_CREAT | O_RDWR, file_access_flags);
   if (fd_beethoven < 0) {
-    printf("Failed to initialize cmd_file\n%s\n", strerror(errno));
+    printf("Failed to initialize cmd_file '%s'\n%s\n", cmd_server_file_name().c_str(), strerror(errno));
     exit(errno);
   } else {
     LOG(printf("Successfully intialized cmd_file at %s\n", cmd_server_file_name().c_str()));
