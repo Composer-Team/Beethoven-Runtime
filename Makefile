@@ -8,7 +8,19 @@ CXX_FLAGS = --std=c++17 -fPIC \
 			-IDRAMsim3/ext/headers/
 PWD = $(shell pwd)
 DRAMSIM3DIR = $(PWD)/DRAMsim3
-LD_FLAGS = -shared -lbeethoven -L/usr/local/lib/ivl/ -LDRAMsim3 -ldramsim3 -undefined suppress -rpath /usr/local/lib -rpath $(DRAMSIM3DIR)
+
+UNAME_S:=$(shell uname -s)
+LD_FLAGS = -shared -lbeethoven -L/usr/local/lib/ivl/ -LDRAMsim3 -ldramsim3 
+
+ifeq ($(UNAME_S),Linux)
+	DRAMSIM3LIB = DRAMsim3/libdramsim3.so
+endif
+
+ifeq ($(UNAME_S),Darwin)
+	DRAMSIM3LIB = DRAMsim3/libdramsim3.dylib
+	LD_FLAGS += -rpath /usr/local/lib -rpath $(DRAMSIM3DIR) -undefined suppress
+endif
+
 
 # DEBUG FLAGS
 CXX_FLAGS += -O0 -g3
@@ -24,7 +36,7 @@ VERILOG_SRCS = $(shell cat ${BEETHOVEN_PATH}/build/vcs_srcs.in) ${BEETHOVEN_PATH
 # vpi
 CXX_FLAGS += -DSIM=vcs
 
-DRAMsim3/libdramsim3.dylib:
+$(DRAMSIM3LIB):
 	cd DRAMsim3/ && mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j8
 
 SRCS = 	src/data_server.o \
@@ -41,7 +53,7 @@ lib_beethoven.o: ${BEETHOVEN_PATH}/build/beethoven_hardware.cc ${BEETHOVEN_PATH}
 src/%.o: src/%.cc
 	c++ -c ${CXX_FLAGS} -o$@ $^
 
-sim_BeethovenRuntime.vpi: $(SRCS) lib_beethoven.o DRAMsim3/libdramsim3.dylib
+sim_BeethovenRuntime.vpi: $(SRCS) lib_beethoven.o $(DRAMSIM3LIB)
 	c++ $(LD_FLAGS) -o$@ $^
 	#c++ -shared -lbeethoven -L/usr/local/lib/ivl/ -osim_BeethovenRuntime.vpi src/data_server.o src/cmd_server.o
 
@@ -51,8 +63,8 @@ beethoven.vvp:
 
 .PHONY: sim_icarus
 sim_icarus: sim_BeethovenRuntime.vpi beethoven.vvp
-	vvp -M. -msim_BeethovenRuntime beethoven.vvp -lDRAMsim3/libdramsim3.dylib
+	vvp -M. -msim_BeethovenRuntime beethoven.vvp -l$(DRAMSIM3LIB)
 
 .PHONY: clean
 clean:
-	rm -f $(SRCS) beethoven.vvp DRAMsim3/libdramsim3.dylib sim_BeethovenRuntime.vpi
+	rm -f $(SRCS) beethoven.vvp $(DRAMSIM3LIB) sim_BeethovenRuntime.vpi
