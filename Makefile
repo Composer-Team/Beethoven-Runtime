@@ -14,11 +14,13 @@ LD_FLAGS = -shared -lbeethoven -L/usr/local/lib/ivl/ -LDRAMsim3 -ldramsim3
 
 ifeq ($(UNAME_S),Linux)
 	DRAMSIM3LIB = DRAMsim3/libdramsim3.so
+	LIB_EXPORT = export LD_LIBRARY_PATH=/usr/local/lib64:DRAMsim3/
 endif
 
 ifeq ($(UNAME_S),Darwin)
 	DRAMSIM3LIB = DRAMsim3/libdramsim3.dylib
 	LD_FLAGS += -rpath /usr/local/lib -rpath $(DRAMSIM3DIR) -undefined suppress
+	LIB_EXPORT=""
 endif
 
 
@@ -55,15 +57,13 @@ src/%.o: src/%.cc
 
 sim_BeethovenRuntime.vpi: $(SRCS) lib_beethoven.o $(DRAMSIM3LIB)
 	c++ $(LD_FLAGS) -o$@ $^
-	#c++ -shared -lbeethoven -L/usr/local/lib/ivl/ -osim_BeethovenRuntime.vpi src/data_server.o src/cmd_server.o
-
 
 beethoven.vvp:
 	iverilog $(VERILOG_FLAGS) -s BeethovenTopVCSHarness -o$@ $(VERILOG_SRCS)
 
 .PHONY: sim_icarus
 sim_icarus: sim_BeethovenRuntime.vpi beethoven.vvp
-	vvp -M. -msim_BeethovenRuntime beethoven.vvp -l$(DRAMSIM3LIB)
+	export LD_LIBRARY_PATH=$(LIB_EXPORT):$(LD_LIBRARY_PATH);vvp -M. -msim_BeethovenRuntime beethoven.vvp
 
 .PHONY: clean
 clean:
