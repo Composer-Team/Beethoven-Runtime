@@ -30,7 +30,7 @@ extern pthread_mutex_t main_lock;
 #if AWS || defined(Kria)
 extern pthread_mutex_t bus_lock;
 #endif
-#ifdef AWS
+#if AWS
 #if defined(VSIM)
 #include "fpga_pci_sv.h"
 #else
