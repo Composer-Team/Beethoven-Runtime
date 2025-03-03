@@ -46,8 +46,8 @@ sim_BeethovenRuntime.vpi: $(SRCS) lib_beethoven.o DRAMsim3/libdramsim3.dylib
 	#c++ -shared -lbeethoven -L/usr/local/lib/ivl/ -osim_BeethovenRuntime.vpi src/data_server.o src/cmd_server.o
 
 
-beethoven.vvp: $(VERILOG_SRCS)
-	iverilog $(VERILOG_FLAGS) -s BeethovenTopVCSHarness -o$@ $^
+beethoven.vvp:
+	iverilog $(VERILOG_FLAGS) -s BeethovenTopVCSHarness -o$@ $(VERILOG_SRCS)
 
 .PHONY: sim_icarus
 sim_icarus: sim_BeethovenRuntime.vpi beethoven.vvp
