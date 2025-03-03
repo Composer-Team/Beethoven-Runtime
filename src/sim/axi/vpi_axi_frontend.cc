@@ -29,10 +29,15 @@ pthread_mutex_t main_lock = PTHREAD_MUTEX_INITIALIZER;
 float ddr_clock_inc;
 auto fpga_clock_inc = 500000 / DEFAULT_PL_CLOCK;
 bool kill_sig;
-extern "C" PLI_INT32 init_input_signals_calltf(PLI_BYTE8 *user_data);
-extern "C" PLI_INT32 init_output_signals_calltf(PLI_BYTE8 *user_data);
-extern "C" PLI_INT32 init_structures_calltf(PLI_BYTE8 *user_data);
-extern "C" PLI_INT32 tick_calltf(PLI_BYTE8 *user_data);
+
+extern "C" {
+PLI_INT32 init_input_signals_calltf(PLI_BYTE8 *user_data);
+
+PLI_INT32 init_output_signals_calltf(PLI_BYTE8 *user_data);
+
+PLI_INT32 init_structures_calltf(PLI_BYTE8 *user_data);
+
+PLI_INT32 tick_calltf(PLI_BYTE8 *user_data);
 
 void print_state(uint64_t mem, uint64_t time) {
   return;
@@ -76,14 +81,14 @@ void print_state(uint64_t mem, uint64_t time) {
   }
 
   std::cout << "\rTime: " << time_string << " | Memory: " << mem_norm << mem_unit << " | Rate: " << mem_rate << " | w("
-            << writes_emitted << ") r(" << reads_emitted << ")";
+      << writes_emitted << ") r(" << reads_emitted << ")";
 #else
   std::cout << "\rTime: " << time_string;
 #endif
 }
 
 PLI_INT32 init_input_signals_calltf(PLI_BYTE8 * /*user_data*/) {
-	std::cout << "init inputs" << std::endl;
+  std::cout << "init inputs" << std::endl;
   vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, nullptr);
   vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
   // Cache Inputs
@@ -96,7 +101,7 @@ PLI_INT32 init_input_signals_calltf(PLI_BYTE8 * /*user_data*/) {
 }
 
 PLI_INT32 init_output_signals_calltf(PLI_BYTE8 * /*user_data*/) {
-	std::cout << "init outputs" << std::endl;
+  std::cout << "init outputs" << std::endl;
   vpiHandle syscall_handle = vpi_handle(vpiSysTfCall, nullptr);
   vpiHandle arg_iter = vpi_iterate(vpiArgument, syscall_handle);
   // Cache Inputs
@@ -116,7 +121,7 @@ vpiHandle getHandle(const std::string &name) {
       return arg;
     }
   }
-  
+
   for (const auto &arg: outputs) {
     // get the name of each signal and return the handle to it if the argument matches
     auto nm = vpi_get_str(vpiName, arg);
@@ -211,7 +216,7 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
 #endif
 
   // initialize the unused fields (e.g., ID)
-  
+
   auto aw_id_handle = getHandle("S00_AXI_awid");
   auto ar_id_handle = getHandle("S00_AXI_arid");
   s_vpi_value value;
@@ -244,24 +249,24 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
   vpi_put_value(getHandle("S00_AXI_wstrb"), &value, nullptr, vpiNoDelay);
 
   ctrl.set_ar(
-          VCSShortHandle(getHandle("S00_AXI_arvalid")),
-          VCSShortHandle(getHandle("S00_AXI_arready")),
-          VCSLongHandle(getHandle("S00_AXI_araddr")));
+    VCSShortHandle(getHandle("S00_AXI_arvalid")),
+    VCSShortHandle(getHandle("S00_AXI_arready")),
+    VCSLongHandle(getHandle("S00_AXI_araddr")));
   ctrl.set_aw(
-          VCSShortHandle(getHandle("S00_AXI_awvalid")),
-          VCSShortHandle(getHandle("S00_AXI_awready")),
-          VCSLongHandle(getHandle("S00_AXI_awaddr")));
+    VCSShortHandle(getHandle("S00_AXI_awvalid")),
+    VCSShortHandle(getHandle("S00_AXI_awready")),
+    VCSLongHandle(getHandle("S00_AXI_awaddr")));
   ctrl.set_w(
-          VCSShortHandle(getHandle("S00_AXI_wvalid")),
-          VCSShortHandle(getHandle("S00_AXI_wready")),
-          VCSShortHandle(getHandle("S00_AXI_wdata")));
+    VCSShortHandle(getHandle("S00_AXI_wvalid")),
+    VCSShortHandle(getHandle("S00_AXI_wready")),
+    VCSShortHandle(getHandle("S00_AXI_wdata")));
   ctrl.set_r(
-          VCSShortHandle(getHandle("S00_AXI_rready")),
-          VCSShortHandle(getHandle("S00_AXI_rvalid")),
-          VCSShortHandle(getHandle("S00_AXI_rdata")));
+    VCSShortHandle(getHandle("S00_AXI_rready")),
+    VCSShortHandle(getHandle("S00_AXI_rvalid")),
+    VCSShortHandle(getHandle("S00_AXI_rdata")));
   ctrl.set_b(
-          VCSShortHandle(getHandle("S00_AXI_bready")),
-          VCSShortHandle(getHandle("S00_AXI_bvalid")));
+    VCSShortHandle(getHandle("S00_AXI_bready")),
+    VCSShortHandle(getHandle("S00_AXI_bvalid")));
 
 
   std::cout << "start servers" << std::endl;
@@ -269,76 +274,75 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
   cmd_server::start();
   data_server::start();
 
-  std:: cout << "finished init structures" << std::endl;
+  std::cout << "finished init structures" << std::endl;
   return 0;
 }
 
 PLI_INT32 tick_calltf(PLI_BYTE8 * /*user_data*/) {
-  main_time+= fpga_clock_inc;;
+  main_time += fpga_clock_inc;;
   if (main_time % 10000 == 0) {
-     print_state(memory_transacted, main_time);
+    print_state(memory_transacted, main_time);
   }
   if (main_time > 100000) {
-     tick_signals(&ctrl);
+    tick_signals(&ctrl);
   }
   return 0;
 }
 
 
-void tick_register(void)
-{
+void tick_register(void) {
   s_vpi_systf_data tf_data;
 
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = "$tick";
-  tf_data.calltf    = tick_calltf;
+  tf_data.type = vpiSysTask;
+  tf_data.tfname = "$tick";
+  tf_data.calltf = tick_calltf;
   tf_data.compiletf = 0;
-  tf_data.sizetf    = 0;
+  tf_data.sizetf = 0;
   tf_data.user_data = 0;
   vpi_register_systf(&tf_data);
 }
 
-void init_input_signals_register(void)
-{
+void init_input_signals_register(void) {
   s_vpi_systf_data tf_data;
 
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = "$init_input_signals";
-  tf_data.calltf    = init_input_signals_calltf;
+  tf_data.type = vpiSysTask;
+  tf_data.tfname = "$init_input_signals";
+  tf_data.calltf = init_input_signals_calltf;
   tf_data.compiletf = 0;
-  tf_data.sizetf    = 0;
+  tf_data.sizetf = 0;
   tf_data.user_data = 0;
   vpi_register_systf(&tf_data);
 }
-void init_output_signals_register(void)
-{
+
+void init_output_signals_register(void) {
   s_vpi_systf_data tf_data;
 
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = "$init_output_signals";
-  tf_data.calltf    = init_output_signals_calltf;
+  tf_data.type = vpiSysTask;
+  tf_data.tfname = "$init_output_signals";
+  tf_data.calltf = init_output_signals_calltf;
   tf_data.compiletf = 0;
-  tf_data.sizetf    = 0;
+  tf_data.sizetf = 0;
   tf_data.user_data = 0;
   vpi_register_systf(&tf_data);
 }
-void init_structures_register(void)
-{
+
+void init_structures_register(void) {
   s_vpi_systf_data tf_data;
 
-  tf_data.type      = vpiSysTask;
-  tf_data.tfname    = "$init_structures";
-  tf_data.calltf    = init_structures_calltf;
+  tf_data.type = vpiSysTask;
+  tf_data.tfname = "$init_structures";
+  tf_data.calltf = init_structures_calltf;
   tf_data.compiletf = 0;
-  tf_data.sizetf    = 0;
+  tf_data.sizetf = 0;
   tf_data.user_data = 0;
   vpi_register_systf(&tf_data);
 }
 
 void (*vlog_startup_routines[])(void) = {
-    tick_register,
-    init_input_signals_register,
-    init_output_signals_register,
-    init_structures_register,
+  tick_register,
+  init_input_signals_register,
+  init_output_signals_register,
+  init_structures_register,
   0
 };
+} // end extern C
