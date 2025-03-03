@@ -91,7 +91,7 @@ public:
         uint32_t payload = value.value.vector[idx].aval;
         uint32_t mask = 0xFF << (off*8);
         ret.get()[i] = (payload & mask) >> (off*8);
-        printf("[%d]: PAYLOAD: %08x\tMASK: %08x\tresult: %02x\n", i, payload, mask, ret.get()[i]);
+        // printf("[%d]: PAYLOAD: %08x\tMASK: %08x\tresult: %02x\n", i, payload, mask, ret.get()[i]);
       }
     }
     return ret;
