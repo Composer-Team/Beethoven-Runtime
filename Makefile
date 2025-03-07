@@ -58,6 +58,7 @@ src/%.o: src/%.cc
 sim_BeethovenRuntime.vpi: $(SRCS) lib_beethoven.o $(DRAMSIM3LIB)
 	c++ $(LD_FLAGS) -o$@ $^
 
+.PHONY: beethoven.vvp
 beethoven.vvp:
 	iverilog $(VERILOG_FLAGS) -s BeethovenTopVCSHarness -o$@ $(VERILOG_SRCS)
 
