@@ -195,6 +195,11 @@ void register_reponse(uint32_t *r_buffer) {
   if (it == in_flight.end()) {
     std::cerr << "Error: Got bad response from HW: " << r_buffer[0] << " " << r_buffer[1] << " " << r_buffer[2]
               << std::endl;
+#ifdef USE_VCS
+#ifdef SIM
+      vpi_control(vpiFinish);
+#endif
+#endif
     pthread_mutex_unlock(&cmdserverlock);
     pthread_mutex_unlock(&main_lock);
   } else {
