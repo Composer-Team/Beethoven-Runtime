@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5.0)
 project(BeethovenRuntime)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
 find_package(beethoven REQUIRED)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -42,8 +42,7 @@ if ("${TARGET}" STREQUAL "sim")
             message("BUILDING FOR VCS")
 	    option(VCS_INCLUDE_DIR "")
             if (NOT "${VCS_INCLUDE_DIR}" STREQUAL "")
-              include_directories(${VCS_INCLUDE_DIR})
-            endif
+            endif()
             set(SRC ${SRC} src/sim/axi/vpi_axi_frontend.cc)
             add_compile_definitions(USE_VCS=1)
         endif ()
@@ -90,9 +89,6 @@ if ("${TARGET}" STREQUAL "sim")
         install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/scripts/tab.tab
                 DESTINATION $ENV{BEETHOVEN_PATH}/inc/)
         add_library(BeethovenRuntime SHARED ${SRC})
-        if ("${SIMULATOR}" STREQUAL "icarus")
-            set_target_properties(BeethovenRuntime PROPERTIES SUFFIX ".vpi")
-        endif ()
 
         add_compile_definitions(VCS=1)
         target_include_directories(BeethovenRuntime PUBLIC $ENV{VCS_HOME}/include)
@@ -187,23 +183,7 @@ if (${BUILD_SIM})
                 -Wno-context -Wno-lint -Wno-style -Wno-symrsvdword -Wno-multidriven -Wno-combdly
                 -Wno-moddup -Wno-unoptflat -Wno-stmtdly
         )
-    elseif ("${SIMULATOR}" STREQUAL "vcs" OR "${SIMULATOR}" STREQUAL "icarus")
-        if ("${SIMULATOR}" STREQUAL "icarus")
-#            target_sources(BeethovenRuntime PUBLIC /)
-#            target_link_libraries(BeethovenRuntime PRIVATE vpi)
-            target_include_directories(BeethovenRuntime PUBLIC /usr/local/include/iverilog)
-            set(CMAKE_CXX_FLAGS "-flat_namespace -undefined suppress")
-#            set(CMAKE_CXX_LINK_EXECUTABLE iverilog-vpi)
-#            set(CMAKE_CXX_COMPILER_LINKER iverilog-vpi)
-#            add_link_options("-fuse-ld=lld")
-#            set(CMAKE_CXX_FLAGS -fuse-ld=iverilog-vpi)
-        endif ()
-        add_custom_target(BeethovenTop
-                ALL
-                DEPENDS BeethovenRuntime
-                COMMAND iverilog -m${CMAKE_CURRENT_BINARY_DIR}/libBeethovenRuntime.vpi -D CLOCK_PERIOD=500 ${SRCS} $ENV{BEETHOVEN_PATH}/build/hw/BeethovenTopVCSHarness.v
-        )
-    endif ()
+      endif()
 endif ()
 
 add_executable(brt-kill src/kill.cc)
