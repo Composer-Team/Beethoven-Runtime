@@ -18,7 +18,7 @@
 #include <vector>
 
 std::vector<vpiHandle> inputs, outputs;
-AXIControlIntf<VCSShortHandle, VCSLongHandle, VCSShortHandle> ctrl;
+AXIControlIntf<VCSShortHandle, VCSLongHandle, VCSLongHandle> ctrl;
 uint64_t memory_transacted = 0;
 #if NUM_DDR_CHANNELS >= 1
 extern int writes_emitted;
@@ -138,14 +138,20 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
   // at this point, we have all the inputs and outputs, and we have to tie them into the interfaces
 #if NUM_DDR_CHANNELS >= 1
 #ifdef DRAMSIM_CONFIG
+  std::cout << "trying to init from '" DRAMSIM_CONFIG "'" << std::endl;
   mem_ctrl::init( DRAMSIM_CONFIG );
 #else
+  std::cout << "trying to init from default" << std::endl;
   mem_ctrl::init("custom_dram_configs/DDR4_8Gb_x16_3200.ini");
 #endif
+
+  std::cout << "DRAMsim init'd" << std::endl;
 
   for (auto &axi4_mem: axi4_mems) {
     axi4_mem.init_dramsim3();
   }
+
+  std::cout << "Mem structures init'd" << std::endl;
 
   ddr_clock_inc = (1000.0 / dramsim3config->tCK) / DEFAULT_PL_CLOCK;
   axi4_mems[0].ar.init(VCSShortHandle(getHandle("M00_AXI_arready")),
@@ -259,11 +265,11 @@ PLI_INT32 init_structures_calltf(PLI_BYTE8 *) {
   ctrl.set_w(
     VCSShortHandle(getHandle("S00_AXI_wvalid")),
     VCSShortHandle(getHandle("S00_AXI_wready")),
-    VCSShortHandle(getHandle("S00_AXI_wdata")));
+    VCSLongHandle(getHandle("S00_AXI_wdata")));
   ctrl.set_r(
     VCSShortHandle(getHandle("S00_AXI_rready")),
     VCSShortHandle(getHandle("S00_AXI_rvalid")),
-    VCSShortHandle(getHandle("S00_AXI_rdata")));
+    VCSLongHandle(getHandle("S00_AXI_rdata")));
   ctrl.set_b(
     VCSShortHandle(getHandle("S00_AXI_bready")),
     VCSShortHandle(getHandle("S00_AXI_bvalid")));

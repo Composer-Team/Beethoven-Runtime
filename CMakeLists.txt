@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.5.0)
 project(BeethovenRuntime)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 11)
 
 find_package(beethoven REQUIRED)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -18,7 +18,7 @@ if (NOT EXISTS ${BEETHOVEN_DIR}/beethoven_hardware.h)
     message(FATAL_ERROR "${BEETHOVEN_DIR}/beethoven_hardware.h does not exist. Try building your project or moving this file into the directory.")
 endif ()
 
-include_directories(include)
+include_directories(${CMAKE_SOURCE_DIR}/include)
 
 if ("${SIMULATOR}" STREQUAL "")
     set(SIMULATOR "verilator")
@@ -40,6 +40,8 @@ if ("${TARGET}" STREQUAL "sim")
             #            add_link_options(-latomic)
         elseif ("${SIMULATOR}" STREQUAL "vcs")
             message("BUILDING FOR VCS")
+	    option(VCS_INCLUDE_DIR "")
+	    include_directories(${VCS_INCLUDE_DIR})
             set(SRC ${SRC} src/sim/axi/vpi_axi_frontend.cc)
             add_compile_definitions(USE_VCS=1)
         endif ()
@@ -132,7 +134,7 @@ set_target_properties(BeethovenRuntime PROPERTIES
         CXX_EXTENSIONS NO
 )
 target_link_libraries(BeethovenRuntime PUBLIC APEX::beethoven)
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -fpermissive -Wno-attributes")
 
 
 set(BEETHOVEN_HWDIR $ENV{BEETHOVEN_PATH}/build/)

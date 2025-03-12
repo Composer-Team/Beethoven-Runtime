@@ -351,7 +351,7 @@ struct AXIControlIntf : public ControlIntf {
         r_ready.set(1);
         if (r_valid.get(0)) {
           ongoing_rsp.progress = 0;
-          if (r_data.get()) {
+          if (r_data.get(0)) {
             LOG(printf("Found valid response on cycle %lu!!!\n", main_time));
             ongoing_rsp.state = RESPT_BITS_ADDR;
           } else {
