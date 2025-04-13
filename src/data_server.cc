@@ -18,7 +18,7 @@
 
 #include "../include/data_server.h"
 
-#ifdef USE_VCS
+#if defined(SIM) && !defined(USE_VERILATOR)
 #include <vpi_user.h>
 #endif
 
@@ -405,10 +405,9 @@ void *address_translator::translate(uint64_t fp_addr) const {
       std::cerr << q.fpga_addr << "\t" << q.mapping_length << std::endl;
     }
 #if defined(SIM) && defined(TRACE)
-
     tfp->close();
 #endif
-#ifndef USE_VERILATOR
+#if defined(SIM) && !defined(USE_VERILATOR)
     vpi_control(vpiFinish);
     return nullptr;
 #else
