@@ -408,7 +408,7 @@ void *address_translator::translate(uint64_t fp_addr) const {
 
     tfp->close();
 #endif
-#ifdef USE_VCS
+#ifndef USE_VERILATOR
     vpi_control(vpiFinish);
     return nullptr;
 #else

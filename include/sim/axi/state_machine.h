@@ -39,7 +39,6 @@ enum cmd_transfer_state {
   CMD_VALID_WRITE_B,
   CMD_RECHECK_READY_ADDR,
   CMD_RECHECK_READY_DAT,
-
 };
 
 enum resp_transfer_state {
